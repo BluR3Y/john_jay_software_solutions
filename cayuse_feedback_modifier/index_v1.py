@@ -6,7 +6,8 @@ import json
 # Load the Excel file
 filepath = r'C:\Users\reyhe\OneDrive\Documents\Assistant_Role\data\Cayuse_Feedback_Modifications_7_25_2024\Legacy Data Template John Jay College - Cayuse Review 07.15.24.xlsx'
 sheet = 'Members - Template'
-df = pd.read_excel(filepath, sheet_name=sheet)
+df = pd.read_excel(filepath, sheet_name=None)
+df = df[sheet]
 logger = {
     'filename': os.path.basename(filepath),
     'sheet': sheet,
@@ -118,4 +119,4 @@ def save_excel_changes(filepath, as_copy = False):
         json.dump(logger, json_file)
 
 modify_entries()
-save_excel_changes(filepath, True)
+save_excel_changes(filepath, True) # Save as a copy

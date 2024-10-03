@@ -1,15 +1,16 @@
 from dotenv import load_dotenv
+# Load environment variables from .env file
+load_dotenv("../env/.env.development")
+
 import pandas as pd
 import pyodbc
 import os
 import json
 
-import db_config
+import configs.db_config as db_config
+import configs.openai_config as openai_config
 import sheets.members as members
 import sheets.attachments as attachments
-
-# Load environment variables from .env file
-load_dotenv("../env/.env.development")
 
 class FeedBackModifier:
     
@@ -61,4 +62,4 @@ if __name__ == "__main__":
 
 
     # Save document changes
-    # my_instance.save_excel_changes()
+    my_instance.save_excel_changes()

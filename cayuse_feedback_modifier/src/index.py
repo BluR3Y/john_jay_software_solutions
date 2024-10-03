@@ -6,7 +6,7 @@ import json
 
 import db_config
 import sheets.members as members
-
+import sheets.attachments as attachments
 
 # Load environment variables from .env file
 load_dotenv("../env/.env.development")
@@ -48,11 +48,17 @@ class FeedBackModifier:
         
 FeedBackModifier.execute_query = db_config.execute_query
 FeedBackModifier.modify_username = members.modify_entries
+FeedBackModifier.verify_entries = attachments.verify_entries
 
 # Testing the Modifier class:
 if __name__ == "__main__":
     # Create a new class instance
     my_instance = FeedBackModifier()
-    my_instance.modify_username()
 
-    my_instance.save_excel_changes()
+
+    # my_instance.modify_username()
+    my_instance.verify_entries()
+
+
+    # Save document changes
+    # my_instance.save_excel_changes()

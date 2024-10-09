@@ -49,6 +49,8 @@ def verify_entries(self):
         
         # If the path represents an existing file:
         if os.path.isfile(attachment_path):
+            # Experimental Condition
+            continue
             try:
                 file_content = extract_file_content(attachment_path)
                 file_classification = classify_document(file_content)
@@ -56,6 +58,8 @@ def verify_entries(self):
                     sheet_logger[f"{row['legacyNumber']}:attachmentType"] = f"File is detected to have the wrong attachment type. It's ideal type is '{file_classification}'"
             except Exception as err:
                 sheet_logger[f"{row['legacyNumber']}:fileExtension"] = err
+        else:
+            sheet_logger[f"{row['legacyNumber']}:fileExistance"] = f"File does not exist in directory"
 
 
     # If no prior logs have been created for the current sheet, initialize the property in the logger's modifications for that sheet

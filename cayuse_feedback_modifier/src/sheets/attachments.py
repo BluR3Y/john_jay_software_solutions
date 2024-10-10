@@ -111,3 +111,34 @@ def classify_document(document_content):
         ]
     )
     return completion.choices[0].message.content
+
+# Function to account for projects that don't have attachments
+def missing_project_attachments(self):
+    award_sheet_name = 'Award - Template'
+    award_sheet_content = self.df[award_sheet_name]
+    attachment_sheet_content = self.df[SHEET_NAME]
+
+    project_attachments = dict()
+    for legacyNum in award_sheet_content['projectLegacyNumber']:
+        project_attachments[legacyNum] = 0
+    
+    for legacyNum in attachment_sheet_content['projectLegacyNumber']:
+        project_attachments[legacyNum] += 1
+
+    sheet_logger = {
+        'no_attachments': [],
+        'less_than_three_attachments': []
+    }
+
+    for key, value in project_attachments.items():
+        if (value == 0):
+            sheet_logger['no_attachments'].append(key)
+        elif (value < 3):
+            sheet_logger['less_than_three_attachments'].append(key)
+        
+    # If no prior logs have been created for the current sheet, initialize the property in the logger's modifications for that sheet
+    if SHEET_NAME not in self.logger['modifications']:
+        self.logger['modifications'][SHEET_NAME] = sheet_logger
+    # Else, add the properties of the sheet to the class logger
+    else:
+        self.logger['modifications'][SHEET_NAME].update(sheet_logger)

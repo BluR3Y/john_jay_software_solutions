@@ -46,6 +46,7 @@ class FeedBackModifier:
 FeedBackModifier.execute_query = db_config.execute_query
 FeedBackModifier.modify_username = members.modify_entries
 FeedBackModifier.verify_entries = attachments.verify_entries
+FeedBackModifier.get_missing_project_attachments = attachments.missing_project_attachments
 
 # Testing the Modifier class:
 if __name__ == "__main__":

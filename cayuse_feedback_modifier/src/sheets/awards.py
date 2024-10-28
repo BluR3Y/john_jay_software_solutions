@@ -17,47 +17,55 @@ def populate_db_discipline(self):
     )
     sheet_logger = dict()
 
-    project_disciplines = dict()
-    # Loop through every row in the table
+    discipline_query = "SELECT Name FROM LU_Discipline;"
+    result = self.execute_query(discipline_query)
+    project_disciplines = { discipline["Name"]: {
+        "primary_keys": []
+    } for discipline in result}
+
+    # Loop through every record in the table
     for index, row in file_content.iterrows():
         primary, secondary, tertiary = re.split(r'[-\s]+', row['Prsy'])
         rf_id = primary+secondary
 
-        if rf_id in project_disciplines and project_disciplines[rf_id]["discipline"] is not None:
-            project_disciplines[rf_id]["secondary_keys"].append(tertiary)
+        discipline = row.get("Discipline", None)
+        # Checks if the 'Discipline' value is missing
+        if not pd.isna(discipline):
+            # Regex expression checks if discipline has an abbreviation
+            regex_match = re.search(r'-\s*(.+)', discipline)
+            # If so, the discipline is extracted from the string
+            if regex_match:
+                discipline = regex_match.group(1)
         else:
-            discipline = row.get("Discipline", None)
-            # Checks if the 'Discipline' value is missing
-            if not pd.isna(discipline):
-                # Regex expression checks if discipline has an abbreviation
-                regex_match = re.search(r'-\s*(.+)', discipline)
-                # If so, the discipline is extracted from the string
-                if regex_match:
-                    discipline = regex_match.group(1)
-            else:
-                discipline = None
-                sheet_logger[f"{primary}-{secondary}-{tertiary}"] = "Project is missing 'Discipline' value"
+            discipline = None
+            sheet_logger[f"{primary}-{secondary}-{tertiary}"] = "Project is missing 'Discipline' value"
+            continue
 
-            project_disciplines[rf_id] = {
-                "secondary_keys": project_disciplines.get(rf_id,{}).get("secondary_keys", []) + [tertiary],
-                "discipline": discipline
-            }
-
-    current_index = 0
-    num_modifications = len(project_disciplines)
-    for key in project_disciplines:
-        current_index += 1
-        query = f"""
-            UPDATE grants
-            SET Discipline = ?
-            WHERE RF_Account = ?;
-        """
-        self.execute_query(query, (project_disciplines[key]["discipline"], key))
-        print(f"Database modifications are {round(current_index/num_modifications)}% complete")
-
-        # If no prior logs have been created for the current sheet, initialize the property in the logger's modifications for that sheet
-        if SHEET_NAME not in self.logger['modifications']:
-            self.logger['modifications'][SHEET_NAME] = sheet_logger
-        # Else, add the properties of the sheet to the class logger
+        correlating_item = None
+        for key in project_disciplines:
+            if key.lower() == discipline.lower():
+                correlating_item = key
+                break
+        if (correlating_item):
+            if rf_id not in project_disciplines[correlating_item]["primary_keys"]:
+                project_disciplines[correlating_item]["primary_keys"].append(rf_id)
         else:
-            self.logger['modifications'][SHEET_NAME].update(sheet_logger)
+            sheet_logger[f"{primary}-{secondary}-{tertiary}"] = f"Project has the value '{discipline}' for it's Discipline field, which is an invalid value"
+
+
+    for index, key in enumerate(project_disciplines):
+        if project_disciplines[key]["primary_keys"]:
+            primary_keys = project_disciplines[key]["primary_keys"]
+            update_query = f"""
+                UPDATE grants
+                SET Discipline = ?
+                WHERE RF_Account IN ({','.join(['?' for _ in primary_keys])})
+            """
+            self.execute_query(update_query, key, *primary_keys)
+        print(f"Database modifications are {round(index/len(project_disciplines) * 100)}% complete")
+
+    self.append_process_logs(SHEET_NAME, {
+        "populate_db_discipline": {
+        "Description": "Process processes data from an excel file which should contain a table with the RF_Account and discipline of awards",
+        "logs": sheet_logger
+    } })

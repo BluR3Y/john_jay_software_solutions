@@ -6,6 +6,7 @@ import pandas as pd
 import os
 import json
 import argparse
+import datetime
 
 import configs.db_config as db_config
 import configs.openai_config as openai_config
@@ -23,7 +24,8 @@ class FeedBackModifier:
 
         self.logger = {
             'filename': os.path.basename(self.filepath),
-            'modifications': dict()
+            'timestamp': str(datetime.date.today()),
+            'sheets': dict()
         }
 
     # Save changes to excel file
@@ -43,6 +45,15 @@ class FeedBackModifier:
                 json.dump(self.logger, json_file)
         except Exception as e:
             print(f"Error saving Excel file: {e}")
+
+    # Adds process logs to the object's logger
+    def append_process_logs(self, sheet, logs):
+        # If no prior logs have been created for the provided sheet, initialize the property in the logger
+        if sheet not in self.logger['sheets']:
+            self.logger['sheets'][sheet] = logs
+        # Else, add the properties of the sheet to the class logger
+        else:
+            self.logger['sheets'][sheet].update(*logs)
         
 FeedBackModifier.execute_query = db_config.execute_query
 FeedBackModifier.modify_username = members.modify_entries

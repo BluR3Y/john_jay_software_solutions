@@ -1,7 +1,7 @@
 import pyodbc
 import os
 
-def execute_query(self, query, parameters):
+def execute_query(self, query, *args):
     connection = None
     try:
         # Open the connection
@@ -12,7 +12,7 @@ def execute_query(self, query, parameters):
         cursor = connection.cursor()
 
         # Execute the query
-        cursor.execute(query, parameters)
+        cursor.execute(query, *args)
         # If the query modifies the database, make sure to commit
         if query.lower().strip().startswith(('insert', 'update', 'delete')):
             connection.commit()

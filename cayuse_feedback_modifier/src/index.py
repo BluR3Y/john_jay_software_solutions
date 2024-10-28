@@ -11,6 +11,7 @@ import configs.db_config as db_config
 import configs.openai_config as openai_config
 import sheets.members as members
 import sheets.attachments as attachments
+import sheets.awards as awards
 
 class FeedBackModifier:
     
@@ -48,6 +49,7 @@ FeedBackModifier.modify_username = members.modify_entries
 FeedBackModifier.verify_entries = attachments.verify_entries
 FeedBackModifier.get_missing_project_attachments = attachments.missing_project_attachments
 FeedBackModifier.get_project_info = attachments.retrieve_project_info
+FeedBackModifier.populate_db_award_discipline = awards.populate_db_discipline
 
 # Testing the Modifier class:
 if __name__ == "__main__":

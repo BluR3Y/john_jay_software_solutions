@@ -155,11 +155,12 @@ def missing_project_attachments(self):
         self.logger['modifications'][SHEET_NAME].update(sheet_logger)
 
 # Function to retrieve information related to the project from the database
+
 def retrieve_project_info(self):
     sheet_logger = dict()
     attachment_sheet_content = self.df[SHEET_NAME]
     projects = dict()
-        
+
     for index, project in attachment_sheet_content.iterrows():
         if (projects.get(project['legacyNumber']) is None):
             projects[project['legacyNumber']] = {
@@ -172,18 +173,23 @@ def retrieve_project_info(self):
     for key in projects:
         if (len(bundles[-1]) == bundle_max):
             bundles.append({})
-
         bundles[-1][key] = projects[key]
-
-    sheet_logger['attachment_data'] = dict()
+    
+    populated_projects = dict()
     for bundle in bundles:
         bundle_ids = [key for key, value in bundle.items()]
         query = f"SELECT Primary_PI, RF_Account, Sponsor_1, Sponsor_2, Grant_ID FROM grants WHERE Grant_ID IN ({','.join(['?' for _ in bundle_ids])})"
         db_data = self.execute_query(query, bundle_ids)
-        db_data_dict = {bundle[entry['Grant_ID']]['project_legacy_number']: entry for entry in db_data}
-        
-        sheet_logger['attachment_data'].update(db_data_dict)
-        
+        populated_projects.update({bundle[entry['Grant_ID']]['project_legacy_number']: entry for entry in db_data})
+
+    for index, row in attachment_sheet_content.iterrows():
+        associated_project = populated_projects.get(row['projectLegacyNumber'])
+        if (associated_project):
+            attachment_sheet_content.loc[index, 'PI_Name'] = associated_project['Primary_PI']
+            attachment_sheet_content.loc[index, 'RF_Account'] = associated_project['RF_Account']
+            attachment_sheet_content.loc[index, 'Orig_Sponsor'] = associated_project['Sponsor_2']
+            attachment_sheet_content.loc[index, 'Sponsor'] = associated_project['Sponsor_1']
+
     # If no prior logs have been created for the current sheet, initialize the property in the logger's modifications for that sheet
     if SHEET_NAME not in self.logger['modifications']:
         self.logger['modifications'][SHEET_NAME] = sheet_logger

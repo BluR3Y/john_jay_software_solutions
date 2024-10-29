@@ -1,17 +1,30 @@
+import utils
+import pandas as pd
 
 SHEET_NAME = "Proposal - Template"
 
 def populate_template_department(self):
+    # ------------------------- LU_Department table is polluted with invalid values (Approach is currently unusable) ------------------------------
+    # # Retrieve the departments from the table LU_Department in the database
+    # department_query = "SELECT LU_Department AS Name FROM LU_Department"
+    # department_result = self.execute_query(department_query)
+    # valid_departments = [value['Name'] for value in department_result]
+    # ---------------------------------------------------------------------------------------------------------------------------------------------
+
+    # --------------------------------------- Request file with valid departments (Alternative approach) ------------------------------------------
+    file_path = utils.request_file_path("Enter the path of the file with the valid Departments", ['.xlsx'])
+    # Read the contents of the file
+    file_content = pd.read_excel(file_path)
+    valid_departments = [ dept.split(" - ")[1] for dept in file_content['Name'] ]
+    missing_departments = set()
+    # ---------------------------------------------------------------------------------------------------------------------------------------------
+
+    sheet_logger = dict()
     # Retrieve the content of the proposals sheet
     proposal_sheet_content = self.df[SHEET_NAME]
     # Acquire all the rf_ids from the award sheet in the excel file
     proposal_query_ids = proposal_sheet_content['proposalLegacyNumber'].tolist()
-    sheet_logger = dict()
-
-    # Retrieve the departments from the table LU_Department in the database
-    department_query = "SELECT LU_Department AS Name FROM LU_Department"
-    department_result = self.execute_query(department_query)
-    valid_departments = [value['Name'] for value in department_result]
+    # Modify to pull id in addition to name
 
     last_index = 0
     batch_limit = 40
@@ -44,7 +57,13 @@ def populate_template_department(self):
                         # Assign the 'Department' property of the row with the id the updated value
                         proposal_sheet_content.loc[file_record_index, 'Admin Unit'] = project_departments[id]
                     else:
-                        sheet_logger[f"{id}:department"] = f"The value '{project_departments[id]}' for the department of the record may be invalid."
+                        closest_match = utils.find_closest_match(project_departments[id], valid_departments)
+                        log = f"The value '{project_departments[id]}' for the department of the record may be invalid."
+                        if closest_match:
+                            log += " Did you possibly mean to assign: " + closest_match
+                        else:
+                            missing_departments.add(project_departments[id])
+                        sheet_logger[f"{id}:department"] = log
                 else:
                     sheet_logger[f"{id}:department"] = "The record does not have a value assigned for the department column"
             else:
@@ -55,6 +74,7 @@ def populate_template_department(self):
     self.append_process_logs(SHEET_NAME, {
         "populate_template_department": {
             "description": "Process populates the 'Admin Unit' column of the proposals in the template document with the value the record is assigned in the Microsoft Access database. Additionally, the process also catches various types of issues found in the data from multiple sources such as the template file and the database and logs them.",
-            "logs": sheet_logger
+            "logs": sheet_logger,
+            "missing_departments": list(missing_departments)
         }
     })

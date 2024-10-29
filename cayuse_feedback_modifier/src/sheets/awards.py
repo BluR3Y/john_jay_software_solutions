@@ -36,6 +36,8 @@ def populate_db_discipline(self):
             # If so, the discipline is extracted from the string
             if regex_match:
                 discipline = regex_match.group(1)
+            else:
+                sheet_logger[f"{primary}-{secondary}-{tertiary}"] = "Project is assigned an unusual 'Discipline' value that may become an issue"
         else:
             discipline = None
             sheet_logger[f"{primary}-{secondary}-{tertiary}"] = "Project is missing 'Discipline' value"
@@ -52,6 +54,7 @@ def populate_db_discipline(self):
         else:
             sheet_logger[f"{primary}-{secondary}-{tertiary}"] = f"Project has the value '{discipline}' for it's Discipline field, which is an invalid value"
 
+    #  ** Create a query that checks if a project exists, log project if it does not exist in database
 
     for index, key in enumerate(project_disciplines):
         if project_disciplines[key]["primary_keys"]:
@@ -66,6 +69,57 @@ def populate_db_discipline(self):
 
     self.append_process_logs(SHEET_NAME, {
         "populate_db_discipline": {
-        "Description": "Process processes data from an excel file which should contain a table with the RF_Account and discipline of awards",
+        "description": "Process processes data from an excel file which should contain a table with the RF_Account and discipline of awards",
         "logs": sheet_logger
     } })
+
+def populate_template_discipline(self):
+    award_sheet_content = self.df[SHEET_NAME]
+    # Acquire all the rf_ids from the award sheet in the excel file
+    award_query_ids = award_sheet_content['proposalLegacyNumber'].tolist()
+    sheet_logger = dict()
+    
+    last_index = 0
+    # Loop while index has not reached the length of the list
+    while last_index <= len(award_query_ids):
+        # The new end index will be the previous value plus 40, i.e, the limit of the list that will store the ids
+        new_end = last_index + 40
+        batch_ids = award_query_ids[last_index:new_end]
+        # Assign the value of last_index to be that of new_end
+        last_index = new_end
+        
+        # Retrieve the Grant_ID and Discipline value of the records in the batch_ids list
+        search_query = f"SELECT Grant_ID, Discipline FROM grants WHERE Grant_ID IN ({','.join(['?' for _ in batch_ids])})"
+        search_result = self.execute_query(search_query, batch_ids)
+        project_disciplines = { project['Grant_ID']:project['Discipline'] for project in search_result }
+
+        # Retrieve the disciplines from the table LU_Discipline in the database
+        discipline_query = "SELECT Name FROM LU_Discipline;"
+        discipline_result = self.execute_query(discipline_query)
+        valid_disciplines = [value['Name'] for value in discipline_result]
+
+        # Loop through every rf_id in the batch
+        for id in batch_ids:
+            # Check if the database returned a record with the id
+            if id in project_disciplines:
+                # If the 'Discipline' field for the record in the database is not empty
+                if project_disciplines[id]:
+                    # Validate that the 'Discipline' value for the record in the database is a valid value
+                    if project_disciplines[id] in valid_disciplines:
+                        # Retrieve the index of the row with the id in the template file
+                        file_record_index = award_sheet_content.index[award_sheet_content['proposalLegacyNumber'] == id]
+                        # Assign the 'Discipline' property of the row with the id the updated value
+                        award_sheet_content.loc[file_record_index, 'Discipline'] = project_disciplines[id]
+                    else:
+                        sheet_logger[f"{id}:discipline"] = "The record's 'Discipline' value may be invalid"
+                else:
+                    sheet_logger[f"{id}:discipline"] = "The record does not have a value assigned for the 'Discipline' column"
+            else:
+                sheet_logger[f"{id}:database"] = "RF_Account is not associated with any record in the database."
+
+    self.append_process_logs(SHEET_NAME, {
+        "populate_template_discipline": {
+            "description": "",
+            "logs": sheet_logger
+        }
+    })

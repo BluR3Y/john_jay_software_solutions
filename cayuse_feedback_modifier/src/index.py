@@ -53,7 +53,7 @@ class FeedBackModifier:
             self.logger['sheets'][sheet] = logs
         # Else, add the properties of the sheet to the class logger
         else:
-            self.logger['sheets'][sheet].update(*logs)
+            self.logger['sheets'][sheet].update(logs)
         
 FeedBackModifier.execute_query = db_config.execute_query
 FeedBackModifier.modify_username = members.modify_entries
@@ -61,6 +61,7 @@ FeedBackModifier.verify_entries = attachments.verify_entries
 FeedBackModifier.get_missing_project_attachments = attachments.missing_project_attachments
 FeedBackModifier.get_project_info = attachments.retrieve_project_info
 FeedBackModifier.populate_db_award_discipline = awards.populate_db_discipline
+FeedBackModifier.populate_template_award_discipline = awards.populate_template_discipline
 
 # Testing the Modifier class:
 if __name__ == "__main__":

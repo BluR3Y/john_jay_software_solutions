@@ -74,7 +74,7 @@ def populate_db_discipline(self):
             
             missing_keys = primary_keys - existing_keys
             for key in missing_keys:
-                sheet_logger[f"{key}:database"] = "Record does not exist in the database."
+                sheet_logger[f"{key}:database"] = "No record exists in the database with the RF_Account"
             
         print(f"Process is {round(index/len(project_disciplines) * 100)}% complete")
 

@@ -37,10 +37,10 @@ def populate_db_discipline(self):
             if regex_match:
                 discipline = regex_match.group(1)
             else:
-                sheet_logger[f"{primary}-{secondary}-{tertiary}"] = "Project is assigned an unusual 'Discipline' value that may become an issue"
+                sheet_logger[f"{primary}-{secondary}-{tertiary}"] = "Project is assigned an unusual 'Discipline' value in the imported file."
         else:
             discipline = None
-            sheet_logger[f"{primary}-{secondary}-{tertiary}"] = "Project is missing 'Discipline' value"
+            sheet_logger[f"{primary}-{secondary}-{tertiary}"] = "Project is missing 'Discipline' value in the imported file."
             continue
 
         correlating_item = None
@@ -52,24 +52,35 @@ def populate_db_discipline(self):
             if rf_id not in project_disciplines[correlating_item]["primary_keys"]:
                 project_disciplines[correlating_item]["primary_keys"].append(rf_id)
         else:
-            sheet_logger[f"{primary}-{secondary}-{tertiary}"] = f"Project has the value '{discipline}' for it's Discipline field, which is an invalid value"
-
-    #  ** Create a query that checks if a project exists, log project if it does not exist in database
+            sheet_logger[f"{primary}-{secondary}-{tertiary}"] = f"Project has the value '{discipline}' for it's Discipline field in the imported file, which is an invalid value."
 
     for index, key in enumerate(project_disciplines):
         if project_disciplines[key]["primary_keys"]:
-            primary_keys = project_disciplines[key]["primary_keys"]
-            update_query = f"""
-                UPDATE grants
-                SET Discipline = ?
+            primary_keys = set(project_disciplines[key]["primary_keys"])
+            verify_query = f"""
+                SELECT RF_Account
+                FROM grants
                 WHERE RF_Account IN ({','.join(['?' for _ in primary_keys])})
             """
-            self.execute_query(update_query, key, *primary_keys)
+            verify_result = self.execute_query(verify_query, *primary_keys)
+            existing_keys = set([key['RF_Account'] for key in verify_result])
+            if existing_keys:
+                update_query = f"""
+                    UPDATE grants
+                    SET Discipline = ?
+                    WHERE RF_Account IN ({','.join(['?' for _ in existing_keys])})
+                """
+                self.execute_query(update_query, key, *existing_keys)
+            
+            missing_keys = primary_keys - existing_keys
+            for key in missing_keys:
+                sheet_logger[f"{key}:database"] = "Record does not exist in the database."
+            
         print(f"Database modifications are {round(index/len(project_disciplines) * 100)}% complete")
 
     self.append_process_logs(SHEET_NAME, {
         "populate_db_discipline": {
-        "description": "Process processes data from an excel file which should contain a table with the RF_Account and discipline of awards",
+        "description": "Process processes data from an excel file, which should contain a table with the RF_Account and discipline of the awards, and updates the 'Discipline' field of the records in the Microsoft Access database. Additionally, the process also catches various types of issues found in the data from multiple sources such as the imported file and the database and logs them.",
         "logs": sheet_logger
     } })
 
@@ -119,7 +130,7 @@ def populate_template_discipline(self):
 
     self.append_process_logs(SHEET_NAME, {
         "populate_template_discipline": {
-            "description": "",
+            "description": "Process populates the 'Discipline' column of the awards in the template document with the value the record is assigned in the Microsoft Access database. Additionally, the process also catches various types of issues found in the data from multiple sources such as the template file and the database and logs them.",
             "logs": sheet_logger
         }
     })

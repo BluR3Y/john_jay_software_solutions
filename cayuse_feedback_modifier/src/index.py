@@ -16,6 +16,7 @@ import sheets.members as members
 import sheets.attachments as attachments
 import sheets.awards as awards
 import sheets.proposals as proposals
+import utils
 
 class FeedBackModifier:
     
@@ -94,6 +95,7 @@ FeedBackModifier.populate_template_award_discipline = awards.populate_template_d
 FeedBackModifier.populate_template_proposal_discipline = proposals.populate_template_discipline
 FeedBackModifier.populate_template_award_department = awards.populate_template_department
 FeedBackModifier.populate_template_proposal_department = proposals.populate_template_department
+FeedBackModifier.grant_abondant_record_field_modifier = utils.grant_abondant_record_field_modifier
 
 # Testing the Modifier class:
 if __name__ == "__main__":

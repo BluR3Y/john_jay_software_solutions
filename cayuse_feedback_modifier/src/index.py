@@ -51,8 +51,12 @@ class FeedBackModifier:
                 if sheet_name in workbook.sheetnames:
                     sheet_content = workbook[sheet_name]
                     for cell_position in self.comment_cache[sheet_name]:
-                        cell = sheet_content[cell_position]
-                        cell.comment = openpyxl.comments.Comment(self.comment_cache[sheet_name][cell_position], "Developer")
+                        row, col = cell_position.split(':')
+                        cell = sheet_content.cell(int(row) + 1, int(col) + 1)   # Plus 1 accounts for rows and columns being 1-based index
+                        comment = openpyxl.comments.Comment(self.comment_cache[sheet_name][cell_position], "Developer")
+                        cell.comment = comment
+                        comment.height = 150 # Height in pixels
+                        comment.width = 300 # Width in pixels
                 else:
                     raise Exception(f"The sheet with the name '{sheet_name}' does not exist in the workbook")
             # Save the workbook with comments
@@ -74,11 +78,11 @@ class FeedBackModifier:
             self.logger['sheets'][sheet].update(logs)
 
     # Add cell comments to the object's comment cache
-    def append_cell_comments(self, sheet, cell, comment):
+    def append_cell_comment(self, sheet, row, col, comment):
         if sheet not in self.comment_cache:
-            self.comment_cache[sheet] = { cell: comment }
+            self.comment_cache[sheet] = { f"{row}:{col}": comment }
         else:
-            self.comment_cache[sheet].update({ cell: comment })
+            self.comment_cache[sheet].update({ f"{row}:{col}": comment })
         
 FeedBackModifier.execute_query = db_config.execute_query
 FeedBackModifier.modify_username = members.modify_entries
@@ -113,4 +117,3 @@ if __name__ == "__main__":
                 raise Exception(f"The method {method} does not exist")
         # Save document changes
         my_instance.save_excel_changes()
-

@@ -224,12 +224,17 @@ def populate_template_department(self):
                                 # Assign the 'Admin Unit Primary Code' property of the row with the id the updated value
                                 proposal_sheet_content.loc[document_index, 'Admin Unit Primary Code'] = valid_departments[item_dept]
                             else:
-                                self.append_cell_comment(
-                                    SHEET_NAME,
-                                    document_index + 1,
-                                    proposal_sheet_content.columns.get_loc('Admin Unit'),
-                                    f"The record has the value '{project_departments[id]}' assigned to it's department in the database."
-                                )
+                                if item_dept not in valid_departments:
+                                    proposal_sheet_content.loc[document_index, 'Admin Unit'] = project_departments[id]
+                                    proposal_sheet_content.loc[document_index, 'Admin Unit Primary Code'] = valid_departments[project_departments[id]]
+                                    sheet_logger[f"{id}:department"] = f"The value '{item_dept}' for the department of the record was updated to '{project_departments[id]}'. This is because the previous value was not a valid department."
+                                else:
+                                    self.append_cell_comment(
+                                        SHEET_NAME,
+                                        document_index + 1,
+                                        proposal_sheet_content.columns.get_loc('Admin Unit'),
+                                        f"The record has the value '{project_departments[id]}' assigned to it's department in the database."
+                                    )
                     else:
                         log = f"The record has '{project_departments[id]}' for the department in the database which may be invalid."
                         closest_match = utils.find_closest_match(project_departments[id], [dept for dept in valid_departments])

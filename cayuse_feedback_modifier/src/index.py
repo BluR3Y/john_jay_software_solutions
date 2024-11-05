@@ -1,88 +1,5 @@
-from dotenv import load_dotenv
-# Load environment variables from .env file
-load_dotenv("../env/.env.development")
-
-import pandas as pd
-import os
-import json
 import argparse
-import datetime
-import inspect
-
-import configs.db_config as db_config
-import sheets.attachments as attachments
-import sheets.members as members
-import sheets.awards as awards
-import sheets.proposals as proposals
-from methods import utils
-from methods import logger
-from methods import comment
-
-class FeedBackModifier:
-    # Variable that will store comments before creating them in the excel file
-    comment_cache = dict()
-
-    def __init__(self):
-        # Read Excel file
-        self.df = pd.read_excel(os.getenv('EXCEL_FILE_PATH'), sheet_name=None)
-        # Store the sheet names
-        self.sheets = list(self.df.keys())
-
-        # Variable that will store the path of the json file that will store the logs
-        self.logs_path = os.path.join(os.getenv('SAVE_PATH') or os.path.dirname(self.filepath), 'cayuse_data_migration_logs.json')
-        # If the file exists:
-        if os.path.exists(self.logs_path):
-            # Store the logs in a variable
-            with open(self.logs_path) as json_file:
-                self.logs = json.load(json_file)
-        else:
-            # Initialize an empty dictionary
-            self.logs = dict()
-
-        all_processes = dict()
-        for sheet_methods in [awards, proposals, members, attachments]:
-            if sheet_methods.SHEET_NAME in self.sheets:
-                sheet_processes = dict()
-                for fnName, fn in inspect.getmembers(sheet_methods, inspect.isfunction):
-                    process = fn(self)
-                    sheet_processes[process.name] = process
-                all_processes[sheet_methods.SHEET_NAME] = sheet_processes
-            else:
-                raise Exception(f"The sheet '{sheet_methods.SHEET_NAME}' does not exist in the workbook")
-        self.processes = all_processes
-
-    # Save changes to all related resources
-    def save_changes(self, as_copy = True, index=False):
-        try:
-            excel_file_path = os.getenv('EXCEL_FILE_PATH')
-            file_save_path = os.getenv('SAVE_PATH') if as_copy and os.getenv('SAVE_PATH') else os.path.dirname(excel_file_path)
-            file_name = f"{os.path.splitext(os.path.basename(excel_file_path))[0]}{f" - modified_copy_{datetime.datetime.today().strftime('%m-%d-%Y')}" if as_copy else ''}.xlsx"
-            full_path = os.path.join(file_save_path, file_name)
-
-            # Use ExcelWriter to write multiple sheets back into the Excel file
-            with pd.ExcelWriter(full_path, engine='openpyxl', mode='w') as writer:
-                for sheet_name, df_sheet in self.df.items():
-                    # Leave index as False if you don't want to save the index column from the DataFrame
-                    df_sheet.to_excel(writer, sheet_name=sheet_name, index=index)
-
-            # Create cell comments in excel file
-            self.create_comments(full_path)
-            # Save the changes made to the logger
-            self.save_logs()
-
-        except Exception as e:
-            print(f"Error occured while saving changes: {e}")
-
-# Database related methods
-FeedBackModifier.execute_query = db_config.execute_query
-
-# Logger related methods
-FeedBackModifier.append_logs = logger.append_logs
-FeedBackModifier.save_logs = logger.save_logs
-
-# Comment related methods
-FeedBackModifier.append_comment = comment.append_comment
-FeedBackModifier.create_comments = comment.create_comments
+from classes.FeedBackModifier import FeedBackModifier
 
 # Run the program
 if __name__ == "__main__":
@@ -98,7 +15,7 @@ if __name__ == "__main__":
 
     # Parse the arguments
     args = parser.parse_args()
-    if args:
+    if args._get_args():
         selected_sheet = args.sheet
         selected_processes = args.process
         if selected_sheet and selected_processes:
@@ -115,3 +32,45 @@ if __name__ == "__main__":
             my_instance.save_changes()
         else:
             raise Exception("Not all required arguments were passed.")
+    else:
+        while True:
+            action_string = "Select an action to perform:\n\t1 - Modify data\n\t2 - View Logs\n\t0 - Quit Program\n"
+            selected_action = input(action_string)
+            numeric_action = int(selected_action) if selected_action.isnumeric() else None
+            match numeric_action:
+                case 0:
+                    break
+                case 1:
+                    process_sheets = list(my_instance.processes.keys())
+                    modify_string = "Select a sheet to modify:\n"
+                    for index, sheet in enumerate(process_sheets):
+                        modify_string += f"\t{index} - '{sheet}'\n"
+                    
+                    selected_sheet = input(modify_string)
+                    numeric_sheet = int(selected_sheet) if selected_sheet.isnumeric() else None
+                    if numeric_sheet != None and (0 <= numeric_sheet < len(process_sheets)):
+                        availabile_sheet_processes = list(my_instance.processes[process_sheets[numeric_sheet]].keys())
+                        selected_processes = list()
+                        while availabile_sheet_processes:
+                            process_string = f"Select {"another" if len(selected_processes) else "a"} process you wish to run:\n\t0 - Finish selecting processes\n"
+                            for index, key in enumerate(availabile_sheet_processes, start=1):
+                                process_string += f"\t{index} - {key}\n"
+                            selected_process = input(process_string)
+                            numeric_process = int(selected_process) if selected_process.isnumeric() else None
+                            if numeric_process != None and (0 <= numeric_process <= len(availabile_sheet_processes)):
+                                if not numeric_process:
+                                    break
+                                else:
+                                    selected_processes.append(availabile_sheet_processes[numeric_process - 1])
+                                    availabile_sheet_processes.pop(numeric_process - 1)
+                            else:
+                                print("Invalid process selected.")
+                        for process in selected_processes:
+                            my_instance.processes[process_sheets[numeric_sheet]][process].logic()
+                        my_instance.save_changes()
+                    else:
+                        print("Invalid sheet selected.")
+                case 2:
+                    print('view')
+                case _:
+                    print("Invalid action selected.")

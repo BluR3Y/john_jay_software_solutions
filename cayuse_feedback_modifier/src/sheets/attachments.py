@@ -3,7 +3,7 @@ import pypdf
 import pathlib
 import math
 from methods import utils
-from process_class import Process
+from classes.Process import Process
 
 SHEET_NAME = "Attachments - Template"
 

@@ -1,4 +1,4 @@
-from process_class import Process
+from classes.Process import Process
 
 SHEET_NAME = "Members - Template"
 

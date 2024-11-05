@@ -1,6 +1,6 @@
 import pandas as pd
 from methods import utils
-from process_class import Process
+from classes.Process import Process
 
 SHEET_NAME = "Proposal - Template"
 

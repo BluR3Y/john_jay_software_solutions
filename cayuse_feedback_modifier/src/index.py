@@ -10,9 +10,8 @@ import datetime
 import inspect
 
 import configs.db_config as db_config
-import configs.openai_config as openai_config
-# import sheets.attachments as attachments
-# import sheets.members as members
+import sheets.attachments as attachments
+import sheets.members as members
 import sheets.awards as awards
 import sheets.proposals as proposals
 from methods import utils
@@ -31,7 +30,6 @@ class FeedBackModifier:
 
         # Variable that will store the path of the json file that will store the logs
         self.logs_path = os.path.join(os.getenv('SAVE_PATH') or os.path.dirname(self.filepath), 'cayuse_data_migration_logs.json')
-        print(self.logs_path)
         # If the file exists:
         if os.path.exists(self.logs_path):
             # Store the logs in a variable
@@ -42,7 +40,7 @@ class FeedBackModifier:
             self.logs = dict()
 
         all_processes = dict()
-        for sheet_methods in [awards, proposals]:
+        for sheet_methods in [awards, proposals, members, attachments]:
             if sheet_methods.SHEET_NAME in self.sheets:
                 sheet_processes = dict()
                 for fnName, fn in inspect.getmembers(sheet_methods, inspect.isfunction):
@@ -100,12 +98,20 @@ if __name__ == "__main__":
 
     # Parse the arguments
     args = parser.parse_args()
-
-    if args.sheet and args.process:
-        if args.sheet in my_instance.processes:
-            for method in args.process:
-                my_instance.processes[args.sheet][method].logic()
+    if args:
+        selected_sheet = args.sheet
+        selected_processes = args.process
+        if selected_sheet and selected_processes:
+            if selected_sheet in my_instance.processes:
+                for method in selected_processes:
+                    if method in my_instance.processes[selected_sheet]:
+                        my_instance.processes[selected_sheet][method].logic()
+                    else:
+                        raise Exception(f"The process '{method}' does not exist for the sheet '{selected_sheet}'.")
+            else:
+                raise Exception(f"The sheet '{selected_sheet}' does not exist in the workbook.")
+            
             # Save changes
             my_instance.save_changes()
         else:
-            print("Invalid sheet argument")
+            raise Exception("Not all required arguments were passed.")

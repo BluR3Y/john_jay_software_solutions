@@ -83,7 +83,7 @@ def populate_db_discipline(self):
             self.append_logs(SHEET_NAME, sheet_logger)
     return Process(
         logic,
-        'Populate Database Disciplines (Awards)',
+        'Populate Database Disciplines',
         "This process processes data from an excel file, which should contain a table with the RF_Account and discipline of the awards, and updates the 'Discipline' field of the records in the Microsoft Access database. Additionally, the process also catches various types of issues found in the data from multiple sources such as the imported file and the database and logs them."
     )
 
@@ -166,7 +166,7 @@ def populate_template_discipline(self):
             self.append_logs(SHEET_NAME, sheet_logger)
     return Process(
         logic,
-        'Populate Template Disciplines (Awards)',
+        'Populate Template Disciplines',
         "Process populates the 'Discipline' column of the awards in the template document with the value the record is assigned in the Microsoft Access database. Additionally, the process also catches various types of issues found in the data from multiple sources such as the template file and the database and logs them."
     )
 
@@ -274,6 +274,6 @@ def populate_template_department(self):
             self.append_logs(SHEET_NAME, sheet_logger)
     return Process(
         logic,
-        'Populate Template Departments (Awards)',
+        'Populate Template Departments',
         "rocess populates the 'Admin Unit' column of the proposals in the template document with the value the record is assigned in the Microsoft Access database. Additionally, the process also catches various types of issues found in the data from multiple sources such as the template file and the database and logs them."
     )

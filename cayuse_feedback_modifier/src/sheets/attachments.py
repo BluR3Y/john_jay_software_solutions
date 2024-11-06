@@ -17,9 +17,6 @@ def verify_entries(self):
         
         # Store the sheet's content
         sheet_content = self.df[SHEET_NAME]
-        # Missing logging
-        sheet_logger = dict()
-        
         # Loop through every row in the sheet
         for index, row in sheet_content.iterrows():
             # Retrieve the record's filepath
@@ -48,14 +45,13 @@ def verify_entries(self):
     )
 
 def missing_project_attachments(self):
+    process_name = "Retrieve and Populate Missing Grants From Template Attachments"
     def logic():
         award_sheet_name = 'Award - Template'
         proposal_sheet_name = 'Proposal - Template'
         award_sheet_content = self.df[award_sheet_name]
         proposal_sheet_content = self.df[proposal_sheet_name]
         attachment_sheet_content = self.df[SHEET_NAME]
-        # Missing logging
-        sheet_logger = dict()
 
         # dict with keep track of how many attachments each project has in the 'Attachments' sheet
         attachment_counter = dict()
@@ -92,17 +88,20 @@ def missing_project_attachments(self):
                     f"Only {props['num_attachments']} attachment records exist with the projectLegacyNumber {key}."
                 )
 
-        if sheet_logger:
-            self.append_logs(SHEET_NAME, sheet_logger)
+        if new_rows:
+            self.df[SHEET_NAME] = self.df[SHEET_NAME].__append(new_rows, ignore_index=True)
+            self.append_logs(SHEET_NAME, process_name, list(new_rows))
 
     return Process(
         logic,
-        "Retrieve and Populate Missing Grants From Template Attachments",
+        process_name,
         "The process goes through every record in the 'Proposal' and 'Award' sheet and determines the grants that are missing from the 'Attachment' sheet."
     )
 
 def populate_project_info(self):
+    process_name = "Fill Missing Attachment Columns"
     def logic():
+        # Missing Logging functionality
         sheet_logger = dict()
         attachment_sheet_content = self.df[SHEET_NAME]
         projects = dict()
@@ -145,9 +144,9 @@ def populate_project_info(self):
                 )
         
         if sheet_logger:
-            self.append_logs(SHEET_NAME, sheet_logger)
+            self.append_logs(SHEET_NAME, process_name, sheet_logger)
     return Process(
         logic,
-        "Fill Missing Attachment Columns",
+        process_name,
         "This process goes through every record in the 'attachments' sheet and populates the PI_NAME, RF_Account, Orig_Sponsor, and Sponsor columns in the sheet with information retrieved from the database."
     )

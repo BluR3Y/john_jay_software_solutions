@@ -13,7 +13,8 @@ import sheets.attachments as attachments
 import sheets.members as members
 import sheets.awards as awards
 import sheets.proposals as proposals
-from methods import utils
+import sheets.others as others
+
 from methods import logger
 from methods import comment
 
@@ -39,15 +40,12 @@ class FeedBackModifier:
             self.logs = dict()
 
         all_processes = dict()
-        for sheet_methods in [awards, proposals, members, attachments]:
-            if sheet_methods.SHEET_NAME in self.sheets:
-                sheet_processes = dict()
-                for fnName, fn in inspect.getmembers(sheet_methods, inspect.isfunction):
-                    process = fn(self)
-                    sheet_processes[process.name] = process
-                all_processes[sheet_methods.SHEET_NAME] = sheet_processes
-            else:
-                raise Exception(f"The sheet '{sheet_methods.SHEET_NAME}' does not exist in the workbook")
+        for sheet_methods in [awards, proposals, members, attachments, others]:
+            sheet_processes = dict()
+            for fnName, fn in inspect.getmembers(sheet_methods, inspect.isfunction):
+                process = fn(self)
+                sheet_processes[process.name] = process
+            all_processes[sheet_methods.SHEET_NAME] = sheet_processes
         self.processes = all_processes
 
     # Save changes to all related resources

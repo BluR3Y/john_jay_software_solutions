@@ -9,7 +9,7 @@ def save_logs(self):
         json.dump(self.logs, json_file, indent=4) # indent=4 for pretty printing
 
 # Method will add logs to the logger
-def append_logs(self, sheet, logs):
+def append_logs(self, sheet, process, logs):
     # Retrieve the current datetime and format it
     current_date_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     # Get all logs for the current moment

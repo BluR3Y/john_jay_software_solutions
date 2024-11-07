@@ -1,11 +1,11 @@
 from classes.Process import Process
+from methods import utils
 
 SHEET_NAME = "Other"
 
 def database_record_modifier(self):
+    process_name = "Modify Database Records"
     def logic():
-        # Missing logging functionality
-        logger = list()
         
         # Retrieve all tables in the database
         tables = []
@@ -20,30 +20,58 @@ def database_record_modifier(self):
                 table_columns = [column[0] for column in self.db_manager.cursor.description]
                 record_identifier = table_columns[0]
                 
-                selected_search_column = input(f"Input the name of the column in the '{selected_table}' table which will be used to filter records in the database: ")
-                if selected_search_column in table_columns:
-                    selected_search_value = input(f"Input the value to search for in the '{selected_search_column}' column: ")
-                    search_result = self.db_manager.execute_query(f"SELECT {record_identifier} FROM {selected_table} WHERE {selected_search_column} = ?;", selected_search_value)
-                    records = [item[record_identifier] for item in search_result]
-
-                    if records:
-                        print(f"Search returned {len(records)} records.\n")
-                        selected_modify_column = input(f"Input the name of the column in the '{selected_table}' table whose value will be updated: ")
-                        if selected_modify_column in table_columns:
-                            selected_modify_value = input(f"Input the new value that will be applied to the '{selected_modify_column}' column of the record(s): ")
-                            update_query = f"""
-                                UPDATE {selected_table}
-                                SET {selected_modify_column} = ?
-                                WHERE {record_identifier} IN ({','.join(['?' for _ in records])})
-                            """
-                            self.db_manager.execute_query(update_query, selected_modify_value, *records)
-                            print(f"The following records from the table '{selected_table}' were modified: {records}")
-                        else:
-                            print(f"The column '{selected_modify_column}' does not exist in the table.")
+                selected_search_conditions = input(f"Input the name of the column in the '{selected_table}' table followed by the value in the selected column separated by a ':' and enclosed in double quotes, which will be used to filter records in the database. Ex: \"Discipline:Philosophy\": ")
+                search_conditions = dict()
+                for condition in utils.extract_quoted_strings(selected_search_conditions):
+                    col, val = condition.split(':')
+                    if col in table_columns:
+                        search_conditions[col] = val
                     else:
-                        print("Search returned 0 records.")
-                else:
-                    print(f"The column '{selected_search_column}' does not exist in the table '{selected_table}'.")
+                        print(f"The column '{col}' does not exist in the table '{selected_table}'.")
+                        break
+                
+                search_query = f"""
+                    SELECT {','.join(set([record_identifier, *search_conditions.keys()]))}
+                    FROM {selected_table}
+                    WHERE {' AND '.join([f"{col}=?" for col in search_conditions.keys()])}
+                """
+                search_result = self.db_manager.execute_query(search_query, *search_conditions.values())
+                record_data = {item[record_identifier]:item for item in search_result}
+                print(f"Search returned {len(record_data)} records.")
+
+                if record_data:
+                    selected_alter_properties = input(f"Input the name of the column in the '{selected_table}' table that will be updated followed by the new value separated by a ':' and enclosed in double quites. Ex: \"Discipline:Philosophy\": ")
+                    alter_properties = dict()
+                    for prop in utils.extract_quoted_strings(selected_alter_properties):
+                        col, val = prop.split(':')
+                        if col in table_columns:
+                            alter_properties[col] = val
+                        else:
+                            print(f"The column '{col}' does not exist in the table '{selected_table}'")
+                            break
+
+                    missing_data_columns = alter_properties.keys() - search_conditions.keys()
+                    if missing_data_columns:
+                        missing_data_query = f"""
+                            SELECT {','.join(set([record_identifier, *missing_data_columns]))}
+                            FROM {selected_table}
+                            WHERE {record_identifier} IN ({','.join(['?' for _ in record_data])})
+                        """
+                        missing_record_data = self.db_manager.execute_query(missing_data_query, *record_data.keys())
+                        for data in missing_record_data:
+                            record_data[data[record_identifier]].update(data)
+
+                    update_query = f"""
+                        UPDATE {selected_table}
+                        SET {','.join([f"{prop} = ?" for prop in alter_properties.keys()])}
+                        WHERE {record_identifier} IN ({','.join(['?' for _ in record_data])})
+                    """
+                    self.db_manager.execute_query(update_query, *alter_properties.values(), *record_data.keys())
+                    self.append_logs(SHEET_NAME, process_name, {
+                        f"{selected_table}:{id}": {
+                            key: f"{record_data[id][key]}:{alter_properties[key]}"
+                        for key in alter_properties.keys()}
+                    for id in record_data.keys()})
             else:
                 print(f"Table '{selected_table}' does not exist in the database.")
 
@@ -53,6 +81,6 @@ def database_record_modifier(self):
 
     return Process(
         logic,
-        "Modify Database Records",
+        process_name,
         "The process "
     )

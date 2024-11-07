@@ -16,12 +16,18 @@ def append_logs(self, sheet, process, logs):
     moment_logs = self.logs.get(current_date_time, {})
     # If no prior logs have been created for the provided sheet, initialize the property in the logger
     if sheet not in moment_logs:
-        moment_logs[sheet] = logs
+        moment_logs[sheet] = {
+            process: logs
+        }
     else:
-        moment_logs[sheet].update(logs)
+        # moment_logs[sheet][process].update(logs)
+        if process not in moment_logs[sheet]:
+            moment_logs[sheet][process] = logs
+        else:
+            moment_logs[sheet][process].update(logs)
+
     # Assign the new logs to the current datetime
     self.logs[current_date_time] = moment_logs
-
 
 # Future Features:
     # Roleback changes

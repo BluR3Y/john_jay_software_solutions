@@ -82,5 +82,5 @@ def database_record_modifier(self):
     return Process(
         logic,
         process_name,
-        "The process "
+        "The database_record_modifier function provides an interactive tool for modifying records within a specified table in a connected database. It allows users to select a table, define search conditions, and update multiple records in a single operation. This function is designed for dynamic and secure interaction with the database, verifying that tables and columns exist before performing operations and using parameterized queries to avoid SQL injection risks. It encapsulates the entire process in a callable Process object, ready to be integrated into larger workflows or batch processes."
     )

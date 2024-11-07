@@ -48,7 +48,7 @@ def modify_entries(self):
             for bundle in modifying_entries:
                 bundle_ids = [item['id'] for item in bundle]
                 query = f"SELECT Primary_PI, Primary_Dept, Grant_ID FROM grants WHERE Grant_ID IN ({','.join(['?' for _ in bundle_ids])})"
-                db_data = self.execute_query(query, bundle_ids)
+                db_data = self.db_manager.execute_query(query, bundle_ids)
                 db_data_dict = {entry["Grant_ID"]: entry for entry in db_data}
 
                 for bundle_item in bundle:

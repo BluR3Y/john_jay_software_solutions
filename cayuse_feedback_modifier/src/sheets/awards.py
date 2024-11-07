@@ -19,7 +19,7 @@ def populate_db_discipline(self):
         sheet_logger = dict()
 
         discipline_query = "SELECT Name FROM LU_Discipline;"
-        result = self.execute_query(discipline_query)
+        result = self.db_manager.execute_query(discipline_query)
         project_disciplines = { discipline["Name"]: {
             "primary_keys": []
         } for discipline in result}
@@ -63,7 +63,7 @@ def populate_db_discipline(self):
                     FROM grants
                     WHERE RF_Account IN ({','.join(['?' for _ in primary_keys])})
                 """
-                verify_result = self.execute_query(verify_query, *primary_keys)
+                verify_result = self.db_manager.execute_query(verify_query, *primary_keys)
                 existing_keys = set([key['RF_Account'] for key in verify_result])
                 if existing_keys:
                     update_query = f"""
@@ -71,7 +71,7 @@ def populate_db_discipline(self):
                         SET Discipline = ?
                         WHERE RF_Account IN ({','.join(['?' for _ in existing_keys])})
                     """
-                    self.execute_query(update_query, key, *existing_keys)
+                    self.db_manager.execute_query(update_query, key, *existing_keys)
                 
                 missing_keys = primary_keys - existing_keys
                 for key in missing_keys:
@@ -95,7 +95,7 @@ def populate_template_discipline(self):
 
         # Retrieve the disciplines from the table LU_Discipline in the database
         discipline_query = "SELECT Name FROM LU_Discipline;"
-        discipline_result = self.execute_query(discipline_query)
+        discipline_result = self.db_manager.execute_query(discipline_query)
         valid_disciplines = [value['Name'] for value in discipline_result]
 
         last_index = 0
@@ -109,7 +109,7 @@ def populate_template_discipline(self):
         
             # Retrieve the Grant_ID and Discipline value of the records in the batch_ids list
             search_query = f"SELECT Grant_ID, Discipline FROM grants WHERE Grant_ID IN ({','.join(['?' for _ in batch_ids])})"
-            search_result = self.execute_query(search_query, batch_ids)
+            search_result = self.db_manager.execute_query(search_query, batch_ids)
             project_disciplines = { project['Grant_ID']:project['Discipline'] for project in search_result }
 
             # Loop through every grant_id in the batch
@@ -175,7 +175,7 @@ def populate_template_department(self):
         # ------------------------- LU_Department table is polluted with invalid values (Approach is currently unusable) ------------------------------
         # # Retrieve the departments from the table LU_Department in the database
         # department_query = "SELECT LU_Department AS Name FROM LU_Department"
-        # department_result = self.execute_query(department_query)
+        # department_result = self.db_manager.execute_query(department_query)
         # valid_departments = [value['Name'] for value in department_result]
         # ---------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -207,7 +207,7 @@ def populate_template_department(self):
                 FROM grants
                 WHERE Grant_ID IN ({','.join(['?' for _ in batch_ids])})
             """
-            search_result = self.execute_query(search_query, batch_ids)
+            search_result = self.db_manager.execute_query(search_query, batch_ids)
             project_departments = { project['Grant_ID']:project['Primary_Dept'] for project in search_result }
 
             # Loop through every grant_id in the batch

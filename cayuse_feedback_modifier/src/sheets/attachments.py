@@ -124,7 +124,7 @@ def populate_project_info(self):
         for bundle in bundles:
             bundle_ids = [key for key, value in bundle.items()]
             query = f"SELECT Primary_PI, RF_Account, Sponsor_1, Sponsor_2, Grant_ID FROM grants WHERE Grant_ID IN ({','.join(['?' for _ in bundle_ids])})"
-            db_data = self.execute_query(query, bundle_ids)
+            db_data = self.db_manager.execute_query(query, bundle_ids)
             populated_projects.update({bundle[entry['Grant_ID']]['project_legacy_number']: entry for entry in db_data})
 
         for index, row in attachment_sheet_content.iterrows():

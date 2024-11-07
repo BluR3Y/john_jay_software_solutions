@@ -8,7 +8,8 @@ import json
 import datetime
 import inspect
 
-import configs.db_config as db_config
+from classes.DatabaseManager import DatabaseManager
+
 import sheets.attachments as attachments
 import sheets.members as members
 import sheets.awards as awards
@@ -27,6 +28,9 @@ class FeedBackModifier:
         self.df = pd.read_excel(os.getenv('EXCEL_FILE_PATH'), sheet_name=None)
         # Store the sheet names
         self.sheets = list(self.df.keys())
+
+        self.db_manager = DatabaseManager()
+        self.db_manager.init_db_conn()
 
         # Variable that will store the path of the json file that will store the logs
         self.logs_path = os.path.join(os.getenv('SAVE_PATH') or os.path.dirname(self.filepath), 'cayuse_data_migration_logs.json')
@@ -69,9 +73,6 @@ class FeedBackModifier:
 
         except Exception as e:
             print(f"Error occured while saving changes: {e}")
-
-# Database related methods
-FeedBackModifier.execute_query = db_config.execute_query
 
 # Logger related methods
 FeedBackModifier.append_logs = logger.append_logs

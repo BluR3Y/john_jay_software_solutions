@@ -7,6 +7,7 @@ from classes.Process import Process
 SHEET_NAME = "Award - Template"
 
 def populate_db_discipline(self):
+    process_name = 'Populate Database Disciplines'
     def logic():
         # Request path to the file from the user
         file_path = utils.request_file_path("Enter the path of the file that will be used to populate the database", ['.xlsx'])
@@ -80,10 +81,10 @@ def populate_db_discipline(self):
             print(f"Process is {round(index/len(project_disciplines) * 100)}% complete")
         
         if sheet_logger:
-            self.append_logs(SHEET_NAME, sheet_logger)
+            self.append_logs(SHEET_NAME, process_name, sheet_logger)
     return Process(
         logic,
-        'Populate Database Disciplines',
+        process_name,
         "This process processes data from an excel file, which should contain a table with the RF_Account and discipline of the awards, and updates the 'Discipline' field of the records in the Microsoft Access database. Additionally, the process also catches various types of issues found in the data from multiple sources such as the imported file and the database and logs them."
     )
 

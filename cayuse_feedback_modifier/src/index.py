@@ -15,7 +15,8 @@ if __name__ == "__main__":
 
     # Parse the arguments
     args = parser.parse_args()
-    if args._get_args():
+    user_passed_args = any(val for key, val in args._get_kwargs())
+    if user_passed_args:
         selected_sheet = args.sheet
         selected_processes = args.process
         if selected_sheet and selected_processes:

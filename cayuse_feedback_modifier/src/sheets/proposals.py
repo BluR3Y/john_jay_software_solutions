@@ -1,5 +1,6 @@
 import pandas as pd
 from methods import utils
+from datetime import datetime
 from classes.Process import Process
 
 SHEET_NAME = "Proposal - Template"
@@ -247,4 +248,54 @@ def populate_template_department(self):
         logic,
         process_name,
         "Process populates the 'Admin Unit' column of the proposals in the template document with the value the record is assigned in the Microsoft Access database. Additionally, the process also catches various types of issues found in the data from multiple sources such as the template file and the database and logs them."
+    )
+
+def populate_project_status(self):
+    process_name = "Populate Template Status"
+    def logic():
+        # Retrieve the content of the sheet
+        proposal_sheet_content = self.df[SHEET_NAME]
+        status_threshold = datetime.strptime('2024-01-01', '%Y-%m-%d')
+
+        last_index = 0
+        batch_limit = 40
+        num_sheet_rows = len(proposal_sheet_content)
+        # Loop while the index has not reached the number of rows in the sheet
+        while last_index < num_sheet_rows:
+            new_end = last_index + batch_limit
+            # Retrieve all the records in the dataframe in the batch range
+            batch_records = proposal_sheet_content.iloc[last_index:new_end]
+            last_index = new_end
+
+            batch_ids = batch_records['proposalLegacyNumber']
+            search_query = f"SELECT Grant_ID, End_Date FROM grants WHERE Grant_ID IN ({','.join(['?' for _ in batch_ids])})"
+            search_result = self.db_manager.execute_query(search_query, *batch_ids)
+            record_db_date = { data['Grant_ID']: data['End_Date'] for data in search_result }
+            
+            for document_index, props in batch_records.iterrows():
+                record_grant_id = props['proposalLegacyNumber']
+                record_end_date = props['Project End Date']
+                if record_grant_id in record_db_date:
+                    # *** Missing Check if template end_date is the same as db end_date
+                    if not pd.isna(record_end_date):
+                        proposal_sheet_content.loc[document_index, 'status'] = "Active" if record_end_date >= status_threshold else "Closed"
+                    else:
+                        self.append_comment(
+                            SHEET_NAME,
+                            document_index + 1,
+                            proposal_sheet_content.columns.get_loc('Project End Date'),
+                            f"This field can not be left empty."
+                        )
+                else:
+                    self.append_comment(
+                        SHEET_NAME,
+                        document_index + 1,
+                        proposal_sheet_content.columns.get_loc('proposalLegacyNumber'),
+                        f"The record with grant_id {record_grant_id} does not exist in the database."
+                    )
+
+    return Process(
+        logic,
+        process_name,
+        "This process goes through every record in the Proposals sheet and determines the appropriate status for the records."
     )

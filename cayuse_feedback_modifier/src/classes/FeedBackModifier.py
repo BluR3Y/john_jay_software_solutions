@@ -14,6 +14,7 @@ import sheets.attachments as attachments
 import sheets.members as members
 import sheets.awards as awards
 import sheets.proposals as proposals
+import sheets.projects as projects
 import sheets.others as others
 
 from methods import logger
@@ -44,7 +45,7 @@ class FeedBackModifier:
             self.logs = dict()
 
         all_processes = dict()
-        for sheet_methods in [awards, proposals, members, attachments, others]:
+        for sheet_methods in [awards, proposals, projects, members, attachments, others]:
             sheet_processes = dict()
             for fnName, fn in inspect.getmembers(sheet_methods, inspect.isfunction):
                 process = fn(self)

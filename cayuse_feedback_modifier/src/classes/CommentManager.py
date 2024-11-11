@@ -7,11 +7,12 @@ class CommentManager:
             existing_comments = dict()
             # Load the workbook
             workbook = openpyxl.load_workbook(read_file_path)
-            for sheet_name in workbook.sheetnames:
-                sheet = workbook[sheet_name]
-                existing_comments[sheet_name] = {
-                    f"{cell.row}:{cell.column}": cell.comment for row in sheet.iter_rows() for cell in row if cell.comment
-                }
+            # Commented for debugging purposes -----
+            # for sheet_name in workbook.sheetnames:
+            #     sheet = workbook[sheet_name]
+            #     existing_comments[sheet_name] = {
+            #         f"{cell.row}:{cell.column}": cell.comment for row in sheet.iter_rows() for cell in row if cell.comment
+            #     }
             self.comment_cache = existing_comments
             self.sheets = workbook.sheetnames
         else:

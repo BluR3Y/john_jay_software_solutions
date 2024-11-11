@@ -30,7 +30,6 @@ def populate_project_status(self):
                         f"The record does not have a status assigned to it in the Proposal sheet."
                     )
             else:
-                print(record_pln)
                 self.comment_manager.append_comment(
                     SHEET_NAME,
                     document_index + 1,

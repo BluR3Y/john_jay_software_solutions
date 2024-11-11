@@ -61,7 +61,7 @@ def populate_template_discipline(self):
                             }
                             template_record_discipline = closest_valid_discipline
 
-                    # Lazy Data Migration (Temporary, Suggested, Not ideal for future proofing)
+                    # *** Lazy Data Migration (Temporary, Suggested, Not ideal for future proofing)
                     elif template_record_discipline and pd.isna(template_record_discipline):
                         record_admin_unit = record['Admin Unit']
                         if not pd.isna(record_admin_unit) and record_admin_unit in valid_disciplines:

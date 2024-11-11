@@ -21,7 +21,7 @@ def populate_project_status(self):
             if not correlating_proposal_record.empty:
                 proposal_record_status = correlating_proposal_record['status']
                 if not pd.isna(proposal_record_status):
-                    proposal_sheet_content.loc[document_index, 'status'] = proposal_record_status
+                    project_sheet_content.loc[document_index, 'status'] = proposal_record_status
                 else:
                     self.comment_manager.append_comment(
                         SHEET_NAME,

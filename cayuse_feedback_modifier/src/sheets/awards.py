@@ -206,13 +206,22 @@ def populate_template_department(self):
         # ---------------------------------------------------------------------------------------------------------------------------------------------
 
         # --------------------------------------- Request file with valid departments (Alternative approach) ------------------------------------------
-        file_path = utils.request_file_path("Enter the path of the file with the valid Departments", ['.xlsx'])
+        dept_file_path = utils.request_file_path("Enter the path of the file with the valid Departments", ['.xlsx'])
         # Read the contents of the file
-        file_content = pd.read_excel(file_path)
+        dept_file_content = pd.read_excel(dept_file_path)
         # valid_departments = [ dept.split(" - ")[1] for dept in file_content['Name'] ]
-        valid_departments = { dept['Name'].split(" - ")[1]: dept['Primary Code'] for index, dept in file_content.iterrows() }
+        valid_departments = { dept['Name'].split(" - ")[1]: dept['Primary Code'] for index, dept in dept_file_content.iterrows() }
         missing_departments = set()
-        # ---------------------------------------------------------------------------------------------------------------------------------------------
+
+        # ---------------------------------------- Request file with valid Centers (Alternative approach) ---------------------------------------------
+        centers_file_path = utils.request_file_path("Enter the path of the file with the valid Centers", ['.xlsx'])
+        centers_file_content = pd.read_excel(centers_file_path)
+        valid_centers = {
+            center['Name']: {
+                'Admin Unit': center['Admin Unit'],
+                'Primary Code': center['Admin Unit Code']
+            } 
+        for index, center in centers_file_content.iterrows() }
 
         sheet_logger = dict()
         # Retrieve the content of the proposal sheet
@@ -271,6 +280,21 @@ def populate_template_department(self):
                             }
                             template_record_unit = closest_valid_dept
                             template_record_unit_code = closest_valid_dept_code
+                        else:
+                            closest_valid_center = utils.find_closest_match(template_record_unit, [center for center in valid_centers])
+                            if closest_valid_center:
+                                center_info = valid_centers[closest_valid_center]
+                                prev_record_center = proposal_sheet_content['John Jay Centers'][document_index]
+                                proposal_sheet_content.loc[document_index, 'John Jay Centers'] = closest_valid_center
+                                proposal_sheet_content.loc[document_index, 'Admin Unit'] = center_info['Admin Unit']
+                                proposal_sheet_content.loc[document_index, 'Admin Unit Primary Code'] = center_info['Primary Code']
+                                sheet_logger[f"template:{id}"] = {
+                                    "John Jay Centers": f"{prev_record_center}:{closest_valid_center}",
+                                    "Admin Unit": f"{template_record_unit}:{center_info['Admin Unit']}",
+                                    "Admin Unit Primary Code": f"{template_record_unit_code}:{center_info['Primary Code']}"
+                                }
+                                template_record_unit = center_info['Admin Unit']
+                                template_record_unit_code = center_info['Primary Code']
 
                     if project_departments[id] and project_departments[id] in valid_departments:
                         if not pd.isna(template_record_unit) and template_record_unit in valid_departments:
@@ -309,12 +333,14 @@ def populate_template_department(self):
                                 "Primary_Dept": f"{project_departments[id]}:{template_record_unit}"
                             }
                         else:
-                            self.append_comment(
-                                SHEET_NAME,
-                                document_index + 1,
-                                proposal_sheet_content.columns.get_loc('Admin Unit'),
-                                f"The record does not have a valid department in either the database or in the template."
-                            )
+                            if not template_record_unit or template_record_unit not in valid_centers:
+                                print(template_record_unit in valid_centers)
+                                self.append_comment(
+                                    SHEET_NAME,
+                                    document_index + 1,
+                                    proposal_sheet_content.columns.get_loc('Admin Unit'),
+                                    f"The record does not have a valid department in either the database or in the template."
+                                )
                 else:
                     self.append_comment(
                         SHEET_NAME,
@@ -332,3 +358,4 @@ def populate_template_department(self):
         process_name,
         "Process populates the 'Admin Unit' column of the proposals in the template document with the value the record is assigned in the Microsoft Access database. Additionally, the process also catches various types of issues found in the data from multiple sources such as the template file and the database and logs them."
     )
+

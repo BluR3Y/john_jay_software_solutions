@@ -40,6 +40,7 @@ if __name__ == "__main__":
             numeric_action = int(selected_action) if selected_action.isnumeric() else None
             match numeric_action:
                 case 0:
+                    my_instance.save_changes()
                     break
                 case 1:
                     process_sheets = list(my_instance.processes.keys())
@@ -68,7 +69,6 @@ if __name__ == "__main__":
                                 print("Invalid process selected.")
                         for process in selected_processes:
                             my_instance.processes[process_sheets[numeric_sheet]][process].logic()
-                        my_instance.save_changes()
                     else:
                         print("Invalid sheet selected.")
                 case 2:

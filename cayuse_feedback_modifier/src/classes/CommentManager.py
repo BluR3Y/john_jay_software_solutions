@@ -14,7 +14,6 @@ class CommentManager:
                 }
             self.comment_cache = existing_comments
             self.sheets = workbook.sheetnames
-            print(self.sheets)
         else:
             raise Exception("The comment manager was provided an invalid file path.")
         

@@ -324,3 +324,25 @@ def populate_project_status(self):
         process_name,
         "This process goes through every record in the Proposals sheet and determines the appropriate status for the records."
     )
+
+def validate_project_instrument_type(self):
+    process_name = "Validate Project Instrument Type"
+    def logic():
+        # Retrieve the content of the sheet
+        proposal_sheet_content = self.df[SHEET_NAME]
+        valid_instrument_types = ['Grant', 'Contract', 'Cooperative Agreement', 'Incoming Subaward', 'NYC/NYS MOU - Interagency Agreement', 'PSC CUNY', 'CUNY Internal']
+
+        for index, type in enumerate(proposal_sheet_content['Instrument Type']):
+            if type not in valid_instrument_types:
+                self.comment_manager.append_comment(
+                    SHEET_NAME,
+                    index + 1,
+                    proposal_sheet_content.columns.get_loc('Instrument Type'),
+                    "Record has invalid instrument type."
+                )
+
+    return Process(
+        logic,
+        process_name,
+        "This process valides the value under 'Instrument Type' for each record in the proposal sheet."
+    )

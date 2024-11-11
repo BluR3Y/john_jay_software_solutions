@@ -24,14 +24,14 @@ def verify_entries(self):
             if not isinstance(file_path, float):
                 full_path = os.path.join(dir_path, file_path)
                 if not os.path.isfile(full_path):
-                    self.append_comment(
+                    self.comment_manager.append_comment(
                         SHEET_NAME,
                         index + 1,
                         sheet_content.columns.get_loc('filePath'),
                         "File path does not point to an existing file."
                     )
             else:
-                self.append_comment(
+                self.comment_manager.append_comment(
                     SHEET_NAME,
                     index + 1,
                     sheet_content.columns.get_loc('filePath'),
@@ -65,7 +65,7 @@ def missing_project_attachments(self):
             if row['projectLegacyNumber'] in attachment_counter:
                 attachment_counter[row['projectLegacyNumber']]['num_attachments'] += 1
             else:
-                self.append_comment(
+                self.comment_manager.append_comment(
                     SHEET_NAME,
                     index + 1,
                     attachment_sheet_content.columns.get_loc('projectLegacyNumber'),
@@ -81,7 +81,7 @@ def missing_project_attachments(self):
                 })
             elif props['num_attachments'] < 3:
                 first_record = attachment_sheet_content.loc[attachment_sheet_content['projectLegacyNumber'] == key].index[0]
-                self.append_comment(
+                self.comment_manager.append_comment(
                     SHEET_NAME,
                     first_record + 1,
                     attachment_sheet_content.columns.get_loc('projectLegacyNumber'),
@@ -90,7 +90,7 @@ def missing_project_attachments(self):
 
         if new_rows:
             self.df[SHEET_NAME] = self.df[SHEET_NAME].__append(new_rows, ignore_index=True)
-            self.append_logs(SHEET_NAME, process_name, list(new_rows))
+            self.log_manager.append_logs(SHEET_NAME, process_name, list(new_rows))
 
     return Process(
         logic,
@@ -136,7 +136,7 @@ def populate_project_info(self):
                 attachment_sheet_content.loc[index, 'Sponsor'] = associated_project['Sponsor_1']
             else:
                 first_record = attachment_sheet_content.loc[attachment_sheet_content['legacyNumber'] == row['legacyNumber']].index[0]
-                self.append_comment(
+                self.comment_manager.append_comment(
                     SHEET_NAME,
                     first_record + 1,
                     attachment_sheet_content.columns.get_loc('legacyNumber'),
@@ -144,7 +144,7 @@ def populate_project_info(self):
                 )
         
         if sheet_logger:
-            self.append_logs(SHEET_NAME, process_name, sheet_logger)
+            self.log_manager.append_logs(SHEET_NAME, process_name, sheet_logger)
     return Process(
         logic,
         process_name,

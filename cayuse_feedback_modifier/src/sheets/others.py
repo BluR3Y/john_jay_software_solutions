@@ -67,7 +67,7 @@ def database_record_modifier(self):
                         WHERE {record_identifier} IN ({','.join(['?' for _ in record_data])})
                     """
                     self.db_manager.execute_query(update_query, *alter_properties.values(), *record_data.keys())
-                    self.append_logs(SHEET_NAME, process_name, {
+                    self.log_manager.append_logs(SHEET_NAME, process_name, {
                         f"{selected_table}:{id}": {
                             key: f"{record_data[id][key]}:{alter_properties[key]}"
                         for key in alter_properties.keys()}

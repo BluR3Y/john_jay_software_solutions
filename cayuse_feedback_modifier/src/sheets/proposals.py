@@ -65,7 +65,7 @@ def populate_template_discipline(self):
                     if project_disciplines[id] and project_disciplines[id] in valid_disciplines:
                         if not pd.isna(template_record_discipline) and template_record_discipline in valid_disciplines:
                             if template_record_discipline != project_disciplines[id]:
-                                self.append(
+                                self.comment_manager.append_comment(
                                     SHEET_NAME,
                                     document_index + 1,
                                     award_sheet_content.columns.get_loc('Discipline'),
@@ -88,14 +88,14 @@ def populate_template_discipline(self):
                                 "Discipline": f"{project_disciplines[id]}:{template_record_discipline}"
                             }
                         else:
-                            self.append_comment(
+                            self.comment_manager.append_comment(
                                 SHEET_NAME,
                                 document_index + 1,
                                 award_sheet_content.columns.get_loc('Discipline'),
                                 f"The record does not have a valid discipline in either the database or in the template."
                             )
                 else:
-                    self.append_comment(
+                    self.comment_manager.append_comment(
                         SHEET_NAME,
                         document_index + 1,
                         award_sheet_content.columns.get_loc('proposalLegacyNumber'),
@@ -105,7 +105,7 @@ def populate_template_discipline(self):
             print(f"Process is {round(last_index/num_sheet_rows * 100)}% complete")
 
         if sheet_logger:
-            self.append_logs(SHEET_NAME, process_name, sheet_logger)
+            self.log_manager.append_logs(SHEET_NAME, process_name, sheet_logger)
     return Process(
         logic,
         process_name,
@@ -224,7 +224,7 @@ def populate_template_department(self):
                                         "Admin Unit Primary Code": f"{template_record_unit_code}:{dept_code}"
                                     }
                             else:
-                                self.append_comment(
+                                self.comment_manager.append_comment(
                                     SHEET_NAME,
                                     document_index + 1,
                                     proposal_sheet_content.columns.get_loc('Admin Unit'),
@@ -251,15 +251,14 @@ def populate_template_department(self):
                             }
                         else:
                             if not template_record_unit or template_record_unit not in valid_centers:
-                                print(template_record_unit in valid_centers)
-                                self.append_comment(
+                                self.comment_manager.append_comment(
                                     SHEET_NAME,
                                     document_index + 1,
                                     proposal_sheet_content.columns.get_loc('Admin Unit'),
                                     f"The record does not have a valid department in either the database or in the template."
                                 )
                 else:
-                    self.append_comment(
+                    self.comment_manager.append_comment(
                         SHEET_NAME,
                         document_index + 1,
                         proposal_sheet_content.columns.get_loc('proposalLegacyNumber'),
@@ -269,7 +268,7 @@ def populate_template_department(self):
             print(f"Process is {round(last_index/num_sheet_rows * 100)}% complete")
         
         if sheet_logger:
-            self.append_logs(SHEET_NAME, process_name, sheet_logger)
+            self.log_manager.append_logs(SHEET_NAME, process_name, sheet_logger)
     return Process(
         logic,
         process_name,
@@ -282,7 +281,7 @@ def populate_project_status(self):
         # Retrieve the content of the sheet
         proposal_sheet_content = self.df[SHEET_NAME]
         status_threshold = datetime.strptime('2024-01-01', '%Y-%m-%d')
-
+        # Missing Logging
         last_index = 0
         batch_limit = 40
         num_sheet_rows = len(proposal_sheet_content)
@@ -306,14 +305,14 @@ def populate_project_status(self):
                     if not pd.isna(record_end_date):
                         proposal_sheet_content.loc[document_index, 'status'] = "Active" if record_end_date >= status_threshold else "Closed"
                     else:
-                        self.append_comment(
+                        self.comment_manager.append_comment(
                             SHEET_NAME,
                             document_index + 1,
                             proposal_sheet_content.columns.get_loc('Project End Date'),
                             f"This field can not be left empty."
                         )
                 else:
-                    self.append_comment(
+                    self.comment_manager.append_comment(
                         SHEET_NAME,
                         document_index + 1,
                         proposal_sheet_content.columns.get_loc('proposalLegacyNumber'),

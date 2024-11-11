@@ -59,7 +59,7 @@ def modify_entries(self):
                                 l_name, f_name = username.split(", ")
                                 sheet_content.loc[bundle_item['index'], 'username'] = f_name + ' ' + l_name
                             else:
-                                self.append_comment(
+                                self.comment_manager.append_comment(
                                     SHEET_NAME,
                                     bundle_item['index'] + 1,
                                     sheet_content.columns.get_loc('username'),
@@ -71,21 +71,21 @@ def modify_entries(self):
                             if association:
                                 sheet_content.loc[bundle_item['index'], 'association 1'] = association
                             else:
-                                self.append_comment(
+                                self.comment_manager.append_comment(
                                     SHEET_NAME,
                                     bundle_item['index'] + 1,
                                     sheet_content.columns.get_loc('association'),
                                     "The entry does not have a Primary Department in the database."
                                 )
                     else:
-                        self.append_comment(
+                        self.comment_manager.append_comment(
                             SHEET_NAME,
                             bundle_item['index'] + 1,
                             sheet_content.columns.get_loc('legacyNumber'),
                             f"The database does not have any record associated with the legacyNumber {bundle_item['id']}"
                         )
         if sheet_logger:
-            self.append_logs(
+            self.log_manager.append_logs(
                 SHEET_NAME,
                 sheet_logger
             )

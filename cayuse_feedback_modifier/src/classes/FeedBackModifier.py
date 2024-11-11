@@ -4,11 +4,12 @@ load_dotenv("../env/.env.development")
 
 import pandas as pd
 import os
-import json
 import datetime
 import inspect
 
 from classes.DatabaseManager import DatabaseManager
+from classes.CommentManager import CommentManager
+from classes.LogManager import LogManager
 
 import sheets.attachments as attachments
 import sheets.members as members
@@ -17,33 +18,25 @@ import sheets.proposals as proposals
 import sheets.projects as projects
 import sheets.others as others
 
-from methods import logger
-from methods import comment
-
 class FeedBackModifier:
-    # Variable that will store comments before creating them in the excel file
-    comment_cache = dict()
 
     def __init__(self):
         # Read Excel file
         self.df = pd.read_excel(os.getenv('EXCEL_FILE_PATH'), sheet_name=None)
-        # Store the sheet names
-        self.sheets = list(self.df.keys())
 
+        # Initialize an instance of the DatabaseManager class
         self.db_manager = DatabaseManager()
         self.db_manager.init_db_conn()
 
-        # Variable that will store the path of the json file that will store the logs
-        self.logs_path = os.path.join(os.getenv('SAVE_PATH') or os.path.dirname(self.filepath), 'cayuse_data_migration_logs.json')
-        # If the file exists:
-        if os.path.exists(self.logs_path):
-            # Store the logs in a variable
-            with open(self.logs_path) as json_file:
-                self.logs = json.load(json_file)
-        else:
-            # Initialize an empty dictionary
-            self.logs = dict()
+        # Initialize an instance of the CommentManager class
+        self.comment_manager = CommentManager(os.getenv('EXCEL_FILE_PATH'))
 
+        # Initialize an instance of the LogManager class
+        self.log_manager = LogManager(os.path.join(os.getenv('SAVE_PATH') or os.path.dirname(self.filepath), 'cayuse_data_migration_logs.json'))
+
+        self.init_processes()
+
+    def init_processes(self):
         all_processes = dict()
         for sheet_methods in [awards, proposals, projects, members, attachments, others]:
             sheet_processes = dict()
@@ -68,17 +61,9 @@ class FeedBackModifier:
                     df_sheet.to_excel(writer, sheet_name=sheet_name, index=index)
 
             # Create cell comments in excel file
-            self.create_comments(full_path)
+            self.comment_manager.create_comments(full_path)
             # Save the changes made to the logger
-            self.save_logs()
+            self.log_manager.save_logs()
 
         except Exception as e:
             print(f"Error occured while saving changes: {e}")
-
-# Logger related methods
-FeedBackModifier.append_logs = logger.append_logs
-FeedBackModifier.save_logs = logger.save_logs
-
-# Comment related methods
-FeedBackModifier.append_comment = comment.append_comment
-FeedBackModifier.create_comments = comment.create_comments

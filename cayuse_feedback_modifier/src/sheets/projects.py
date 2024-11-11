@@ -23,7 +23,7 @@ def populate_project_status(self):
                 if not pd.isna(proposal_record_status):
                     proposal_sheet_content.loc[document_index, 'status'] = proposal_record_status
                 else:
-                    self.append_comment(
+                    self.comment_manager.append_comment(
                         SHEET_NAME,
                         document_index + 1,
                         project_sheet_content.columns.get_loc('status'),
@@ -31,7 +31,7 @@ def populate_project_status(self):
                     )
             else:
                 print(record_pln)
-                self.append_comment(
+                self.comment_manager.append_comment(
                     SHEET_NAME,
                     document_index + 1,
                     project_sheet_content.columns.get_loc('projectLegacyNumber'),

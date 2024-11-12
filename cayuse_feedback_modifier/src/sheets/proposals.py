@@ -294,10 +294,11 @@ def populate_template_department(self):
 def populate_project_status(self):
     process_name = "Populate Template Status"
     def logic():
+        sheet_logger = dict()
         # Retrieve the content of the sheet
         proposal_sheet_content = self.df[SHEET_NAME]
         status_threshold = datetime.strptime('2024-01-01', '%Y-%m-%d')
-        # Missing Logging
+        # ** Missing Logging
         last_index = 0
         batch_limit = 40
         num_sheet_rows = len(proposal_sheet_content)
@@ -309,24 +310,138 @@ def populate_project_status(self):
             last_index = new_end
 
             batch_ids = batch_records['proposalLegacyNumber']
-            search_query = f"SELECT Grant_ID, End_Date FROM grants WHERE Grant_ID IN ({','.join(['?' for _ in batch_ids])})"
+            search_query = f"SELECT Grant_ID, Start_Date_Req AS Start_Date, End_Date_Req AS End_Date, Status as OAR_Status FROM grants WHERE Grant_ID IN ({','.join(['?' for _ in batch_ids])})"
             search_result = self.db_manager.execute_query(search_query, *batch_ids)
-            record_db_date = { data['Grant_ID']: data['End_Date'] for data in search_result }
-            
-            for document_index, props in batch_records.iterrows():
-                record_grant_id = props['proposalLegacyNumber']
-                record_end_date = props['Project End Date']
-                if record_grant_id in record_db_date:
-                    # *** Missing Check if template end_date is the same as db end_date
-                    if not pd.isna(record_end_date):
-                        proposal_sheet_content.loc[document_index, 'status'] = "Active" if record_end_date >= status_threshold else "Closed"
+            search_db_data = { data['Grant_ID']: data for data in search_result }
+
+            for document_index, record_template_data in batch_records.iterrows():
+                record_grant_id = record_template_data['proposalLegacyNumber']
+                record_db_data = search_db_data.get(record_grant_id)
+                if record_db_data:
+                    record_template_status = record_template_data['status']
+                    record_template_oar = record_template_data['OAR Status']
+                    record_db_oar = record_db_data['OAR_Status']
+                    if pd.isna(record_template_oar):
+                        if record_db_oar:
+                            proposal_sheet_content.loc[document_index, 'OAR Status'] = record_db_oar
+                            sheet_logger[f"template:{record_grant_id}"] = {
+                                "OAR Status": f"{record_template_oar}:{record_db_oar}"
+                            }
+                            record_template_oar = record_db_oar
+                        else:
+                            self.comment_manager.append_comment(
+                                SHEET_NAME,
+                                document_index + 1,
+                                proposal_sheet_content.columns.get_loc('OAR Status'),
+                                f"The record does not have a Status value in either the template or the database."
+                            )
                     else:
-                        self.comment_manager.append_comment(
-                            SHEET_NAME,
-                            document_index + 1,
-                            proposal_sheet_content.columns.get_loc('Project End Date'),
-                            f"This field can not be left empty."
-                        )
+                        if not record_db_oar:
+                            update_query = """
+                                UPDATE grants
+                                SET OAR_Status = ?
+                                WHERE Grant_ID = ?
+                            """
+                            self.db_manager.execute_query(update_query, record_template_oar, record_grant_id)
+                            sheet_logger[f"database:{record_grant_id}"] = {
+                                "Start_Date_Req": f"{record_db_oar}:{record_template_oar}"
+                            }
+                            record_db_oar = record_template_oar
+                        elif record_template_oar != record_db_oar:
+                            self.comment_manager.append_comment(
+                                SHEET_NAME,
+                                document_index + 1,
+                                proposal_sheet_content.columns.get_loc('OAR Status'),
+                                f"The record has a different OAR Status in the database ({record_db_oar}). This form of inconsistency can cause incorrect data to be generated."
+                            )
+
+                    if record_template_oar != "Rejected":
+                        record_template_start_date = record_template_data['Project Start Date']
+                        record_db_start_date = record_db_data['Start_Date']
+                        if pd.isna(record_template_start_date):
+                            if record_db_start_date:
+                                proposal_sheet_content.loc[document_index, 'Project Start Date'] = record_db_start_date
+                                sheet_logger[f"template:{record_grant_id}"] = {
+                                    "Project Start Date": f"{record_template_start_date}:{record_db_start_date}"
+                                }
+                                record_template_start_date = record_db_start_date
+                            else:
+                                self.comment_manager.append_comment(
+                                    SHEET_NAME,
+                                    document_index + 1,
+                                    proposal_sheet_content.columns.get_loc('Project Start Date'),
+                                    f"The record does not have a Project Start Date value in either the template or the database."
+                                )
+                        else:
+                            if not record_db_start_date:
+                                update_query = """
+                                    UPDATE grants
+                                    SET Start_Date_Req = ?
+                                    WHERE Grant_ID = ?
+                                """
+                                self.db_manager.execute_query(update_query, record_template_start_date, record_grant_id)
+                                sheet_logger[f"database:{record_grant_id}"] = {
+                                    "Start_Date_Req": f"{record_db_start_date}:{record_template_start_date}"
+                                }
+                                record_db_start_date = record_template_start_date
+                            elif record_template_start_date != record_db_start_date:
+                                self.comment_manager.append_comment(
+                                    SHEET_NAME,
+                                    document_index + 1,
+                                    proposal_sheet_content.columns.get_loc('Project Start Date'),
+                                    f"The record has a different Start date in the database ({record_db_start_date}). This form of inconsistency can cause incorrect data to be generated."
+                                )
+
+                        record_template_end_date = record_template_data['Project End Date']
+                        record_db_end_date = record_db_data['End_Date']
+                        if pd.isna(record_template_end_date):
+                            if record_db_end_date:
+                                proposal_sheet_content.loc[document_index, 'Project End Date'] = record_db_end_date
+                                sheet_logger[f"template:{record_grant_id}"] = {
+                                    "Project End Date": f"{record_template_end_date}:{record_db_end_date}"
+                                }
+                                record_template_end_date = record_db_end_date
+                            else:
+                                self.comment_manager.append_comment(
+                                    SHEET_NAME,
+                                    document_index + 1,
+                                    proposal_sheet_content.columns.get_loc('Project End Date'),
+                                    f"The record does not have a Project End Date value in either the template or the database."
+                                )
+                        else:
+                            if not record_db_end_date:
+                                update_query = """
+                                    UPDATE grants
+                                    SET End_Date_Req = ?
+                                    WHERE Grant_ID = ?
+                                """
+                                self.db_manager.execute_query(update_query, record_template_end_date, record_grant_id)
+                                sheet_logger[f"database:{record_grant_id}"] = {
+                                    "End_Date_Req": f"{record_db_end_date}:{record_template_end_date}"
+                                }
+                                record_db_end_date = record_template_end_date
+                            elif record_template_end_date != record_db_end_date:
+                                self.comment_manager.append_comment(
+                                    SHEET_NAME,
+                                    document_index + 1,
+                                    proposal_sheet_content.columns.get_loc('Project End Date'),
+                                    f"The record has a different End date in the database ({record_db_end_date}). This form of inconsistency can cause incorrect data to be generated."
+                                )
+                        
+                        determined_oar = ("Active" if record_template_end_date >= status_threshold else "Closed") if record_template_end_date else None
+                        if not determined_oar:
+                            self.comment_manager.append_comment(
+                                SHEET_NAME,
+                                document_index + 1,
+                                proposal_sheet_content.columns.get_loc('status'),
+                                f"A correct status was not able to be determined for this record. Please check other cells in the record for possible issues."
+                            )
+                        elif record_template_status != determined_oar:
+                            proposal_sheet_content.loc[document_index, 'status'] = determined_oar
+                            sheet_logger[f"template:{record_grant_id}"] = { "status": f"{record_template_status}:{determined_oar}" }
+                    elif record_template_status != "Rejected":
+                        proposal_sheet_content.loc[document_index, 'status'] = "Closed"
+                        sheet_logger[f"template:{record_grant_id}"] = { "status": f"{record_template_data['status']}:Closed" }
                 else:
                     self.comment_manager.append_comment(
                         SHEET_NAME,
@@ -335,14 +450,18 @@ def populate_project_status(self):
                         f"The record with grant_id {record_grant_id} does not exist in the database."
                     )
 
+        if sheet_logger:
+            self.log_manager.append_logs(SHEET_NAME, process_name, sheet_logger)
+
     return Process(
         logic,
         process_name,
         "This process goes through every record in the Proposals sheet and determines the appropriate status for the records."
     )
 
+# Needs improving
 def validate_project_instrument_type(self):
-    process_name = "Validate Project Instrument Type"
+    process_name = "Validate Template Instrument Type"
     def logic():
         # Retrieve the content of the sheet
         proposal_sheet_content = self.df[SHEET_NAME]

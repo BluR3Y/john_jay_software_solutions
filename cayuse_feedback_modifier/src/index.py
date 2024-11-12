@@ -12,6 +12,7 @@ if __name__ == "__main__":
     # Add optional flags and arguments
     parser.add_argument('--sheet', '-s', type=str, help="The name of the workbook sheet that the process belongs to.")
     parser.add_argument('--process', '-p', action="append", help='Add process to call.')
+    parser.add_argument('--dev', action='store_true', help="Run process in developer mode.")
 
     # Parse the arguments
     args = parser.parse_args()
@@ -30,7 +31,8 @@ if __name__ == "__main__":
                 raise Exception(f"The sheet '{selected_sheet}' does not exist in the workbook.")
             
             # Save changes
-            my_instance.save_changes()
+            if not args.dev:
+                my_instance.save_changes()
         else:
             raise Exception("Not all required arguments were passed.")
     else:

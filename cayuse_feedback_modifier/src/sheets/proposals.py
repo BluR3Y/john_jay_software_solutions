@@ -10,7 +10,7 @@ def populate_template_discipline(self):
     def logic():
         sheet_logger = dict()
         # Retrieve the content of the proposal sheet
-        proposal_sheet_content = self.df[SHEET_NAME]
+        proposal_sheet_content = self.template_manager.df[SHEET_NAME]
 
         # Retrieve the disciplines from the table LU_Discipline in the database
         discipline_query = "SELECT Name FROM LU_Discipline;"
@@ -158,7 +158,7 @@ def populate_template_department(self):
 
         sheet_logger = dict()
         # Retrieve the content of the proposal sheet
-        proposal_sheet_content = self.df[SHEET_NAME]
+        proposal_sheet_content = self.template_manager.df[SHEET_NAME]
 
         last_index = 0
         batch_limit = 40
@@ -296,7 +296,7 @@ def populate_project_status(self):
     def logic():
         sheet_logger = dict()
         # Retrieve the content of the sheet
-        proposal_sheet_content = self.df[SHEET_NAME]
+        proposal_sheet_content = self.template_manager.df[SHEET_NAME]
         status_threshold = datetime.strptime('2024-01-01', '%Y-%m-%d')
         # ** Missing Logging
         last_index = 0
@@ -321,39 +321,66 @@ def populate_project_status(self):
                     record_template_status = record_template_data['status']
                     record_template_oar = record_template_data['OAR Status']
                     record_db_oar = record_db_data['OAR_Status']
-                    if pd.isna(record_template_oar):
-                        if record_db_oar:
-                            proposal_sheet_content.loc[document_index, 'OAR Status'] = record_db_oar
+                    if not pd.isna(record_template_oar) and record_db_oar:
+                        are_equivalent = ("Pending" if record_template_oar == "Submitted to Sponsor" else record_template_oar) == record_db_oar
+                        if not are_equivalent:
+                            absolute_states = ['Funded','Rejected']
+                            is_template_oar_absolute = record_template_oar in absolute_states
+                            is_db_oar_absolute = record_db_oar in absolute_states
+                            if is_template_oar_absolute ^ is_db_oar_absolute:
+                                if is_template_oar_absolute:
+                                    update_query = """
+                                        UPDATE grants
+                                        SET OAR_Status = ?
+                                        WHERE Grant_ID = ?
+                                    """
+                                    new_db_oar = "Pending" if record_template_oar == "Submitted to Sponsor" else record_template_oar
+                                    self.db_manager.execute_query(update_query, new_db_oar, record_grant_id)
+                                    sheet_logger[f"database:{record_grant_id}"] = {
+                                        "OAR_Status": f"{record_db_oar}:{new_db_oar}"
+                                    }
+                                    record_db_oar = new_db_oar
+                                else:
+                                    new_template_oar = "Submitted to Sponsor" if record_db_oar == "Pending" else record_db_oar
+                                    proposal_sheet_content.loc[document_index, 'OAR Status'] = new_template_oar
+                                    sheet_logger[f"template:{record_grant_id}"] = {
+                                        "OAR Status": f"{record_template_oar}:{new_template_oar}"
+                                    }
+                                    record_template_oar = new_template_oar
+                            else:
+                                self.comment_manager.append_comment(
+                                    SHEET_NAME,
+                                    document_index + 1,
+                                    proposal_sheet_content.columns.get_loc('OAR Status'),
+                                    f"The record has a different OAR Status in the database ({record_db_oar}). This form of inconsistency can cause incorrect data to be generated."
+                                )
+                    elif not pd.isna(record_template_oar) or record_db_oar:
+                        if pd.isna(record_template_oar):
+                            new_template_oar = "Submitted to Sponsor" if record_db_oar == "Pending" else record_db_oar
+                            proposal_sheet_content.loc[document_index, 'OAR Status'] = new_template_oar
                             sheet_logger[f"template:{record_grant_id}"] = {
-                                "OAR Status": f"{record_template_oar}:{record_db_oar}"
+                                "OAR Status": f"{record_template_oar}:{new_template_oar}"
                             }
-                            record_template_oar = record_db_oar
+                            record_template_oar = new_template_oar
                         else:
-                            self.comment_manager.append_comment(
-                                SHEET_NAME,
-                                document_index + 1,
-                                proposal_sheet_content.columns.get_loc('OAR Status'),
-                                f"The record does not have a Status value in either the template or the database."
-                            )
-                    else:
-                        if not record_db_oar:
+                            new_db_oar = "Pending" if record_template_oar == "Submitted to Sponsor" else record_template_oar
                             update_query = """
                                 UPDATE grants
                                 SET OAR_Status = ?
                                 WHERE Grant_ID = ?
                             """
-                            self.db_manager.execute_query(update_query, record_template_oar, record_grant_id)
+                            self.db_manager.execute_query(update_query, new_db_oar, record_grant_id)
                             sheet_logger[f"database:{record_grant_id}"] = {
-                                "Start_Date_Req": f"{record_db_oar}:{record_template_oar}"
+                                "OAR_Status": f"{record_db_oar}:{new_db_oar}"
                             }
-                            record_db_oar = record_template_oar
-                        elif record_template_oar != record_db_oar:
-                            self.comment_manager.append_comment(
-                                SHEET_NAME,
-                                document_index + 1,
-                                proposal_sheet_content.columns.get_loc('OAR Status'),
-                                f"The record has a different OAR Status in the database ({record_db_oar}). This form of inconsistency can cause incorrect data to be generated."
-                            )
+                            record_db_oar = new_db_oar
+                    else:
+                        self.comment_manager.append_comment(
+                            SHEET_NAME,
+                            document_index + 1,
+                            proposal_sheet_content.columns.get_loc('OAR Status'),
+                            f"The record does not have a Status value in either the template or the database."
+                        )
 
                     if record_template_oar != "Rejected":
                         record_template_start_date = record_template_data['Project Start Date']
@@ -428,17 +455,17 @@ def populate_project_status(self):
                                     f"The record has a different End date in the database ({record_db_end_date}). This form of inconsistency can cause incorrect data to be generated."
                                 )
                         
-                        determined_oar = ("Active" if record_template_end_date >= status_threshold else "Closed") if record_template_end_date else None
-                        if not determined_oar:
+                        determined_status = ("Active" if record_template_end_date >= status_threshold else "Closed") if record_template_end_date else None
+                        if not determined_status:
                             self.comment_manager.append_comment(
                                 SHEET_NAME,
                                 document_index + 1,
                                 proposal_sheet_content.columns.get_loc('status'),
                                 f"A correct status was not able to be determined for this record. Please check other cells in the record for possible issues."
                             )
-                        elif record_template_status != determined_oar:
-                            proposal_sheet_content.loc[document_index, 'status'] = determined_oar
-                            sheet_logger[f"template:{record_grant_id}"] = { "status": f"{record_template_status}:{determined_oar}" }
+                        elif record_template_status != determined_status:
+                            proposal_sheet_content.loc[document_index, 'status'] = determined_status
+                            sheet_logger[f"template:{record_grant_id}"] = { "status": f"{record_template_status}:{determined_status}" }
                     elif record_template_status != "Rejected":
                         proposal_sheet_content.loc[document_index, 'status'] = "Closed"
                         sheet_logger[f"template:{record_grant_id}"] = { "status": f"{record_template_data['status']}:Closed" }
@@ -464,16 +491,24 @@ def validate_project_instrument_type(self):
     process_name = "Validate Template Instrument Type"
     def logic():
         # Retrieve the content of the sheet
-        proposal_sheet_content = self.df[SHEET_NAME]
+        proposal_sheet_content = self.template_manager.df[SHEET_NAME]
         valid_instrument_types = ['Grant', 'Contract', 'Cooperative Agreement', 'Incoming Subaward', 'NYC/NYS MOU - Interagency Agreement', 'PSC CUNY', 'CUNY Internal']
 
         for index, type in enumerate(proposal_sheet_content['Instrument Type']):
-            if type not in valid_instrument_types:
+            if not pd.isna(type):
+                if type not in valid_instrument_types:
+                    self.comment_manager.append_comment(
+                        SHEET_NAME,
+                        index + 1,
+                        proposal_sheet_content.columns.get_loc('Instrument Type'),
+                        "Record has an invalid instrument type."
+                    )
+            else:
                 self.comment_manager.append_comment(
                     SHEET_NAME,
                     index + 1,
                     proposal_sheet_content.columns.get_loc('Instrument Type'),
-                    "Record has invalid instrument type."
+                    "Instrument Type can not be left empty."
                 )
 
     return Process(

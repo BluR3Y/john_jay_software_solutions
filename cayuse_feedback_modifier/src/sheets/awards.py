@@ -93,7 +93,7 @@ def populate_template_discipline(self):
     def logic():
         sheet_logger = dict()
         # Retrieve the content of the proposal sheet
-        proposal_sheet_content = self.df[SHEET_NAME]
+        proposal_sheet_content = self.template_manager.df[SHEET_NAME]
 
         # Retrieve the disciplines from the table LU_Discipline in the database
         discipline_query = "SELECT Name FROM LU_Discipline;"
@@ -241,7 +241,7 @@ def populate_template_department(self):
 
         sheet_logger = dict()
         # Retrieve the content of the proposal sheet
-        proposal_sheet_content = self.df[SHEET_NAME]
+        proposal_sheet_content = self.template_manager.df[SHEET_NAME]
 
         last_index = 0
         batch_limit = 40

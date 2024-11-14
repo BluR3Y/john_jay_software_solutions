@@ -10,6 +10,7 @@ import inspect
 from classes.DatabaseManager import DatabaseManager
 from classes.CommentManager import CommentManager
 from classes.LogManager import LogManager
+from classes.TemplateManager import TemplateManager
 
 import sheets.attachments as attachments
 import sheets.members as members
@@ -21,8 +22,11 @@ import sheets.others as others
 class FeedBackModifier:
 
     def __init__(self):
-        # Read Excel file
-        self.df = pd.read_excel(os.getenv('EXCEL_FILE_PATH'), sheet_name=None)
+        # Initialize an instance of the LogManager class
+        self.log_manager = LogManager(os.path.join(os.getenv('SAVE_PATH') or os.path.dirname(self.filepath), 'cayuse_data_migration_logs.json'))
+
+        # Initialize an instance of the TemplateManager class
+        self.template_manager = TemplateManager(self.log_manager, os.getenv('EXCEL_FILE_PATH'))
 
         # Initialize an instance of the DatabaseManager class
         self.db_manager = DatabaseManager()
@@ -30,9 +34,6 @@ class FeedBackModifier:
 
         # Initialize an instance of the CommentManager class
         self.comment_manager = CommentManager(os.getenv('EXCEL_FILE_PATH'))
-
-        # Initialize an instance of the LogManager class
-        self.log_manager = LogManager(os.path.join(os.getenv('SAVE_PATH') or os.path.dirname(self.filepath), 'cayuse_data_migration_logs.json'))
 
         self.init_processes()
 
@@ -54,12 +55,8 @@ class FeedBackModifier:
             file_name = f"{os.path.splitext(os.path.basename(excel_file_path))[0]}{f" - modified_copy_{datetime.datetime.today().strftime('%m-%d-%Y')}" if as_copy else ''}.xlsx"
             full_path = os.path.join(file_save_path, file_name)
 
-            # Use ExcelWriter to write multiple sheets back into the Excel file
-            with pd.ExcelWriter(full_path, engine='openpyxl', mode='w') as writer:
-                for sheet_name, df_sheet in self.df.items():
-                    # Leave index as False if you don't want to save the index column from the DataFrame
-                    df_sheet.to_excel(writer, sheet_name=sheet_name, index=index)
-
+            # Save the changes made to the template
+            self.template_manager.save_changes(full_path)
             # Create cell comments in excel file
             self.comment_manager.create_comments(full_path)
             # Save the changes made to the logger

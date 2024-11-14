@@ -5,7 +5,7 @@ SHEET_NAME = "Members - Template"
 def modify_entries(self):
     def logic():
         # Store the sheet's content
-        sheet_content = self.df[SHEET_NAME]
+        sheet_content = self.template_manager.df[SHEET_NAME]
         # Store entries that need modifying
         modifying_entries = [[
            {

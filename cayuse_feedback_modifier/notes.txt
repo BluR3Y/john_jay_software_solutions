@@ -1,0 +1,3 @@
+Things to do:
+    - Modify processes to retrieve dataframe from "TemplateMananger" instance instead of "self.df"
+    - Implement log manager into "DatabaseManager" and "TemplateMananger" classes to handle logging automatically rather manually.

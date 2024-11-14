@@ -16,7 +16,7 @@ def verify_entries(self):
             raise Exception("Invalid directory provided")
         
         # Store the sheet's content
-        sheet_content = self.df[SHEET_NAME]
+        sheet_content = self.template_manager.df[SHEET_NAME]
         # Loop through every row in the sheet
         for index, row in sheet_content.iterrows():
             # Retrieve the record's filepath
@@ -49,9 +49,9 @@ def missing_project_attachments(self):
     def logic():
         award_sheet_name = 'Award - Template'
         proposal_sheet_name = 'Proposal - Template'
-        award_sheet_content = self.df[award_sheet_name]
-        proposal_sheet_content = self.df[proposal_sheet_name]
-        attachment_sheet_content = self.df[SHEET_NAME]
+        award_sheet_content = self.template_manager.df[award_sheet_name]
+        proposal_sheet_content = self.template_manager.df[proposal_sheet_name]
+        attachment_sheet_content = self.template_manager.df[SHEET_NAME]
 
         # dict with keep track of how many attachments each project has in the 'Attachments' sheet
         attachment_counter = dict()
@@ -89,7 +89,7 @@ def missing_project_attachments(self):
                 )
 
         if new_rows:
-            self.df[SHEET_NAME] = self.df[SHEET_NAME].__append(new_rows, ignore_index=True)
+            self.template_manager.df[SHEET_NAME] = self.template_manager.df[SHEET_NAME].__append(new_rows, ignore_index=True)
             self.log_manager.append_logs(SHEET_NAME, process_name, list(new_rows))
 
     return Process(
@@ -103,7 +103,7 @@ def populate_project_info(self):
     def logic():
         # Missing Logging functionality
         sheet_logger = dict()
-        attachment_sheet_content = self.df[SHEET_NAME]
+        attachment_sheet_content = self.template_manager.df[SHEET_NAME]
         projects = dict()
 
         for index, project in attachment_sheet_content.iterrows():

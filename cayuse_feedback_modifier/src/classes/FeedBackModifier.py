@@ -23,14 +23,14 @@ class FeedBackModifier:
 
     def __init__(self):
         # Initialize an instance of the LogManager class
-        self.log_manager = LogManager(os.path.join(os.getenv('SAVE_PATH') or os.path.dirname(self.filepath), 'cayuse_data_migration_logs.json'))
+        # self.log_manager = LogManager(os.path.join(os.getenv('SAVE_PATH') or os.path.dirname(self.filepath), 'cayuse_data_migration_logs.json'))
 
         # Initialize an instance of the TemplateManager class
-        self.template_manager = TemplateManager(self.log_manager, os.getenv('EXCEL_FILE_PATH'))
+        self.template_manager = TemplateManager(os.getenv('EXCEL_FILE_PATH'), os.path.join(os.getenv('SAVE_PATH') or os.path.dirname(self.filepath), 'cayuse_data_migration_template_logs.json'))
 
         # Initialize an instance of the DatabaseManager class
-        self.db_manager = DatabaseManager()
-        self.db_manager.init_db_conn()
+        self.db_manager = DatabaseManager(os.path.join(os.getenv('SAVE_PATH') or os.path.dirname(self.filepath), 'cayuse_data_migration_database_logs.json'))
+        self.db_manager.init_db_conn(os.getenv('ACCESS_DB_PATH'))
 
         # Initialize an instance of the CommentManager class
         self.comment_manager = CommentManager(os.getenv('EXCEL_FILE_PATH'))
@@ -59,8 +59,6 @@ class FeedBackModifier:
             self.template_manager.save_changes(full_path)
             # Create cell comments in excel file
             self.comment_manager.create_comments(full_path)
-            # Save the changes made to the logger
-            self.log_manager.save_logs()
 
         except Exception as e:
             print(f"Error occured while saving changes: {e}")

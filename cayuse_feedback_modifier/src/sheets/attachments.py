@@ -101,8 +101,6 @@ def missing_project_attachments(self):
 def populate_project_info(self):
     process_name = "Fill Missing Attachment Columns"
     def logic():
-        # Missing Logging functionality
-        sheet_logger = dict()
         attachment_sheet_content = self.template_manager.df[SHEET_NAME]
         projects = dict()
 
@@ -123,17 +121,45 @@ def populate_project_info(self):
         populated_projects = dict()
         for bundle in bundles:
             bundle_ids = [key for key, value in bundle.items()]
-            query = f"SELECT Primary_PI, RF_Account, Sponsor_1, Sponsor_2, Grant_ID FROM grants WHERE Grant_ID IN ({','.join(['?' for _ in bundle_ids])})"
-            db_data = self.db_manager.execute_query(query, bundle_ids)
+            db_data = self.db_manager.select_query(
+                "grants",
+                ["Primary_PI","RF_Account", "Sponsor_1", "Sponsor_2", "Grant_ID"],
+                f"Grant_ID IN ({','.join(['?' for _ in bundle_ids])})",
+                bundle_ids
+            )
             populated_projects.update({bundle[entry['Grant_ID']]['project_legacy_number']: entry for entry in db_data})
 
         for index, row in attachment_sheet_content.iterrows():
             associated_project = populated_projects.get(row['projectLegacyNumber'])
             if (associated_project):
-                attachment_sheet_content.loc[index, 'PI_Name'] = associated_project['Primary_PI']
-                attachment_sheet_content.loc[index, 'RF_Account'] = associated_project['RF_Account']
-                attachment_sheet_content.loc[index, 'Orig_Sponsor'] = associated_project['Sponsor_2']
-                attachment_sheet_content.loc[index, 'Sponsor'] = associated_project['Sponsor_1']
+                self.template_manager.update_cell(
+                    process_name,
+                    SHEET_NAME,
+                    index,
+                    'PI_Name',
+                    associated_project['Primary_PI']
+                )
+                self.template_manager.update_cell(
+                    process_name,
+                    SHEET_NAME,
+                    index,
+                    'RF_Account',
+                    associated_project['RF_Account']
+                )
+                self.template_manager.update_cell(
+                    process_name,
+                    SHEET_NAME,
+                    index,
+                    'Orig_Sponsor',
+                    associated_project['Sponsor_2']
+                )
+                self.template_manager.update_cell(
+                    process_name,
+                    SHEET_NAME,
+                    index,
+                    'Sponsor',
+                    associated_project['Sponsor_1']
+                )
             else:
                 first_record = attachment_sheet_content.loc[attachment_sheet_content['legacyNumber'] == row['legacyNumber']].index[0]
                 self.comment_manager.append_comment(
@@ -142,9 +168,6 @@ def populate_project_info(self):
                     attachment_sheet_content.columns.get_loc('legacyNumber'),
                     f"Database does not contain any record with {row['legacyNumber']} as the Grant_ID."
                 )
-        
-        if sheet_logger:
-            self.log_manager.append_logs(SHEET_NAME, process_name, sheet_logger)
     return Process(
         logic,
         process_name,

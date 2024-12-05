@@ -3,6 +3,7 @@ from methods import utils
 
 SHEET_NAME = "Other"
 
+# ***** Must be updated to work with new DatabaseManager methods
 def database_record_modifier(self):
     process_name = "Modify Database Records"
     def logic():

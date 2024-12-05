@@ -3,6 +3,7 @@ from classes.Process import Process
 SHEET_NAME = "Members - Template"
 
 def modify_entries(self):
+    process_name = 'Modify Template Entries'
     def logic():
         # Store the sheet's content
         sheet_content = self.template_manager.df[SHEET_NAME]
@@ -16,8 +17,6 @@ def modify_entries(self):
         ]]
         # Bundle entries to reduce number of requests made to the database
         bundle_max = 40
-        # Local sheet logger
-        sheet_logger = dict()
         
         # Loop through every row in the sheet
         for index, row in sheet_content.iterrows():
@@ -47,8 +46,12 @@ def modify_entries(self):
         if modifying_entries[0]:
             for bundle in modifying_entries:
                 bundle_ids = [item['id'] for item in bundle]
-                query = f"SELECT Primary_PI, Primary_Dept, Grant_ID FROM grants WHERE Grant_ID IN ({','.join(['?' for _ in bundle_ids])})"
-                db_data = self.db_manager.execute_query(query, bundle_ids)
+                db_data = self.db_manager.select_query(
+                    "grants",
+                    ["Primary_PI","Primary_Dept","Grant_ID"],
+                    f"Grant_ID IN ({','.join(['?' for _ in bundle_ids])})",
+                    bundle_ids
+                )
                 db_data_dict = {entry["Grant_ID"]: entry for entry in db_data}
 
                 for bundle_item in bundle:
@@ -57,7 +60,13 @@ def modify_entries(self):
                             username = db_data_dict[bundle_item['id']]['Primary_PI']
                             if username:
                                 l_name, f_name = username.split(", ")
-                                sheet_content.loc[bundle_item['index'], 'username'] = f_name + ' ' + l_name
+                                self.template_manager.update_cell(
+                                    process_name,
+                                    SHEET_NAME,
+                                    bundle_item['index'],
+                                    'username',
+                                    f_name + ' ' + l_name
+                                )
                             else:
                                 self.comment_manager.append_comment(
                                     SHEET_NAME,
@@ -69,7 +78,13 @@ def modify_entries(self):
                         if "association" in bundle_item['properties']:
                             association = db_data_dict[bundle_item['id']]['Primary_Dept']
                             if association:
-                                sheet_content.loc[bundle_item['index'], 'association 1'] = association
+                                self.template_manager.update_cell(
+                                    process_name,
+                                    SHEET_NAME,
+                                    bundle_item['index'],
+                                    'association 1',
+                                    association
+                                )
                             else:
                                 self.comment_manager.append_comment(
                                     SHEET_NAME,
@@ -84,14 +99,9 @@ def modify_entries(self):
                             sheet_content.columns.get_loc('legacyNumber'),
                             f"The database does not have any record associated with the legacyNumber {bundle_item['id']}"
                         )
-        if sheet_logger:
-            self.log_manager.append_logs(
-                SHEET_NAME,
-                sheet_logger
-            )
 
     return Process(
         logic,
-        'Modify Template Entries',
+        process_name,
         "The process goes through every record in the Members sheet and validates if the values for 'username' and 'association' are populated. If those record columns are empty in the template, they will be populated with data that exists in the database"
     )

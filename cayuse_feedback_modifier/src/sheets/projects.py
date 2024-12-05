@@ -22,7 +22,13 @@ def populate_project_status(self):
                 correlating_proposal_record = record_search.iloc[0]
                 proposal_record_status = correlating_proposal_record['status']
                 if not pd.isna(proposal_record_status):
-                    project_sheet_content.loc[document_index, 'status'] = proposal_record_status
+                    self.template_manager.update_cell(
+                        process_name,
+                        SHEET_NAME,
+                        document_index,
+                        "status",
+                        proposal_record_status
+                    )
                 else:
                     self.comment_manager.append_comment(
                         SHEET_NAME,
@@ -32,7 +38,13 @@ def populate_project_status(self):
                     )
                 proposal_record_oar = correlating_proposal_record['OAR Status']
                 if not pd.isna(proposal_record_oar):
-                    project_sheet_content.loc[document_index, 'OAR Status'] = proposal_record_oar
+                    self.template_manager.update_cell(
+                        process_name,
+                        SHEET_NAME,
+                        document_index,
+                        "OAR Status",
+                        proposal_record_oar
+                    )
                 else:
                     self.comment_manager.append_comment(
                         SHEET_NAME,

@@ -6,6 +6,7 @@ from classes.Process import Process
 
 SHEET_NAME = "Award - Template"
 
+# *** Logging needs to be updated
 def populate_db_discipline(self):
     process_name = 'Populate Database Disciplines'
     def logic():
@@ -19,8 +20,10 @@ def populate_db_discipline(self):
         )
         sheet_logger = dict()
 
-        discipline_query = "SELECT Name FROM LU_Discipline;"
-        result = self.db_manager.execute_query(discipline_query)
+        result = self.db_manager.select_query(
+            "LU_Discipline",
+            ["Name"],
+        )
         project_disciplines = { discipline["Name"]: {
             "primary_keys": []
         } for discipline in result}
@@ -59,20 +62,21 @@ def populate_db_discipline(self):
         for index, key in enumerate(project_disciplines):
             if project_disciplines[key]["primary_keys"]:
                 primary_keys = set(project_disciplines[key]["primary_keys"])
-                verify_query = f"""
-                    SELECT RF_Account
-                    FROM grants
-                    WHERE RF_Account IN ({','.join(['?' for _ in primary_keys])})
-                """
-                verify_result = self.db_manager.execute_query(verify_query, *primary_keys)
+                verify_result = self.db_manager.select_query(
+                    "grants",
+                    ["RF_Account"],
+                    f"RF_Account IN ({','.join(['?' for _ in primary_keys])})",
+                    *primary_keys
+                )
                 existing_keys = set([key['RF_Account'] for key in verify_result])
                 if existing_keys:
-                    update_query = f"""
-                        UPDATE grants
-                        SET Discipline = ?
-                        WHERE RF_Account IN ({','.join(['?' for _ in existing_keys])})
-                    """
-                    self.db_manager.execute_query(update_query, key, *existing_keys)
+                    self.db_manager.update_query(
+                        process_name,
+                        "grants",
+                        {"Discipline":key},
+                        f"RF_Account IN ({','.join(['?' for _ in existing_keys])})",
+                        *existing_keys
+                    )
                 
                 missing_keys = primary_keys - existing_keys
                 for key in missing_keys:
@@ -80,8 +84,8 @@ def populate_db_discipline(self):
                 
             print(f"Process is {round(index/len(project_disciplines) * 100)}% complete")
         
-        if sheet_logger:
-            self.log_manager.append_logs(SHEET_NAME, process_name, sheet_logger)
+        # if sheet_logger:
+        #     self.log_manager.append_logs(SHEET_NAME, process_name, sheet_logger)
     return Process(
         logic,
         process_name,
@@ -91,13 +95,14 @@ def populate_db_discipline(self):
 def populate_template_discipline(self):
     process_name = 'Populate Template Disciplines'
     def logic():
-        sheet_logger = dict()
         # Retrieve the content of the proposal sheet
         proposal_sheet_content = self.template_manager.df[SHEET_NAME]
 
         # Retrieve the disciplines from the table LU_Discipline in the database
-        discipline_query = "SELECT Name FROM LU_Discipline;"
-        discipline_result = self.db_manager.execute_query(discipline_query)
+        discipline_result = self.db_manager.select_query(
+            "LU_Discipline",
+            ["Name"]
+        )
         valid_disciplines = [value['Name'] for value in discipline_result]
 
         last_index = 0
@@ -110,8 +115,12 @@ def populate_template_discipline(self):
             last_index = new_end
 
             batch_ids = batch_records['proposalLegacyNumber']
-            search_query = f"SELECT Grant_ID, Discipline FROM grants WHERE Grant_ID IN ({','.join(['?' for _ in batch_ids])})"
-            search_result = self.db_manager.execute_query(search_query, *batch_ids)
+            search_result = self.db_manager.select_query(
+                "grants",
+                ["Grant_ID","Discipline"],
+                f"Grant_ID IN ({','.join(['?' for _ in batch_ids])})",
+                *batch_ids
+            )
             project_disciplines = { project['Grant_ID']:project['Discipline'] for project in search_result }
 
             for document_index, record in batch_records.iterrows():
@@ -122,15 +131,13 @@ def populate_template_discipline(self):
                     if project_disciplines[record_grant_id] and project_disciplines[record_grant_id] not in valid_disciplines:
                         closest_valid_discipline = utils.find_closest_match(project_disciplines[record_grant_id], valid_disciplines)
                         if closest_valid_discipline:
-                            update_query = f"""
-                                UPDATE grants
-                                SET Discipline = ?
-                                WHERE Grant_ID = ?
-                            """
-                            self.db_manager.execute_query(update_query, closest_valid_discipline, record_grant_id)
-                            sheet_logger[f"database:{record_grant_id}"] = {
-                                "Discipline": f"{project_disciplines[record_grant_id]}:{closest_valid_discipline}"
-                            }
+                            self.db_manager.update_query(
+                                process_name,
+                                SHEET_NAME,
+                                {"Discipline":closest_valid_discipline},
+                                "Grant_ID = ?",
+                                record_grant_id
+                            )
                             project_disciplines[record_grant_id] = closest_valid_discipline
 
                     # Retrueve the discipline of the record present in the template file
@@ -138,26 +145,35 @@ def populate_template_discipline(self):
                     if template_record_discipline and not pd.isna(template_record_discipline) and template_record_discipline not in valid_disciplines:
                         closest_valid_discipline = utils.find_closest_match(template_record_discipline, valid_disciplines)
                         if closest_valid_discipline:
-                            proposal_sheet_content.loc[document_index, 'Discipline'] = closest_valid_discipline
-                            sheet_logger[f"template:{record_grant_id}"] = {
-                                "Discipline": f"{template_record_discipline}:{closest_valid_discipline}"
-                            }
+                            self.template_manager.update_cell(
+                                process_name,
+                                SHEET_NAME,
+                                document_index,
+                                'Discipline',
+                                closest_valid_discipline
+                            )
                             template_record_discipline = closest_valid_discipline
 
                     # *** Lazy Data Migration (Temporary, Suggested, Not ideal for future proofing)
                     elif template_record_discipline and pd.isna(template_record_discipline):
                         record_admin_unit = record['Admin Unit']
                         if not pd.isna(record_admin_unit) and record_admin_unit in valid_disciplines:
-                            proposal_sheet_content.loc[document_index, 'Discipline'] = record_admin_unit
-                            sheet_logger[f"template:{record_grant_id}"] = {
-                                "Discipline": f"{template_record_discipline}:{record_admin_unit}"
-                            }
+                            self.template_mananger.update_cell(
+                                process_name,
+                                SHEET_NAME,
+                                document_index,
+                                'Discipline',
+                                record_admin_unit
+                            )
                             template_record_discipline = record_admin_unit
                         elif not pd.isna(record_admin_unit) and not pd.isna(record['John Jay Centers']):
-                            proposal_sheet_content.loc[document_index, 'Discipline'] = "Law and Criminal Justice"
-                            sheet_logger[f"template:{record_grant_id}"] = {
-                                "Discipline": f"{template_record_discipline}:{"Law and Criminal Justice"}"
-                            }
+                            self.template_mananger.update_cell(
+                                process_name,
+                                SHEET_NAME,
+                                document_index,
+                                'Discipline',
+                                "Law and Criminal Justice"
+                            )
                             template_record_discipline = "Law and Criminal Justice"
 
                     if project_disciplines[record_grant_id] and project_disciplines[record_grant_id] in valid_disciplines:
@@ -170,21 +186,22 @@ def populate_template_discipline(self):
                                     f"The record has the discipline '{project_disciplines[record_grant_id]}' in the database which differs from its value in the template. Both of which are valid disciplines."
                                 )
                         else:
-                            proposal_sheet_content.loc[document_index, 'Discipline'] = project_disciplines[record_grant_id]
-                            sheet_logger[f"template:{record_grant_id}"] = {
-                                "Discipline": f"{template_record_discipline}:{project_disciplines[record_grant_id]}"
-                            }
+                            self.template_manager.update_cell(
+                                process_name,
+                                SHEET_NAME,
+                                document_index,
+                                'Discipline',
+                                project_disciplines[record_grant_id]
+                            )
                     else:
                         if template_record_discipline and template_record_discipline in valid_disciplines:
-                            update_query = f"""
-                                UPDATE grants
-                                SET Discipline = ?
-                                WHERE Grant_ID = ?
-                            """
-                            self.db_manager.execute_query(update_query, template_record_discipline, record_grant_id)
-                            sheet_logger[f"database:{record_grant_id}"] = {
-                                "Discipline": f"{project_disciplines[record_grant_id]}:{template_record_discipline}"
-                            }
+                            self.db_manager.update_query(
+                                process_name,
+                                SHEET_NAME,
+                                {"Discipline":template_record_discipline},
+                                "Grant_ID = ?",
+                                record_grant_id
+                            )
                         else:
                             if not template_record_discipline or template_record_discipline not in valid_disciplines:
                                 self.comment_manager.append_comment(
@@ -202,9 +219,6 @@ def populate_template_discipline(self):
                     )
 
             print(f"Process is {round(last_index/num_sheet_rows * 100)}% complete")
-
-        if sheet_logger:
-            self.log_manager.append_logs(SHEET_NAME, process_name, sheet_logger)
     return Process(
         logic,
         process_name,
@@ -239,7 +253,6 @@ def populate_template_department(self):
             } 
         for index, center in centers_file_content.iterrows() }
 
-        sheet_logger = dict()
         # Retrieve the content of the proposal sheet
         proposal_sheet_content = self.template_manager.df[SHEET_NAME]
 
@@ -253,12 +266,12 @@ def populate_template_department(self):
             last_index = new_end
 
             # Retrieve the Grant_ID and the Primary_Dept value of the records in the batch_ids list
-            search_query = f"""
-                SELECT Grant_ID, Primary_Dept
-                FROM grants
-                WHERE Grant_ID IN ({','.join(['?' for _ in batch_ids])})
-            """
-            search_result = self.db_manager.execute_query(search_query, batch_ids)
+            search_result = self.db_manager.select_query(
+                "grants",
+                ["Grant_ID","Primary_Dept"],
+                f"Grant_ID IN ({','.join(['?' for _ in batch_ids])})",
+                batch_ids
+            )
             project_departments = { project['Grant_ID']:project['Primary_Dept'] for project in search_result }
 
             # Loop through every grand_id in the batch
@@ -270,15 +283,13 @@ def populate_template_department(self):
                     if project_departments[id] and project_departments[id] not in valid_departments:
                         closest_valid_dept = utils.find_closest_match(project_departments[id], [dept for dept in valid_departments])
                         if closest_valid_dept:
-                            update_query = f"""
-                                UPDATE grants
-                                SET Primary_Dept = ?
-                                WHERE Grant_ID = ?
-                            """
-                            self.db_manager.execute_query(update_query, closest_valid_dept, id)
-                            sheet_logger[f"database:{id}"] = {
-                                "Admin Unit": f"{project_departments[id]}:{closest_valid_dept}"
-                            }
+                            self.db_manager.update_cell(
+                                process_name,
+                                SHEET_NAME,
+                                {"Primary_Dept":closest_valid_dept},
+                                "Grant_ID = ?",
+                                id
+                            )
                             project_departments[id] = closest_valid_dept
 
                     # Retrieve the department of the record present in the template file
@@ -288,27 +299,47 @@ def populate_template_department(self):
                         closest_valid_dept = utils.find_closest_match(template_record_unit, [dept for dept in valid_departments])
                         if closest_valid_dept:
                             closest_valid_dept_code = valid_departments[closest_valid_dept]
-                            proposal_sheet_content.loc[document_index, 'Admin Unit'] = closest_valid_dept
-                            proposal_sheet_content.loc[document_index, 'Admin Unit Primary Code'] = closest_valid_dept_code
-                            sheet_logger[f"template:{id}"] = {
-                                "Admin Unit": f"{template_record_unit}:{closest_valid_dept}",
-                                "Admin Unit Primary Code": f"{template_record_unit_code}:{closest_valid_dept_code}"
-                            }
+                            self.template_manager.update_cell(
+                                process_name,
+                                SHEET_NAME,
+                                document_index,
+                                'Admin Unit',
+                                closest_valid_dept
+                            )
+                            self.template_manager.update_cell(
+                                process_name,
+                                SHEET_NAME,
+                                document_index,
+                                'Admin Unit Primary Code',
+                                closest_valid_dept_code
+                            )
                             template_record_unit = closest_valid_dept
                             template_record_unit_code = closest_valid_dept_code
                         else:
                             closest_valid_center = utils.find_closest_match(template_record_unit, [center for center in valid_centers])
                             if closest_valid_center:
                                 center_info = valid_centers[closest_valid_center]
-                                prev_record_center = proposal_sheet_content['John Jay Centers'][document_index]
-                                proposal_sheet_content.loc[document_index, 'John Jay Centers'] = closest_valid_center
-                                proposal_sheet_content.loc[document_index, 'Admin Unit'] = center_info['Admin Unit']
-                                proposal_sheet_content.loc[document_index, 'Admin Unit Primary Code'] = center_info['Primary Code']
-                                sheet_logger[f"template:{id}"] = {
-                                    "John Jay Centers": f"{prev_record_center}:{closest_valid_center}",
-                                    "Admin Unit": f"{template_record_unit}:{center_info['Admin Unit']}",
-                                    "Admin Unit Primary Code": f"{template_record_unit_code}:{center_info['Primary Code']}"
-                                }
+                                self.template_manager.update_cell(
+                                    process_name,
+                                    SHEET_NAME,
+                                    document_index,
+                                    'John Jay Centers',
+                                    closest_valid_center
+                                )
+                                self.template_manager.update_cell(
+                                    process_name,
+                                    SHEET_NAME,
+                                    document_index,
+                                    'Admin Unit',
+                                    center_info['Admin Unit']
+                                )
+                                self.template_manager.update_cell(
+                                    process_name,
+                                    SHEET_NAME,
+                                    document_index,
+                                    'Admin Unit Primary Code',
+                                    center_info['Primary Code']
+                                )
                                 template_record_unit = center_info['Admin Unit']
                                 template_record_unit_code = center_info['Primary Code']
 
@@ -318,10 +349,13 @@ def populate_template_department(self):
                                 # Check that the correct Primary Code is assigned to the record
                                 dept_code = valid_departments[project_departments[id]]
                                 if template_record_unit_code != dept_code:
-                                    proposal_sheet_content.loc[document_index, 'Admin Unit Primary Code'] = dept_code
-                                    sheet_logger[f"template:{id}"] = {
-                                        "Admin Unit Primary Code": f"{template_record_unit_code}:{dept_code}"
-                                    }
+                                    self.template_manager.update_cell(
+                                        process_name,
+                                        SHEET_NAME,
+                                        document_index,
+                                        'Admin Unit Primary Code',
+                                        dept_code
+                                    )
                             else:
                                 self.comment_manager.append_comment(
                                     SHEET_NAME,
@@ -331,23 +365,29 @@ def populate_template_department(self):
                                 )
                         else:
                             # Assign the 'Admin Unit' property of the current record the updated value
-                            proposal_sheet_content.loc[document_index, 'Admin Unit'] = project_departments[id]
-                            proposal_sheet_content.loc[document_index, 'Admin Unit Primary Code'] = valid_departments[project_departments[id]]
-                            sheet_logger[f"template:{id}"] = {
-                                'Admin Unit': f"{template_record_unit}:{project_departments[id]}",
-                                'Admin Unit Primary Code': f"{template_record_unit_code}:{valid_departments[project_departments[id]]}"
-                            }
+                            self.template_manager.update_cell(
+                                process_name,
+                                SHEET_NAME,
+                                document_index,
+                                'Admin Unit',
+                                project_departments[id]
+                            )
+                            self.template_manager.update_cell(
+                                process_name,
+                                SHEET_NAME,
+                                document_index,
+                                'Admin Unit Primary Code',
+                                valid_departments[project_departments[id]]
+                            )
                     else:
                         if template_record_unit and template_record_unit in valid_departments:
-                            update_query = """
-                                UPDATE grants
-                                SET Primary_Dept = ?
-                                WHERE Grant_ID = ?
-                            """
-                            self.db_manager.execute_query(update_query, template_record_unit, id)
-                            sheet_logger[f"database:{id}"] = {
-                                "Primary_Dept": f"{project_departments[id]}:{template_record_unit}"
-                            }
+                            self.db_manager.update_query(
+                                process_name,
+                                "grants",
+                                {"Primary_Dept":template_record_unit},
+                                "Grant_ID = ?",
+                                id
+                            )
                         else:
                             if not template_record_unit or template_record_unit not in valid_centers:
                                 self.comment_manager.append_comment(
@@ -365,9 +405,6 @@ def populate_template_department(self):
                     )
 
             print(f"Process is {round(last_index/num_sheet_rows * 100)}% complete")
-        
-        if sheet_logger:
-            self.log_manager.append_logs(SHEET_NAME, process_name, sheet_logger)
     return Process(
         logic,
         process_name,

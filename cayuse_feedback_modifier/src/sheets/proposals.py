@@ -375,7 +375,8 @@ def populate_project_status(self):
                                     )
                                     record_db_oar = new_db_oar
                                 else:
-                                    new_template_oar = "Submitted to Sponsor" if record_db_oar == "Pending" else record_db_oar
+                                    # new_template_oar = "Submitted to Sponsor" if record_db_oar == "Pending" else record_db_oar
+                                    new_template_oar = record_db_oar
                                     self.template_manager.update_cell(
                                         process_name,
                                         SHEET_NAME,
@@ -393,7 +394,8 @@ def populate_project_status(self):
                                 )
                     elif not pd.isna(record_template_oar) or record_db_oar:
                         if pd.isna(record_template_oar):
-                            new_template_oar = "Submitted to Sponsor" if record_db_oar == "Pending" else record_db_oar
+                            # new_template_oar = "Submitted to Sponsor" if record_db_oar == "Pending" else record_db_oar
+                            new_template_oar = record_db_oar
                             self.template_manager.update_cell(
                                 process_name,
                                 SHEET_NAME,
@@ -495,7 +497,14 @@ def populate_project_status(self):
                                     f"The record has a different End date in the database ({record_db_end_date}). This form of inconsistency can cause incorrect data to be generated."
                                 )
                         
-                        determined_status = ("Active" if record_template_end_date >= status_threshold else "Closed") if record_template_end_date else None
+                        determined_status = None
+                        if record_template_oar == "Funded":
+                            determined_status = "Active" if record_template_end_date >= status_threshold else "Closed"
+                        elif record_template_oar == "Pending":
+                            determined_status = "Active" if record_template_start_date >= status_threshold else "Closed"
+                        elif record_template_oar == "Rejected":
+                            determined_status = "Closed"
+
                         if not determined_status:
                             self.comment_manager.append_comment(
                                 SHEET_NAME,

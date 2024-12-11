@@ -1,6 +1,5 @@
 import os
 import pandas as pd
-import inspect
 
 from classes.LogManager.TemplateLogManager import TemplateLogManager
 

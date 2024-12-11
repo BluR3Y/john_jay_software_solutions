@@ -40,6 +40,13 @@ class DatabaseManager:
             except pyodbc.Error as err:
                 print(f"An error occurred while closing the connection: {err}")
 
+    def get_db_tables(self):
+        tables = []
+        for row in self.cursor.tables():
+            if row.table_type == "TABLE":
+                tables.append(row.table_name)
+        return tables
+
     def get_table_columns(self, table):
         """Retrieve table columns."""
         try:
@@ -86,18 +93,18 @@ class DatabaseManager:
                 if self.connection:
                     self.connection.rollback()
 
-
-    # def execute_query(self, query, *args):
-    #     """Execute a given SQL query."""
-    #     try:
-    #         self.cursor.execute(query, *args)
-    #         if query.lower().strip().startswith(('insert', 'update', 'delete')):
-    #             self.connection.commit()
-    #         if query.lower().strip().startswith('select'):
-    #             columns = [column[0] for column in self.cursor.description]
-    #             rows = self.cursor.fetchall()
-    #             return [{columns[i]: row[i] for i in range(len(columns))} for row in rows]
-    #     except pyodbc.Error as err:
-    #         print(f"An error occurred while querying the database: {err}")
-    #         if self.connection:
-    #             self.connection.rollback()
+    # ** Caution: Deprecated
+    def execute_query(self, query, *args):
+        """Execute a given SQL query."""
+        try:
+            self.cursor.execute(query, *args)
+            if query.lower().strip().startswith(('insert', 'update', 'delete')):
+                self.connection.commit()
+            if query.lower().strip().startswith('select'):
+                columns = [column[0] for column in self.cursor.description]
+                rows = self.cursor.fetchall()
+                return [{columns[i]: row[i] for i in range(len(columns))} for row in rows]
+        except pyodbc.Error as err:
+            print(f"An error occurred while querying the database: {err}")
+            if self.connection:
+                self.connection.rollback()

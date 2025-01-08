@@ -19,6 +19,7 @@ import sheets.proposals as proposals
 import sheets.projects as projects
 import sheets.others as others
 
+# *** Future version should make use of magic methods __enter__ and __exit__
 class FeedBackModifier:
 
     def __init__(self):

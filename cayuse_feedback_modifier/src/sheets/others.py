@@ -136,3 +136,58 @@ def report_generator(self):
         process_name,
         ""
     )
+    
+def database_record_plc_populator(self):
+    process_name = "Populate Database Record ProjectLegacyNumber"
+    
+    def logic():
+        if "project_legacy_number" not in self.db_manager.get_table_columns("grants"):
+            print("Created table column")
+            self.db_manager.execute_query("ALTER TABLE grants ADD COLUMN project_legacy_number INTEGER;")
+
+        # Fetch grants data and create a dictionary for quick lookup
+        get_res = self.db_manager.execute_query("SELECT grant_id, project_legacy_number FROM grants;")
+        grants = {int(grant['grant_id']): grant['project_legacy_number'] for grant in get_res}
+        
+        # Load the relevant proposal data as a dictionary for quick lookups
+        proposal_data_frame = self.template_manager.df["Proposal - Template"][['projectLegacyNumber', 'proposalLegacyNumber']]
+        proposal_dict = {
+            int(row['proposalLegacyNumber']): row['projectLegacyNumber'] for _, row in proposal_data_frame.iterrows()
+        }
+            
+        # List to store results
+        existing_pln, missing_pln, conflicting_pln = [], [], []
+        greatest_pln = float("-inf")
+        
+        # Process each grant and compare with proposals
+        for grant_id, project_legacy_number in grants.items():
+            proposal_project_legacy_number = proposal_dict.get(grant_id)    # Retrieve projectLegacyNumber
+            
+            if project_legacy_number is None:
+                if proposal_project_legacy_number:
+                    existing_pln.append((proposal_project_legacy_number, grant_id))
+                else:
+                    missing_pln.append(grant_id)
+            else:
+                if proposal_project_legacy_number and proposal_project_legacy_number != project_legacy_number:
+                    conflicting_pln.append(grant_id)
+                else:
+                    greatest_pln = max(greatest_pln, project_legacy_number)
+        if conflicting_pln:
+            raise Exception(f"The projectLegacyNumbers in the template file contains conflicts with other grants in the database: {conflicting_pln}")
+    
+        # Assign missing projectLegacyNumbers
+        if missing_pln:
+            next_pln = greatest_pln + 1
+            for grant_id in missing_pln:
+                existing_pln.append((next_pln, grant_id))
+                next_pln += 1
+            
+        # Batch update the database
+        if existing_pln:
+            self.db_manager.execute_many_query("UPDATE grants SET project_legacy_number = ? WHERE grant_id = ?;", existing_pln)
+    return Process(
+        logic,
+        process_name,
+        ""
+    )

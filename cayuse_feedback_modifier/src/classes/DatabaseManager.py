@@ -108,3 +108,23 @@ class DatabaseManager:
             print(f"An error occurred while querying the database: {err}")
             if self.connection:
                 self.connection.rollback()
+                
+    # ** Caution: In Testing
+    def execute_many_query(self, query, entries):
+        """
+        The method is both an efficient and scalable way of modifying multiple entries with unique values
+        """
+        try:
+            # Begin a transaction
+            self.connection.autocommit = False
+            
+            # Execute the query for each entry
+            self.cursor.executemany(query, entries)
+            
+            # Commit the transaction
+            self.connection.commit()
+            print("All rows updated successfully.")
+        except Exception as e:
+            # Rollback the transaction on error
+            self.connection.rollback()
+            print(f"An error occured while executing database query: {e}")

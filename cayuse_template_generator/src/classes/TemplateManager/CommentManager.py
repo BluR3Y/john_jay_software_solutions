@@ -2,21 +2,25 @@ import openpyxl
 import os
 
 class CommentManager:
-    def __init__(self, read_file_path):
-        if os.path.exists(read_file_path):
-            existing_comments = dict()
-            # Load the workbook
-            workbook = openpyxl.load_workbook(read_file_path)
-            # Commented for debugging purposes -----
-            # for sheet_name in workbook.sheetnames:
-            #     sheet = workbook[sheet_name]
-            #     existing_comments[sheet_name] = {
-            #         f"{cell.row}:{cell.column}": cell.comment for row in sheet.iter_rows() for cell in row if cell.comment
-            #     }
-            self.comment_cache = existing_comments
-            self.sheets = workbook.sheetnames
+    def __init__(self, read_file_path = None, sheet_names = None):
+        if read_file_path:
+            if os.path.exists(read_file_path):
+                existing_comments = dict()
+                # Load the workbook
+                workbook = openpyxl.load_workbook(read_file_path)
+                # Commented for debugging purposes ----- Intended to collect existing comments from read workbook
+                # for sheet_name in workbook.sheetnames:
+                #     sheet = workbook[sheet_name]
+                #     existing_comments[sheet_name] = {
+                #         f"{cell.row}:{cell.column}": cell.comment for row in sheet.iter_rows() for cell in row if cell.comment
+                #     }
+                self.comment_cache = existing_comments
+                self.sheets = workbook.sheetnames
+        elif sheet_names:
+            self.comment_cache = dict()
+            self.sheets = sheet_names
         else:
-            raise Exception("The comment manager was provided an invalid file path.")
+            raise Exception("Neither a file path or list of sheet names was provided.")
         
     # Add cell comments to the object's comment cache
     def append_comment(self, sheet, row, col, comment):

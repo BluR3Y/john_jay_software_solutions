@@ -9,12 +9,21 @@ load_dotenv("../env/.env.development")
 import os
 
 from classes.DatabaseManager import DatabaseManager
-from classes.CommentManager import CommentManager
-from classes.TemplateManager import TemplateManager
-from classes.PopulationManager import PopulationManager
+from classes.TemplateManager.TemplateManager import TemplateManager
+
+# from sheets.projects import project_sheet_manager
+# from sheets.proposals import proposal_sheet_manager
+# from sheets.members import members_sheet_manager
+from sheets.proposals import proposals_sheet_append
+from sheets.members import members_sheet_append
+from sheets.projects import projects_sheet_append
 
 class MigrationManager:
-    next_avail_legacy_num = float('-inf')
+    # sheet_managers = [
+    #     project_sheet_manager,
+    #     proposal_sheet_manager,
+    #     members_sheet_manager
+    # ]
 
     def __init__(self):
         # Initialize an instance of the TemplateManager class for the feedback file
@@ -24,38 +33,33 @@ class MigrationManager:
         with open('./config/gen_sheets.json') as f:
             # Load the JSON data into a dictionary
             gen_sheets = json.load(f)
-        
-        # Initialize an instance of the TemplateMananger class for the generated data
-        # self.generated_template_manager = TemplateManager(
-        #     log_file_path=(os.path.join(os.getenv('SAVE_PATH'), 'cayuse_generated_data_logs.json')),
-        #     create_sheets=gen_sheets
-        # )
-        
-        # Initialize an instance of the PopulationMananger class for the generated data
-        self.generated_template_manager = PopulationManager()
+            
+        # Initialize an instance of the TemplateManager class for the generated data
+        self.generated_template_manager = TemplateManager(log_file_path=(os.path.join(os.getenv("SAVE_PATH"), 'cayuse_generated_template_data_logs.json')), create_sheets=({sheet: {col:[] for col in sheet_props} for sheet,sheet_props in gen_sheets.items()}))
 
         # Initialize an instance of the DatabaseMananger class
         self.db_manager = DatabaseManager(os.path.join(os.getenv('SAVE_PATH'), 'cayuse_database_data_logs.json'))
         # Initialize the connection to the database
         self.db_manager.init_db_conn(os.getenv('ACCESS_DB_PATH'))
 
-        # Initialize an instance of the CommentManager class
-        self.comment_manager = CommentManager(os.getenv('EXCEL_FILE_PATH'))
-
     def __enter__(self):
-        res = self.db_manager.execute_query("SELECT grant_id FROM grants")
+        res = self.db_manager.execute_query("SELECT grant_id FROM grants;")
         self.grant_ids = [grant['grant_id'] for grant in res]
-
-        # Used to generate new projectLegacyNumber for grants not already assigned one
-        proposal_data_frame = self.feedback_template_manager.df["Proposal - Template"]
-        grants_proposal_legacy_nums = proposal_data_frame["projectLegacyNumber"].tolist()
-        for legacy_num in grants_proposal_legacy_nums:
-            self.next_avail_legacy_num = max(legacy_num, self.next_avail_legacy_num)
-        self.next_avail_legacy_num += 1
 
         return self
     
     def __exit__(self, exc_type, exc_value, traceback):
+        # self.generated_template_manager.save_changes(os.path.join(os.getenv('SAVE_PATH'), 'generated_data.xlsx'))
+        # generated_data = dict()
+        # for manager in self.sheet_managers:
+        #     generated_data[manager.sheet_name] = manager.df.to_dict()      
+        generated_data = dict()
+        for sheet_name, sheet_props in self.feedback_template_manager.df.items():
+            generated_data[sheet_name] = sheet_props.to_dict()
+        # generated_template_manager = TemplateManager(
+        #     log_file_path=(os.path.join(os.getenv('SAVE_PATH'), 'cayuse_generated_data_logs.json')),
+        #     create_sheets=generated_data
+        # )
         self.generated_template_manager.save_changes(os.path.join(os.getenv('SAVE_PATH'), 'generated_data.xlsx'))
 
     def start_migration(self):
@@ -63,7 +67,7 @@ class MigrationManager:
         batch_limit = 40
         num_grants = len(grant_ids)
         total_batches = ceil(num_grants/batch_limit)
-
+        
         # Create a task with a progress bar
         with Progress() as progress:
             task = progress.add_task("Processing", total=total_batches)
@@ -80,17 +84,22 @@ class MigrationManager:
 
                 # Process each grant
                 for grant in query_res:
-                    self.append_grant(grant)
+                    # self.append_grant(grant)
+                    self.append_to_sheets(grant)
                     break
 
                 # Update progress bar after processing the batch
                 progress.update(task, advance=1)
-
+                
     def append_grant(self, grant):
-        template_entry_data = self.feedback_template_manager.get_entry("Proposal - Template", "proposalLegacyNumber", grant['Grant_ID'])
-        if isinstance(template_entry_data, pd.DataFrame):
-            grant['projectLegacyNumber'] = template_entry_data['projectLegacyNumber']
-        else:
-            grant['projectLegacyNumber'] = self.next_avail_legacy_num
-            self.next_avail_legacy_num += 1
-        self.generated_template_manager.populate_grant(grant)
+        for fn in self.sheet_managers:
+            fn.append_grant(grant)
+            
+    def append_to_sheets(self, grant):
+        self.projects_sheet_append(grant)
+        self.proposals_sheet_append(grant)
+        self.members_sheet_append(grant)
+    
+MigrationManager.proposals_sheet_append = proposals_sheet_append
+MigrationManager.projects_sheet_append = projects_sheet_append
+MigrationManager.members_sheet_append = members_sheet_append

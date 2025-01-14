@@ -4,8 +4,10 @@ import pandas as pd
 import openpyxl
 
 from classes.LogManager.TemplateLogManager import TemplateLogManager
+from classes.TemplateManager.CommentManager import CommentManager
 
 class TemplateManager:
+    read_file_path = None
 
     def __init__(self, read_file_path = None, log_file_path = None, create_sheets: dict = None):
         if read_file_path:
@@ -17,10 +19,12 @@ class TemplateManager:
             else: 
                 raise Exception("The Template manager was provided an invalid file path.")
         elif create_sheets:
-            self.df = {sheet_name: pd.DataFrame({col_name: [] for col_name in props})
+            self.df = {sheet_name: pd.DataFrame({col_name: col_data for col_name, col_data in props.items()})
                        for sheet_name, props in create_sheets.items()}
         else:
             raise ValueError("Either read_file_path or create_sheets must be provided.")
+        
+        self.comment_manager = CommentManager(read_file_path, self.df.keys())
 
         # Initialize an instance of the Logger
         self.log_manager = TemplateLogManager(log_file_path)
@@ -40,6 +44,12 @@ class TemplateManager:
             )
         else:
             raise Exception(f"The sheet with the name '{sheet_name}' does not exist in the workbook.")
+        
+    def append_row(self, sheet_name: str, props: dict):
+        # Create a new DataFrame
+        new_row = pd.DataFrame(props)
+        # Append using pd.concat
+        self.df[sheet_name] = pd.concat([self.df[sheet_name], new_row], ignore_index=True)
 
     def get_entry(self, sheet_name: str, identifier: str, value: any, all: bool = False):
         """
@@ -101,5 +111,7 @@ class TemplateManager:
                     
             # Save logger changes
             self.log_manager.save_logs()
+            # Save comments
+            self.comment_manager.create_comments(write_file_path)
         except Exception as e:
             raise Exception(f"Error occured while attempting to save template data: {e}")

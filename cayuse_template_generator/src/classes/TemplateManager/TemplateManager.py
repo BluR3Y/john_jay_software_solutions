@@ -47,7 +47,7 @@ class TemplateManager:
         
     def append_row(self, sheet_name: str, props: dict):
         # Create a new DataFrame
-        new_row = pd.DataFrame(props)
+        new_row = pd.DataFrame({key: [value] for key, value in props.items()})
         # Append using pd.concat
         self.df[sheet_name] = pd.concat([self.df[sheet_name], new_row], ignore_index=True)
 

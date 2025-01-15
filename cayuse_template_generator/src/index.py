@@ -1,4 +1,6 @@
 from classes.MigrationManager import MigrationManager
+import warnings
+warnings.filterwarnings('ignore')
 
 # Run the program
 if __name__ == "__main__":

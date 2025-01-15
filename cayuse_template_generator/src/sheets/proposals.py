@@ -1,4 +1,6 @@
 from datetime import datetime
+from methods.utils import strip_html, find_closest_match
+import json
 
 SHEET_NAME = "Proposal - Template"
 SHEET_COLUMNS = [
@@ -157,7 +159,16 @@ SHEET_COLUMNS = [
     "Admin Unit"
   ]
 
-def determine_statuses(grant):
+ORG_UNITS = None
+with open('./config/john_jay_org_units.json') as f:
+    ORG_UNITS = json.load(f)
+ORG_CENTERS = None
+with open('./config/john_jay_centers.json') as f:
+    ORG_CENTERS = json.load(f)
+    
+DEBUG_COUNTER = 0
+
+def determine_status(grant):
     status_threshold = datetime.strptime('2024-01-01', '%Y-%m-%d')
     project_status = grant['Status']
     project_start_date = grant['Start_Date_Req']
@@ -175,50 +186,85 @@ def determine_statuses(grant):
             raise Exception("Grant is missing start/end date which is required to determine the status.")
     else:
         return "Closed"
+    
+# *** Needs revision
+def determine_instrument_type(grant):
+    valid_instrument_types = ['Grant', 'Contract', 'Cooperative Agreement', 'Incoming Subaward', 'NYC/NYS MOU - Interagency Agreement', 'PSC CUNY', 'CUNY Internal']
+    
+    project_instrument_type = grant['Program_Type']
+    if project_instrument_type:
+        if project_instrument_type in valid_instrument_types:
+            return project_instrument_type
+        else:
+            closest_match = find_closest_match(project_instrument_type, valid_instrument_types)
+            if closest_match:
+                return closest_match
+            else:
+                raise Exception(f"Grant's instrument type '{project_instrument_type}' is not a valid choice.")
+    else:
+        raise Exception("Grant does not have an Instrument Type")
 
+# **** Needs revision
 def determine_Admin_Unit(grant):
-    "lol"
-
-def determine_abstract(grant):
-    return grant['Abstract']
+    project_discipline = grant['Discipline']
+    if project_discipline:
+        if project_discipline in ORG_UNITS:
+            discipline_code = ORG_UNITS[project_discipline]['Primary Code']
+            return project_discipline, discipline_code
+        else:
+            closest_valid_dept = find_closest_match(project_discipline, ORG_UNITS)
+            if closest_valid_dept:
+                closest_valid_dept_code = ORG_UNITS[closest_valid_dept]['Primary Code']
+                return closest_valid_dept, closest_valid_dept_code
+            else:
+                closest_valid_center = find_closest_match(project_discipline, ORG_CENTERS.keys())
+                if closest_valid_center:
+                    return ORG_CENTERS['Admin Unit'], ORG_CENTERS['Admin Unit Code']
+    else:
+        raise Exception("The grant does not have a discipline in the database.")
 
 def proposals_sheet_append(self, grant):
     sheet_df = self.generated_template_manager.df[SHEET_NAME]
     next_row = sheet_df.shape[0] + 1
     
+    # if not DB_CACHE.get('LU_Discipline'):
+    #     query_res = self.db_manager.execute_query("SELECT NAME FROM LU_Discipline;")
+    #     DB_CACHE['LU_Discipline'] = [value['NAME'] for value in query_res]
+    
     try:
-        grant_status = determine_statuses(grant)
+        grant_status = determine_status(grant)
     except Exception as e:
         grant_status = None
         self.generated_template_manager.comment_manager.append_comment(SHEET_NAME, next_row, 3, e)
     
     try:
-        grant_discipline = determine_Admin_Unit(grant)
+        grant_discipline_name, grant_discipline_code = determine_Admin_Unit(grant)
     except Exception as e:
-        grant_discipline = None
-        self.generated_template_manager.comment_manager.append_comment(SHEET_NAME, next_row, 3, e)
-    
+        grant_discipline_name = None
+        grant_discipline_code = None
+        self.generated_template_manager.comment_manager.append_comment(SHEET_NAME, next_row, 151, e)
+        
     try:
-        grant_abstract = determine_abstract(grant)
+        grant_instrument_type = determine_instrument_type(grant)
     except Exception as e:
-        grant_abstract = None
-        self.generated_template_manager.comment_manager.append_comment(SHEET_NAME, next_row, 27, e)
-    
+        grant_instrument_type = None
+        self.generated_template_manager.comment_manager.append_comment(SHEET_NAME, next_row, 7, e)
+
     self.generated_template_manager.append_row(SHEET_NAME, {
-        "projectLegacyNumber": [grant['project_legacy_number']],
-        "proposalLegacyNumber": [grant['Grant_ID']],
-        "OAR Status": [grant['Status']],
+        "projectLegacyNumber": grant['project_legacy_number'],
+        "proposalLegacyNumber": grant['Grant_ID'],
+        "OAR Status": grant['Status'],
         "status": grant_status,
-        "CUNY Campus": [grant['Prim_College']],
-        "Instrument Type": "",
-        "Sponsor": [grant['Sponsor_1']],
-        "Prim Sponsor": [grant['Sponsor_2']],
-        "Title": [grant['Project_Title']],
-        "Project Start Date": [grant['Start_Date_Req']],
-        "Project End Date": [grant['End_Date_Req']],
-        "Activity Type": [grant['Award_Type']],
-        "Discipline": [grant['Discipline']],
-        "Abstract": grant_abstract,
-        "Admin Unit NAME": "",
-        "Admin Unit": ""
+        "CUNY Campus": grant['Prim_College'],
+        "Instrument Type": grant_instrument_type,
+        "Sponsor": grant['Sponsor_1'],
+        "Prime Sponsor": grant['Sponsor_2'],
+        "Title": grant['Project_Title'],
+        "Project Start Date": grant['Start_Date_Req'],
+        "Project End Date": grant['End_Date_Req'],
+        "Activity Type": grant['Award_Type'],
+        "Discipline": grant['Discipline'],
+        "Abstract": (strip_html(grant['Abstract']) if grant['Abstract'] else None),
+        "Admin Unit NAME": grant_discipline_name,
+        "Admin Unit": grant_discipline_code
     })

@@ -3,6 +3,7 @@ from math import ceil
 import pandas as pd
 import json
 from dotenv import load_dotenv
+from methods.utils import find_email_by_username
 # Load environment variables from .env file
 load_dotenv("../env/.env.development")
 
@@ -24,6 +25,7 @@ class MigrationManager:
     #     proposal_sheet_manager,
     #     members_sheet_manager
     # ]
+    pi_data = dict()
 
     def __init__(self):
         # Initialize an instance of the TemplateManager class for the feedback file
@@ -45,21 +47,39 @@ class MigrationManager:
     def __enter__(self):
         res = self.db_manager.execute_query("SELECT grant_id FROM grants;")
         self.grant_ids = [grant['grant_id'] for grant in res]
+        
+        # store pi_data
+        # pi_info = [str(pi_email) for pi_email in self.feedback_template_manager.df["Data - Associations"][['USERNAME','ASSOCIATION']].tolist()]
+        template_pull = self.feedback_template_manager.df["Data - Associations"][['USERNAME','ASSOCIATION']]
+        pi_info = dict()
+        for index, row in template_pull.iterrows():
+            pi_info[row['USERNAME']] = row['ASSOCIATION']
+        pi_emails = [str(email) for email in pi_info.keys()]
+        res = self.db_manager.execute_query("SELECT PI_name FROM PI_name")
+        pi_names = set(pi['PI_name'] for pi in res)
+        
+        for pi in pi_names:
+            if pi:
+                try:
+                    if ',' in pi:
+                        l_name, f_name = pi.split(", ")
+                    else:
+                        l_name, f_name = pi.rsplit(' ')
+                except ValueError:
+                    continue
+                closest_match = find_email_by_username(f_name, l_name, pi_emails)
+                if closest_match:
+                    self.pi_data[f"{l_name}, {f_name}"] = {
+                        "email": closest_match,
+                        "association": pi_info[closest_match]
+                    }
 
         return self
     
-    def __exit__(self, exc_type, exc_value, traceback):
-        # self.generated_template_manager.save_changes(os.path.join(os.getenv('SAVE_PATH'), 'generated_data.xlsx'))
-        # generated_data = dict()
-        # for manager in self.sheet_managers:
-        #     generated_data[manager.sheet_name] = manager.df.to_dict()      
+    def __exit__(self, exc_type, exc_value, traceback):     
         generated_data = dict()
         for sheet_name, sheet_props in self.feedback_template_manager.df.items():
             generated_data[sheet_name] = sheet_props.to_dict()
-        # generated_template_manager = TemplateManager(
-        #     log_file_path=(os.path.join(os.getenv('SAVE_PATH'), 'cayuse_generated_data_logs.json')),
-        #     create_sheets=generated_data
-        # )
         self.generated_template_manager.save_changes(os.path.join(os.getenv('SAVE_PATH'), 'generated_data.xlsx'))
 
     def start_migration(self):
@@ -96,8 +116,8 @@ class MigrationManager:
             fn.append_grant(grant)
             
     def append_to_sheets(self, grant):
-        self.projects_sheet_append(grant)
-        self.proposals_sheet_append(grant)
+        # self.projects_sheet_append(grant)
+        # self.proposals_sheet_append(grant)
         self.members_sheet_append(grant)
     
 MigrationManager.proposals_sheet_append = proposals_sheet_append

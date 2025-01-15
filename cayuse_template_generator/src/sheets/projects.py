@@ -33,7 +33,7 @@ def projects_sheet_append(self, grant):
         self.generated_template_manager.comment_manager.append_comment(SHEET_NAME, next_row, 2, e)
     
     self.generated_template_manager.append_row(SHEET_NAME, {
-        "projectLegacyNumber": [grant['project_legacy_number']],
-        "title": [grant['Project_Title']],
+        "projectLegacyNumber": grant['project_legacy_number'],
+        "title": grant['Project_Title'],
         "status": grant_status
     })

@@ -1,3 +1,4 @@
+from methods.utils import find_closest_match
 
 SHEET_NAME = "Award - Template"
 SHEET_COLUMNS = [
@@ -175,8 +176,75 @@ SHEET_COLUMNS = [
     "Terms and Conditions - Other"
   ]
 
+def determine_instrument_type(grant):
+    valid_instrument_types = ['Grant', 'Contract', 'Cooperative Agreement', 'Incoming Subaward', 'NYC/NYS MOU - Interagency Agreement', 'PSC CUNY', 'CUNY Internal']
+    
+    project_instrument_type = grant['Program_Type']
+    if project_instrument_type:
+        if project_instrument_type in valid_instrument_types:
+            return project_instrument_type
+        else:
+            closest_match = find_closest_match(project_instrument_type, valid_instrument_types)
+            if closest_match:
+                return closest_match
+            else:
+                raise Exception(f"Grant's instrument type '{project_instrument_type}' is not a valid choice.")
+    else:
+        raise Exception("Grant does not have an Instrument Type")
+
 def awards_sheet_append(self, grant):
-    pass
+    sheet_df = self.generated_template_manager.df[SHEET_NAME]
+    next_row = sheet_df.shape[0] + 1
+  
+    try:
+        grant_instrument_type = determine_instrument_type(grant)
+    except Exception as e:
+        grant_instrument_type = None
+        self.generated_template_manager.comment_manager.append_comment(SHEET_NAME, next_row, 7, e)
+    
     self.generated_template_manager.append_row(SHEET_NAME, {
-        
+        "projectLegacyNumber": grant['Project_Legacy_Number'],
+        "awardLegacyNumber": (str(grant['Grant_ID']) + "-award"),
+        "status": "Active",   # Might need evaluation
+        "modificationNumber": 0,
+        "CUNY Campus": grant['Prim_College'],
+        "Instrument Type": "",
+        "Sponsor": "",
+        "Sponsor Award Number": "",
+        "Prime Sponsor": "",
+        "Title": "",
+        "Award Notice Recieved": "",
+        "Project Start Date": "",
+        "Project End Date": "",
+        "Program Name": "",
+        "Activity Type": "",
+        "John Jay Centers": "",
+        "Admin Unit": "",
+        "Discipline": "",
+        "Abstract": "",
+        "Award Legacy Number": "",
+        "Number of Budget Periods": "",
+        "Indirect Rate Cost Type": "",
+        "IDC Rate": "",
+        "IDC Cost Type Explanation": "",
+        "Total Awarded Direct Costs": "",
+        "Total Awarded Indirect Costs": "",
+        "Total Expected Amount": "",
+        "Yr 1 Direct Costs": "",
+        "Year 1 Indirect Costs": "",
+        "Year 1 Total Costs": "",
+        "Awarded Yr 1 Direct Costs": "",
+        "Awarded Yr 1 Indirect Costs": "",
+        "Awarded Yr 1 Total Costs": "",
+        "Total Cost Share": "",
+        "Human Subjects": "",
+        "IRB Protocol Status": "",
+        "IRB Approval Date": "",
+        "Animal Subjects": "",
+        "Hazardous Materials": "",
+        "On Site": "",
+        "Off Site": "",
+        "Subrecipient": "",
+        "Export Control": "",
+        "Award Type": ""
     })

@@ -204,32 +204,28 @@ def determine_instrument_type(grant):
     else:
         raise Exception("Grant does not have an Instrument Type")
 
-# **** Needs revision
-def determine_Admin_Unit(grant):
-    project_discipline = grant['Discipline']
-    if project_discipline:
-        if project_discipline in ORG_UNITS:
-            discipline_code = ORG_UNITS[project_discipline]['Primary Code']
-            return project_discipline, discipline_code
+def determine_Admin_Unit(instance, grant):
+    project_primary_dept = grant['Primary_Dept']
+    
+    if project_primary_dept:
+        if project_primary_dept in ORG_UNITS.keys():
+            return project_primary_dept, ORG_UNITS[project_primary_dept]['Primary Code']
         else:
-            closest_valid_dept = find_closest_match(project_discipline, ORG_UNITS)
+            closest_valid_dept = find_closest_match(project_primary_dept, ORG_UNITS.keys())
             if closest_valid_dept:
-                closest_valid_dept_code = ORG_UNITS[closest_valid_dept]['Primary Code']
-                return closest_valid_dept, closest_valid_dept_code
+                return closest_valid_dept, ORG_UNITS[closest_valid_dept]['Primary Code']
             else:
-                closest_valid_center = find_closest_match(project_discipline, ORG_CENTERS.keys())
+                closest_valid_center = find_closest_match(project_primary_dept, ORG_CENTERS.keys())
                 if closest_valid_center:
-                    return ORG_CENTERS['Admin Unit'], ORG_CENTERS['Admin Unit Code']
+                    return ORG_CENTERS[closest_valid_center]['Admin Unit'], ORG_CENTERS[closest_valid_center]['Admin Unit Code']
+                else:
+                    raise Exception(f"Could not find a valid department for {project_primary_dept}")
     else:
-        raise Exception("The grant does not have a discipline in the database.")
+        raise Exception("Grant does not have a primary department in the database.")
 
 def proposals_sheet_append(self, grant):
     sheet_df = self.generated_template_manager.df[SHEET_NAME]
     next_row = sheet_df.shape[0] + 1
-    
-    # if not DB_CACHE.get('LU_Discipline'):
-    #     query_res = self.db_manager.execute_query("SELECT NAME FROM LU_Discipline;")
-    #     DB_CACHE['LU_Discipline'] = [value['NAME'] for value in query_res]
     
     try:
         grant_status = determine_status(grant)
@@ -238,10 +234,10 @@ def proposals_sheet_append(self, grant):
         self.generated_template_manager.comment_manager.append_comment(SHEET_NAME, next_row, 3, e)
     
     try:
-        grant_discipline_name, grant_discipline_code = determine_Admin_Unit(grant)
+        grant_admin_unit, grant_admin_unit_code = determine_Admin_Unit(self, grant)
     except Exception as e:
-        grant_discipline_name = None
-        grant_discipline_code = None
+        grant_admin_unit = None
+        grant_admin_unit_code = None
         self.generated_template_manager.comment_manager.append_comment(SHEET_NAME, next_row, 151, e)
         
     try:
@@ -251,7 +247,7 @@ def proposals_sheet_append(self, grant):
         self.generated_template_manager.comment_manager.append_comment(SHEET_NAME, next_row, 7, e)
 
     self.generated_template_manager.append_row(SHEET_NAME, {
-        "projectLegacyNumber": grant['project_legacy_number'],
+        "projectLegacyNumber": grant['Project_Legacy_Number'],
         "proposalLegacyNumber": grant['Grant_ID'],
         "OAR Status": grant['Status'],
         "status": grant_status,
@@ -264,7 +260,7 @@ def proposals_sheet_append(self, grant):
         "Project End Date": grant['End_Date_Req'],
         "Activity Type": grant['Award_Type'],
         "Discipline": grant['Discipline'],
-        "Abstract": (strip_html(grant['Abstract']) if grant['Abstract'] else None),
-        "Admin Unit NAME": grant_discipline_name,
-        "Admin Unit": grant_discipline_code
+        "Abstract": "",
+        "Admin Unit NAME": grant_admin_unit,
+        "Admin Unit": grant_admin_unit_code
     })

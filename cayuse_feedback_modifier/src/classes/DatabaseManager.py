@@ -59,7 +59,8 @@ class DatabaseManager:
             if self.connection:
                 self.connection.rollback()
 
-    def select_query(self, table: str, cols: list[str], condition=None, *args) -> list[dict]:
+    # caution: Deprecated
+    def select_query_v1(self, table: str, cols: list[str], condition=None, *args) -> list[dict]:
         """Excecute a select SQL query."""
         try:
             query = f"SELECT {','.join(cols)} FROM {table}"
@@ -71,6 +72,47 @@ class DatabaseManager:
             return [{columns[i]: row[i] for i in range(len(columns))} for row in rows]
         except pyodbc.Error as err:
             print(f"An error occurred while querying the database: {err}")
+            if self.connection:
+                self.connection.rollback()
+    
+    def select_query(self, table: str, cols: list[str], conditions: dict = None) -> list[dict]:
+        """
+        Execute a SELECT SQL query to the database
+        """
+        if not table:
+            raise ValueError("Table name must be provided.")
+        if not cols:
+            raise ValueError("Columns list cannot be empty.")
+        try:
+            # Construct query
+            query = f"SELECT {','.join(cols)} FROM {table}"
+            passing_values = []
+            if conditions:
+                pass
+            
+            if conditions:
+                appending_conditions = []
+                for col, val in conditions.items():
+                    match val:
+                        case None:
+                            appending_conditions.append(f"{col} IS NULL")
+                        case list():
+                            appending_conditions.append(f"{col} IN ({','.join(['?' for _ in val])})")
+                            passing_values.extend(val)
+                        case _:
+                            appending_conditions.append(f"{col} = ?")
+                            passing_values.append(val)
+                            
+                query += " WHERE " + ' AND '.join(appending_conditions)
+
+            # Execute query
+            self.cursor.execute(query, passing_values)
+            rows = self.cursor.fetchall()
+            
+            # Convert results to list of dictionaries
+            return [dict(zip([column[0] for column in self.cursor.description], row)) for row in rows]
+        except pyodbc.Error as err:
+            print(f"An error occured while querying the database: {err}")
             if self.connection:
                 self.connection.rollback()
 

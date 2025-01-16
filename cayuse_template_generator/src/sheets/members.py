@@ -47,8 +47,10 @@ def members_sheet_append(self, grant):
         grant_user_name, grant_user_association = determine_user_name(self, grant)
     except Exception as e:
         grant_user_association = None
-        l_name, f_name = grant['Primary_PI'].split(", ")
-        grant_user_name = f_name + ' ' + l_name
+        grant_user_name = None
+        if grant['Primary_PI']:
+            l_name, f_name = grant['Primary_PI'].split(", ")
+            grant_user_name = f_name + ' ' + l_name
         self.generated_template_manager.comment_manager.append_comment(SHEET_NAME, next_row, 4, e)
     
     try:
@@ -58,7 +60,7 @@ def members_sheet_append(self, grant):
         self.generated_template_manager.comment_manager.append_comment(SHEET_NAME, next_row, 5, e)
 
     self.generated_template_manager.append_row(SHEET_NAME, {
-        "projectLegacyNumber": grant['project_legacy_number'],
+        "projectLegacyNumber": grant['Project_Legacy_Number'],
         "form": "proposal",
         "legacyNumber": grant['Grant_ID'],
         "username": grant_user_name,
@@ -67,7 +69,7 @@ def members_sheet_append(self, grant):
     })
     if project_status == "Funded":
         self.generated_template_manager.append_row(SHEET_NAME, {
-            "projectLegacyNumber": grant['project_legacy_number'],
+            "projectLegacyNumber": grant['Project_Legacy_Number'],
             "form": "award",
             "legacyNumber": (str(grant['Grant_ID']) + "-award"),
             "username": grant_user_name,

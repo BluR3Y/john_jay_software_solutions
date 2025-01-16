@@ -18,13 +18,9 @@ from classes.TemplateManager.TemplateManager import TemplateManager
 from sheets.proposals import proposals_sheet_append
 from sheets.members import members_sheet_append
 from sheets.projects import projects_sheet_append
+from sheets.awards import awards_sheet_append
 
 class MigrationManager:
-    # sheet_managers = [
-    #     project_sheet_manager,
-    #     proposal_sheet_manager,
-    #     members_sheet_manager
-    # ]
     pi_data = dict()
 
     def __init__(self):
@@ -104,9 +100,7 @@ class MigrationManager:
 
                 # Process each grant
                 for grant in query_res:
-                    # self.append_grant(grant)
                     self.append_to_sheets(grant)
-                    break
 
                 # Update progress bar after processing the batch
                 progress.update(task, advance=1)
@@ -116,9 +110,10 @@ class MigrationManager:
             fn.append_grant(grant)
             
     def append_to_sheets(self, grant):
-        # self.projects_sheet_append(grant)
-        # self.proposals_sheet_append(grant)
+        self.projects_sheet_append(grant)
+        self.proposals_sheet_append(grant)
         self.members_sheet_append(grant)
+        
     
 MigrationManager.proposals_sheet_append = proposals_sheet_append
 MigrationManager.projects_sheet_append = projects_sheet_append

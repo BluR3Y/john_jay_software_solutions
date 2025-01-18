@@ -111,8 +111,8 @@ class MigrationManager:
             
     def append_to_sheets(self, grant):
         self.projects_sheet_append(grant)
-        self.proposals_sheet_append(grant)
-        self.members_sheet_append(grant)
+        # self.proposals_sheet_append(grant)
+        # self.members_sheet_append(grant)
         
     
 MigrationManager.proposals_sheet_append = proposals_sheet_append

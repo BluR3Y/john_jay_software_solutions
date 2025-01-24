@@ -67,75 +67,75 @@ def request_user_selection(requestStr: str, validSelections: list[str]) -> str:
     else:
         raise Exception("Did not make a selection. Is required to continue.")
 
+# Define valid operators and keywords
+OPERATORS = ['=', '<>', '!=', '<', '<=', '>', '>=', 'LIKE', 'NOT LIKE', 'REGEXP', 'NOT REGEXP', 'IN', 'NOT IN', 'IS', 'IS NOT', 'BETWEEN']
+LOGICAL_OPERATORS = ['AND', 'OR']
+NULL_VALUES = ['NULL', 'Null']
+PARENTHESIS = r"\((.*?)\)"
+
 def parse_query_conditions(condition_str, valid_columns):
-    """
-    Parses a plain WHERE condition string into a structured Python dictionary and validates column names.
+    # Helper function to check if an operator is valid
+    def is_valid_operator(operator):
+        return operator in OPERATORS
 
-    Args:
-        condition_str (str): The plain WHERE condition string (e.g., "age > 30 AND department = 'Sales'").
-        valid_columns (list): A list of valid column names to validate against.
+    # Helper function to split condition into left and right parts
+    def split_condition(condition):
+        for operator in OPERATORS:
+            if operator in condition:
+                left, right = condition.split(operator, 1)
+                if is_valid_operator(operator):  # Only proceed if the operator is valid
+                    return left.strip(), operator, right.strip()
+        return None, None, None
 
-    Returns:
-        dict: A dictionary representing the parsed conditions.
+    # Function to parse the condition recursively
+    def parse_sub_condition(sub_condition):
+        # If condition is grouped in parentheses, extract and recurse
+        if sub_condition.startswith('(') and sub_condition.endswith(')'):
+            sub_condition = sub_condition[1:-1]
+            return parse_query_conditions(sub_condition, valid_columns)
 
-    Raises:
-        ValueError: If a column in the condition is not valid.
-    """
-    # Define a list of logical operators
-    logical_operators = ["AND", "OR"]
+        # Look for logical operators AND/OR
+        for logical_operator in LOGICAL_OPERATORS:
+            parts = sub_condition.split(logical_operator, 1)
+            if len(parts) > 1:
+                left = parse_sub_condition(parts[0].strip())
+                right = parse_sub_condition(parts[1].strip())
+                return {logical_operator: [left, right]}
 
-    # Function to split conditions based on logical operators
-    def split_conditions(condition):
-        pattern = r'\b(AND|OR)\b'
-        parts = re.split(pattern, condition, flags=re.IGNORECASE)
-        return [p.strip() for p in parts if p.strip()]
+        # Split based on operators and handle each operator type
+        left, operator, right = split_condition(sub_condition)
+        if left and operator and right:
+            left = left.strip()
+            right = right.strip()
 
-    # Recursive function to parse conditions
-    def parse_recursive(conditions):
-        result = {}
-        i = 0
+            # Check for NULL condition
+            if any(null_val in right for null_val in NULL_VALUES):
+                return {left: {'operator': 'IS', 'value': right}}
 
-        while i < len(conditions):
-            part = conditions[i]
+            # Handle IN, NOT IN
+            if operator in ['IN', 'NOT IN']:
+                values = right[1:-1].split(',')
+                return {left: {'operator': operator, 'value': [v.strip() for v in values]}}
 
-            if part.upper() in logical_operators:
-                logical_op = part.upper()
-                left = result
-                right = parse_recursive(conditions[i + 1:])
-                return {logical_op: [left, right]}
+            # Handle LIKE, NOT LIKE, REGEXP, NOT REGEXP
+            if operator in ['LIKE', 'NOT LIKE', 'REGEXP', 'NOT REGEXP']:
+                return {left: {'operator': operator, 'value': right}}
 
-            # Match the column, operator, and value using regex
-            match = re.match(r"(\w+)\s*(=|<>|!=|<|<=|>|>=|LIKE|NOT LIKE|IN|NOT IN|BETWEEN|IS NULL|IS NOT NULL|REGEXP|NOT REGEXP)\s*(.+)?", part, re.IGNORECASE)
-            if match:
-                column, operator, value = match.groups()
+            # Handle BETWEEN
+            if operator == 'BETWEEN':
+                lower, upper = right.split('AND')
+                return {left: {'operator': operator, 'value': (lower.strip(), upper.strip())}}
 
-                # Check if the column is valid
-                if column not in valid_columns:
-                    raise ValueError(f"Invalid column name: {column}")
+            # Otherwise return normal condition
+            return {left: {'operator': operator, 'value': right}}
 
-                # Handle value in IN or BETWEEN (could be a range or a list)
-                if operator in ["IN", "NOT IN", "BETWEEN"]:
-                    value = value.strip()
-                    # Handle ranges in BETWEEN (e.g., BETWEEN 1 AND 10)
-                    if operator == "BETWEEN":
-                        value = value.split("AND")
-                        value = [v.strip() for v in value]
+        return {}
 
-                    # Handle IN as a list (e.g., IN (1, 2, 3))
-                    elif operator in ["IN", "NOT IN"]:
-                        value = value.strip("()").split(",")
-                        value = [v.strip() for v in value]
-                
-                result[column] = {"operator": operator, "value": value.strip() if isinstance(value, str) else value}
-                i += 1
-            else:
-                i += 1
+    # Main function logic
+    condition_str = condition_str.strip()
 
-        return result
-
-    # Split conditions and parse recursively
-    conditions = split_conditions(condition_str)
-    return parse_recursive(conditions)
+    # Start parsing
+    return parse_sub_condition(condition_str)
 
 # Example:
 # {

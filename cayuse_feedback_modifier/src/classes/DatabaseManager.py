@@ -75,38 +75,46 @@ class DatabaseManager:
             if self.connection:
                 self.connection.rollback()
                 
-    def conditions_to_string(self, parsed_conditions: dict) -> str:
-        """
-        Converts a parsed conditions dictionary back into a SQL WHERE clause string.
+    def conditions_to_string(self, parsed_condition):
+        # Helper function to format the condition back to string
+        def format_condition(cond):
+            if isinstance(cond, dict):
+                # Handle logical operators (AND/OR)
+                for operator in ['AND', 'OR']:
+                    if operator in cond:
+                        sub_conditions = cond[operator]
+                        return f"({format_condition(sub_conditions[0])} {operator} {format_condition(sub_conditions[1])})"
+                
+                # Handle comparison operators and other conditions
+                for column, details in cond.items():
+                    operator = details['operator']
+                    value = details['value']
+                    
+                    # Handle IN/NOT IN
+                    if operator in ['IN', 'NOT IN']:
+                        formatted_values = ', '.join([str(v) for v in value])
+                        return f"{column} {operator} ({formatted_values})"
+                    
+                    # Handle BETWEEN
+                    elif operator == 'BETWEEN':
+                        return f"{column} {operator} {value[0]} AND {value[1]}"
+                    
+                    # Handle LIKE, NOT LIKE, REGEXP, NOT REGEXP
+                    elif operator in ['LIKE', 'NOT LIKE', 'REGEXP', 'NOT REGEXP']:
+                        return f"{column} {operator} {value}"
+                    
+                    # Handle IS NULL or IS NOT NULL
+                    elif operator in ['IS', 'IS NOT']:
+                        return f"{column} {operator} {value}"
+                    
+                    # Default: Comparison operators (e.g. =, <>, !=, <, <=, etc.)
+                    else:
+                        return f"{column} {operator} {value}"
 
-        Args:
-            parsed_conditions (dict): The parsed conditions dictionary.
+            return str(cond)
 
-        Returns:
-            str: The reconstructed SQL WHERE clause.
-        """
-        def process_condition(key, value):
-            if isinstance(value, dict):  # Single condition
-                operator = value["operator"]
-                condition_value = value["value"]
-                if isinstance(condition_value, list):  # Handle lists (e.g., IN, BETWEEN)
-                    if operator == "BETWEEN":
-                        return f"{key} {operator} {condition_value[0]} AND {condition_value[1]}"
-                    elif operator in ["IN", "NOT IN"]:
-                        return f"{key} {operator} ({', '.join(condition_value)})"
-                return f"{key} {operator} {condition_value}"
-            elif isinstance(value, str):  # For null checks like "IS NULL"
-                return f"{key} {value}"
-
-        if isinstance(parsed_conditions, dict):
-            for logical_op, conditions in parsed_conditions.items():
-                if logical_op in ["AND", "OR"]:  # Compound condition
-                    sub_conditions = [self.conditions_to_string(cond) for cond in conditions]
-                    return f" {logical_op} ".join([f"({sub})" for sub in sub_conditions])
-                else:  # Single condition
-                    return process_condition(logical_op, conditions)
-
-        return ""
+        # Call the helper function with the top-level parsed condition
+        return format_condition(parsed_condition)
     
     def select_query(self, table: str, cols: list[str], conditions: dict = None) -> list[dict]:
         """

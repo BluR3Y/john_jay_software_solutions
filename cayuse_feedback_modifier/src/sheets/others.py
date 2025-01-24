@@ -69,7 +69,6 @@ def database_record_modifier(self):
     
 def report_generator(self):
     process_name = "Generate Report"
-    
     def logic():
         # Retrieve all the tables in the database
         tables = self.db_manager.get_db_tables()
@@ -91,7 +90,7 @@ def report_generator(self):
                     formatted_search_conditions = utils.parse_query_conditions(selected_search_conditions, table_columns)
                 else:
                     raise Exception("Failed to provide query search conditions.")
-
+                
                 search_result = self.db_manager.select_query(
                     selected_table,
                     [record_identifier],
@@ -139,10 +138,12 @@ def report_generator(self):
                 print(e)
 
         if generated_reports:
+            save_location = os.path.join(os.getenv("SAVE_PATH"), "generated_report.xlsx")
             # Use ExcelWriter to write multiple sheets into an Excel file
-            with pd.ExcelWriter(os.path.join(os.getenv("SAVE_PATH"), "generated_report.xlsx")) as writer:
+            with pd.ExcelWriter(save_location) as writer:
                 for sheet_name, df_sheet in generated_reports.items():
                     df_sheet.to_excel(writer, sheet_name=sheet_name, index=False)
+            print(f"File saved to {save_location}")
 
     return Process(
         logic,

@@ -3,8 +3,8 @@
   "Proposal - Template": [
     "projectLegacyNumber",
     "proposalLegacyNumber",
-    "OAR Status",
     "status",
+    "OAR Status",
     "S2S reference id",
     "CUNY Campus",
     "Sponsor Deadline",
@@ -152,8 +152,8 @@
     "Additional Comments",
     "Submission Date",
     "John Jay Centers",
-    "Admin Unit NAME",
-    "Admin Unit"
+    "Admin Unit Name",
+    "Admin Unit Code"
   ],
   "Members - Template": [
     "projectLegacyNumber",

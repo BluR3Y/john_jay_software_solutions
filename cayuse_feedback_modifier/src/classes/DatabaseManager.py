@@ -74,6 +74,39 @@ class DatabaseManager:
             print(f"An error occurred while querying the database: {err}")
             if self.connection:
                 self.connection.rollback()
+                
+    def conditions_to_string(self, parsed_conditions: dict) -> str:
+        """
+        Converts a parsed conditions dictionary back into a SQL WHERE clause string.
+
+        Args:
+            parsed_conditions (dict): The parsed conditions dictionary.
+
+        Returns:
+            str: The reconstructed SQL WHERE clause.
+        """
+        def process_condition(key, value):
+            if isinstance(value, dict):  # Single condition
+                operator = value["operator"]
+                condition_value = value["value"]
+                if isinstance(condition_value, list):  # Handle lists (e.g., IN, BETWEEN)
+                    if operator == "BETWEEN":
+                        return f"{key} {operator} {condition_value[0]} AND {condition_value[1]}"
+                    elif operator in ["IN", "NOT IN"]:
+                        return f"{key} {operator} ({', '.join(condition_value)})"
+                return f"{key} {operator} {condition_value}"
+            elif isinstance(value, str):  # For null checks like "IS NULL"
+                return f"{key} {value}"
+
+        if isinstance(parsed_conditions, dict):
+            for logical_op, conditions in parsed_conditions.items():
+                if logical_op in ["AND", "OR"]:  # Compound condition
+                    sub_conditions = [self.conditions_to_string(cond) for cond in conditions]
+                    return f" {logical_op} ".join([f"({sub})" for sub in sub_conditions])
+                else:  # Single condition
+                    return process_condition(logical_op, conditions)
+
+        return ""
     
     def select_query(self, table: str, cols: list[str], conditions: dict = None) -> list[dict]:
         """
@@ -91,22 +124,10 @@ class DatabaseManager:
                 pass
             
             if conditions:
-                appending_conditions = []
-                for col, val in conditions.items():
-                    match val:
-                        case None:
-                            appending_conditions.append(f"{col} IS NULL")
-                        case list():
-                            appending_conditions.append(f"{col} IN ({','.join(['?' for _ in val])})")
-                            passing_values.extend(val)
-                        case _:
-                            appending_conditions.append(f"{col} = ?")
-                            passing_values.append(val)
-                            
-                query += " WHERE " + ' AND '.join(appending_conditions)
-
+                query += " WHERE " + self.conditions_to_string(conditions)
+                
             # Execute query
-            self.cursor.execute(query, passing_values)
+            self.cursor.execute(query, *passing_values)
             rows = self.cursor.fetchall()
             
             # Convert results to list of dictionaries

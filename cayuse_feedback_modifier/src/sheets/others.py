@@ -66,68 +66,83 @@ def database_record_modifier(self):
         process_name,
         "This process provides an interactive tool for modifying records within a specified table in a connected database. It allows users to select a table, define search conditions, and update multiple records in a single operation. This function is designed for dynamic and secure interaction with the database, verifying that tables and columns exist before performing operations and using parameterized queries to avoid SQL injection risks. It encapsulates the entire process in a callable Process object, ready to be integrated into larger workflows or batch processes."
     )
-
+    
 def report_generator(self):
     process_name = "Generate Report"
-
+    
     def logic():
         # Retrieve all the tables in the database
         tables = self.db_manager.get_db_tables()
+        generated_reports = {}
 
-        selected_table = input("Enter the name of the table whose records will be used to populate the report: ")
-        if selected_table in tables:
-            table_columns = self.db_manager.get_table_columns(selected_table)
-            record_identifier = table_columns[0]
-            selected_search_conditions = input(f"Input the name of the column in the '{selected_table}' table followed by the value in the selected column separated by a ':' and enclosed in double quotes, which will be used to filter records in the database. Ex: \"Discipline:Philosophy\": ")
-            search_conditions = dict()
-            for condition in utils.extract_quoted_strings(selected_search_conditions):
-                col, val = condition.split(':')
-                if col in table_columns:
-                    search_conditions[col] = (val if val else None)
-                else:
-                    print(f"The column '{col}' does not exist in the table '{selected_table}'.")
-                    break
-            
-            search_result = self.db_manager.select_query(
-                selected_table,
-                [record_identifier],
-                search_conditions
-            )
-            record_ids = [item[record_identifier] for item in search_result]
-            print(f"Search returned {len(record_ids)} records.")
-
-            if record_ids:
-                selected_properties_input = input(f"Input the name of the columns in the '{selected_table}' table that will be used to populate the report. \n The table has the columns: {", ".join(table_columns)} \n Selection: ")
-                selected_properties = selected_properties_input.split(' ')
-                for prop in selected_properties:
-                    if prop not in table_columns:
-                        print(f"The column '{prop}' does not exist in the table '{selected_table}'.")
+        while True:
+            try:
+                if generated_reports:
+                    selected_action = utils.request_user_selection("Enter a next step:", ["Generate another report", "Save and Exit"])
+                    if selected_action == "Save and Exit":
                         break
-                if record_identifier not in selected_properties:
-                    selected_properties.insert(0, record_identifier)
                     
-                last_index = 0
-                batch_limit = 40
-                report_data = []
-                while last_index < len(record_ids):
-                    new_end = last_index + batch_limit
-                    batch_ids = record_ids[last_index:new_end]
-                    last_index = new_end
-
-                    search_result = self.db_manager.select_query(
-                        selected_table,
-                        selected_properties,
-                        {record_identifier:batch_ids}
-                    )
-                    report_data.extend(search_result)
+                selected_table = utils.request_user_selection("Enter the name of the table whose records will be used to populate the report:", tables)
+                table_columns = self.db_manager.get_table_columns(selected_table)
+                record_identifier = table_columns[0]
                 
-                # Convert the data to a DataFrame
-                df = pd.DataFrame(report_data)
+                selected_search_conditions = input("WHERE: ")
+                if selected_search_conditions:
+                    formatted_search_conditions = utils.parse_query_conditions(selected_search_conditions, table_columns)
+                else:
+                    raise Exception("Failed to provide query search conditions.")
 
-                # Write the DataFrame to an Excel file
-                df.to_excel(os.path.join(os.getenv('SAVE_PATH'), 'generated_report.xlsx'), index=False)
-        else:
-            print(f"Table '{selected_table}' does not exist in the database.")
+                search_result = self.db_manager.select_query(
+                    selected_table,
+                    [record_identifier],
+                    formatted_search_conditions
+                )
+                record_ids = [item[record_identifier] for item in search_result]
+                print(f"Search returned {len(record_ids)} records.")
+                
+                if record_ids:
+                    selected_properties_input = input(f"Input the name of the columns in the '{selected_table}' table that will be used to populate the report. \n The table has the columns: {", ".join(table_columns)} \n Selection: ")
+                    selected_properties = selected_properties_input.split(' ')
+                    for prop in selected_properties:
+                        if prop not in table_columns:
+                            print(f"The column '{prop}' does not exist in the table '{selected_table}'.")
+                            break
+                    if record_identifier not in selected_properties:
+                        selected_properties.insert(0, record_identifier)
+                        
+                    last_index = 0
+                    batch_limit = 40
+                    report_data = []
+                    while last_index < len(record_ids):
+                        new_end = last_index + batch_limit
+                        batch_ids = [str(item) for item in record_ids[last_index:new_end]]
+                        last_index = new_end
+
+                        search_result = self.db_manager.select_query(
+                            selected_table,
+                            selected_properties,
+                            {
+                                record_identifier: {
+                                    "operator": "IN",
+                                    "value": batch_ids
+                                }
+                            }
+                        )
+                        report_data.extend(search_result)
+                        
+                    selected_report_name = input("What would you like to name this report? ")
+                    if not selected_report_name:
+                        raise Exception("Failed to provide a report name.")
+                    
+                    generated_reports[selected_report_name] = pd.DataFrame(report_data)
+            except Exception as e:
+                print(e)
+
+        if generated_reports:
+            # Use ExcelWriter to write multiple sheets into an Excel file
+            with pd.ExcelWriter(os.path.join(os.getenv("SAVE_PATH"), "generated_report.xlsx")) as writer:
+                for sheet_name, df_sheet in generated_reports.items():
+                    df_sheet.to_excel(writer, sheet_name=sheet_name, index=False)
 
     return Process(
         logic,

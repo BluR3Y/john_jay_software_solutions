@@ -1,7 +1,8 @@
-from rich.progress import Progress
+import multiprocessing
 from math import ceil
 import pandas as pd
 import json
+import re
 from dotenv import load_dotenv
 from methods.utils import find_email_by_username
 # Load environment variables from .env file
@@ -21,7 +22,6 @@ from sheets.projects import projects_sheet_append
 from sheets.awards import awards_sheet_append
 
 class MigrationManager:
-    pi_data = dict()
 
     def __init__(self):
         # Initialize an instance of the TemplateManager class for the feedback file
@@ -41,35 +41,10 @@ class MigrationManager:
         self.db_manager.init_db_conn(os.getenv('ACCESS_DB_PATH'))
 
     def __enter__(self):
-        res = self.db_manager.execute_query("SELECT grant_id FROM grants;")
-        self.grant_ids = [grant['grant_id'] for grant in res]
-        
-        # store pi_data
-        # pi_info = [str(pi_email) for pi_email in self.feedback_template_manager.df["Data - Associations"][['USERNAME','ASSOCIATION']].tolist()]
-        template_pull = self.feedback_template_manager.df["Data - Associations"][['USERNAME','ASSOCIATION']]
-        pi_info = dict()
-        for index, row in template_pull.iterrows():
-            pi_info[row['USERNAME']] = row['ASSOCIATION']
-        pi_emails = [str(email) for email in pi_info.keys()]
-        res = self.db_manager.execute_query("SELECT PI_name FROM PI_name")
-        pi_names = set(pi['PI_name'] for pi in res)
-        
-        for pi in pi_names:
-            if pi:
-                try:
-                    if ',' in pi:
-                        l_name, f_name = pi.split(", ")
-                    else:
-                        l_name, f_name = pi.rsplit(' ')
-                except ValueError:
-                    continue
-                closest_match = find_email_by_username(f_name, l_name, pi_emails)
-                if closest_match:
-                    self.pi_data[f"{l_name}, {f_name}"] = {
-                        "email": closest_match,
-                        "association": pi_info[closest_match]
-                    }
-
+        self.retrieve_PI_Info()
+        self.retrieve_ORG_Info()
+        self.retrieve_Disciplines()
+                    
         return self
     
     def __exit__(self, exc_type, exc_value, traceback):     
@@ -77,44 +52,105 @@ class MigrationManager:
         for sheet_name, sheet_props in self.feedback_template_manager.df.items():
             generated_data[sheet_name] = sheet_props.to_dict()
         self.generated_template_manager.save_changes(os.path.join(os.getenv('SAVE_PATH'), 'generated_data.xlsx'))
-
-    def start_migration(self):
-        grant_ids = self.grant_ids
-        batch_limit = 40
-        num_grants = len(grant_ids)
-        total_batches = ceil(num_grants/batch_limit)
         
-        # Create a task with a progress bar
-        with Progress() as progress:
-            task = progress.add_task("Processing", total=total_batches)
-
-            last_index = 0
-            while last_index < num_grants:
-                new_end = last_index + batch_limit
-                batch_ids = grant_ids[last_index:new_end]
-                last_index = new_end
-
-                # Perform the database query
-                select_query = f"SELECT * FROM grants WHERE grant_id IN ({','.join(['?' for _ in batch_ids])})"
-                query_res = self.db_manager.execute_query(select_query, batch_ids)
-
-                # Process each grant
-                for grant in query_res:
-                    self.append_to_sheets(grant)
-
-                # Update progress bar after processing the batch
-                progress.update(task, advance=1)
-                
-    def append_grant(self, grant):
-        for fn in self.sheet_managers:
-            fn.append_grant(grant)
+    def retrieve_PI_Info(self):
+        investigators = {}
+        pi_fragments = {}
+        people_dataframe = self.feedback_template_manager.df["Data - People"]
+        people_sheet_length, people_sheet_width = people_dataframe.shape
+        people_rows = people_dataframe.iloc[1:people_sheet_length]
+        for index, person in people_rows.iterrows():
+            first_name = person[0]
+            middle_name = person[1]
+            last_name = person[2]
+            email = person[4]
+            empl_id = None
             
-    def append_to_sheets(self, grant):
-        self.projects_sheet_append(grant)
+            enclosed_regex = r".*\(\d{8}\)$"
+            if re.match(enclosed_regex, last_name):
+                last_name, empl_id = last_name.split("(")
+                empl_id = str(empl_id[:-1])
+            else:
+                empl_id = str(person[3])
+            
+            if not empl_id in investigators:
+                investigators[empl_id] = {
+                    "name": {
+                        "first": first_name,
+                        "middle": middle_name,
+                        "last": last_name
+                    },
+                    "email": email
+                }
+            else:
+                raise Exception("Duplicate investigator in 'Data - People' sheet")
+            
+        association_dataframe = self.feedback_template_manager.df["Data - Associations"]
+        for index, associate in association_dataframe.iterrows():
+            pi_empl_id = str(associate["EMP ID"])
+            if pi_empl_id:
+                pi_association = associate["ASSOCIATION"]
+                if pi_association:
+                    if pi_empl_id in investigators:
+                        investigators[pi_empl_id]["association"] = pi_association
+                    else:
+                       pi_fragments[pi_empl_id] = {
+                           "email": associate["USERNAME"],
+                           "association": pi_association
+                       }
+                else:
+                    raise Exception("Investigator is missing Association in 'Data - Associations' sheet")
+            else:
+                raise Exception("Investigator is missing Employee ID in 'Data - Associations' sheet")
+            
+        # Missing: Logic that fills in missing information for investigators in 'Data - Association' sheet
+        # # Retrieve Primary Investigator Information
+        # template_pull = self.feedback_template_manager.df["Data - Associations"][['USERNAME','ASSOCIATION']]
+        # pi_info = dict()
+        # for index, row in template_pull.iterrows():
+        #     pi_info[row['USERNAME']] = row['ASSOCIATION']
+        # pi_emails = [str(email) for email in pi_info.keys()]
+        # res = self.db_manager.execute_query("SELECT PI_name FROM PI_name")
+        # pi_names = set(pi['PI_name'] for pi in res)
+        
+        # for pi in pi_names:
+        #     if pi:
+        #         try:
+        #             if ',' in pi:
+        #                 l_name, f_name = pi.split(", ")
+        #             else:
+        #                 l_name, f_name = pi.rsplit(' ')
+        #         except ValueError:
+        #             continue
+        #         closest_match = find_email_by_username(f_name, l_name, pi_emails)
+        #         if closest_match:
+        #             self.pi_data[f"{l_name}, {f_name}"] = {
+        #                 "email": closest_match,
+        #                 "association": pi_info[closest_match]
+        #             }
+            
+        self.INVESTIGATORS = investigators
+        
+    def retrieve_ORG_Info(self):
+        # Retrieve Organization related Information
+        with open('./config/john_jay_org_units.json') as f:
+            self.ORG_UNITS = json.load(f)
+        with open('./config/john_jay_centers.json') as f:
+            self.ORG_CENTERS = json.load(f)
+        with open('./config/john_jay_external_orgs.json') as f:
+            self.ORGANIZATIONS = json.load(f)
+        
+    def retrieve_Disciplines(self):
+        select_query = self.db_manager.execute_query("SELECT * FROM LU_Discipline")
+        self.DISCIPLINES = {int(item['ID']):item['Name'] for item in select_query}
+
+    def start_migration(self, grants):
         # self.proposals_sheet_append(grant)
+        # self.projects_sheet_append(grant)
         # self.members_sheet_append(grant)
         
-    
-MigrationManager.proposals_sheet_append = proposals_sheet_append
+        # self.projects_sheet_append(grants)
+        self.proposals_sheet_append(grants)
+            
 MigrationManager.projects_sheet_append = projects_sheet_append
-MigrationManager.members_sheet_append = members_sheet_append
+MigrationManager.proposals_sheet_append = proposals_sheet_append

@@ -74,7 +74,7 @@ class TemplateManager:
                 return matching_rows
             else:
                 # Return first match or None
-                return matching_rows.iloc[0] if not matching_rows.empty else None
+                return matching_rows.iloc[0].to_dict() if not matching_rows.empty else None
         except KeyError as e:
             raise KeyError(f"{str(e)} not found in the workbook.")
 

@@ -160,24 +160,39 @@ SHEET_COLUMNS = [
     "Admin Unit Code"
   ]
     
-DEBUG_COUNTER = 0
-    
-# *** Needs revision
-def determine_instrument_type(grant):
-    valid_instrument_types = ['Grant', 'Contract', 'Cooperative Agreement', 'Incoming Subaward', 'NYC/NYS MOU - Interagency Agreement', 'PSC CUNY', 'CUNY Internal']
-    
-    project_instrument_type = grant['Program_Type']
-    if project_instrument_type:
-        if project_instrument_type in valid_instrument_types:
-            return project_instrument_type
-        else:
-            closest_match = find_closest_match(project_instrument_type, valid_instrument_types)
-            if closest_match:
-                return closest_match
-            else:
-                raise Exception(f"Grant's instrument type '{project_instrument_type}' is not a valid choice.")
-    else:
-        raise Exception("Grant does not have an Instrument Type")
+ACTIVITY_ASSOCIATIONS = {
+    'Research': 'Research on Campus',
+    'Conference': 'General and Administrative Purpose on Campus',
+    'Other': 'Other Institutional Activity',
+    'Training': 'Instruction on Campus',
+    'Course Development': 'Experimental Development Research on Campus Experimental',
+    'Equipment': 'Equipment on Campus',
+    'Other - Center Development': 'Other Sponsored Activity on Campus',
+    'Program Development': 'Experimental Development Research on Campus Experimental',
+    'Research/Training': 'Research Training on Campus',
+    'Student Support': 'Fellowship'
+}
+
+def determine_instrument_type(self, grant):
+    valid_types = self.INSTRUMENT_TYPES
+    project_award_type = grant['Award Type']
+
+    if project_award_type:
+        type_letter, type_title = project_award_type.split('-')
+        type_letter.strip()
+        type_title.strip()
+
+        for type_name, association in valid_types.items():
+            if type_letter in association.keys():
+                return type_name
+            closest_valid_type = find_closest_match(type_title, [str(item) for item in association.values()], case_sensitive=False)
+            if closest_valid_type:
+                return type_name
+
+    str_id = str(grant['Grant_ID'])
+    if str_id.startswith('6'):
+        return "PSC CUNY"
+        
 
 def determine_sponsor(instance, sponsor):
     if not sponsor:
@@ -227,12 +242,17 @@ def determine_sponsor(instance, sponsor):
     raise Exception(f"Failed to determine a sponsor code for '{sponsor}'")
 
 def determine_activity_type(grant):
-    pass
+    award_type = grant['Award_Type']
+    if award_type and award_type in ACTIVITY_ASSOCIATIONS:
+        return ACTIVITY_ASSOCIATIONS[award_type]
 
 def proposals_sheet_append(self, grants):
-    for index, grant in enumerate(grants, start=1):
+    for index, grant_obj in enumerate(grants, start=1):
+        grant_data = grant_obj['grant_data']
+        total_data = grant_obj['total_data']
+        rifunds_data = grant_obj['rifunds_data']
         
-        grant_id = grant['Grant_ID']
+        grant_id = grant_data['Grant_ID']
         existing_grant = {}
         if grant_id:
             retrieved_entry = self.feedback_template_manager.get_entry(SHEET_NAME, "proposalLegacyNumber", existing_grant)
@@ -246,7 +266,7 @@ def proposals_sheet_append(self, grants):
                 "Grant is missing Grant_ID in the database"
             )
         
-        grant_pln = grant['Project_Legacy_Number']
+        grant_pln = grant_data['Project_Legacy_Number']
         if not grant_pln:
             self.generated_template_manager.comment_manager.append_comment(
                 SHEET_NAME,
@@ -258,8 +278,8 @@ def proposals_sheet_append(self, grants):
         grant_status = None
         grant_oar = None
         try:
-            grant_oar = determine_grant_status(grant)
-            grant_status = grant['Status']
+            grant_oar = determine_grant_status(grant_data)
+            grant_status = grant_data['Status']
         except Exception as e:
             self.generated_template_manager.comment_manager.append_comment(
                 SHEET_NAME,
@@ -269,7 +289,7 @@ def proposals_sheet_append(self, grants):
             )
         if not grant_status and existing_grant.get('Status'):
             try:
-                grant_oar = determine_grant_status(**grant, **{
+                grant_oar = determine_grant_status(**grant_data, **{
                     "Status": existing_grant['Status'],
                     "Start_Date_Req": existing_grant['Project Start Date'],
                     "End_Date_Req": existing_grant['Project End Date']
@@ -278,7 +298,7 @@ def proposals_sheet_append(self, grants):
             except Exception as e:
                 print("Error using existing entry to determine Status: ", e)
         
-        grant_primary_college = grant['Prim_College'] or existing_grant.get("CUNY Campus")
+        grant_primary_college = grant_data['Prim_College'] or existing_grant.get("CUNY Campus")
         if not grant_primary_college:
             self.generated_template_manager.comment_manager.append_comment(
                 SHEET_NAME,
@@ -287,8 +307,9 @@ def proposals_sheet_append(self, grants):
                 "Grant is missing Prim_College in the database."
             )
             
+        grant_instrument_type = None
         try:
-            grant_instrument_type = determine_instrument_type(grant)
+            grant_instrument_type = determine_instrument_type(self, grant_data)
         except Exception as e:
             self.generated_template_manager.comment_manager.append_comment(
                 SHEET_NAME,
@@ -299,9 +320,9 @@ def proposals_sheet_append(self, grants):
             
         grant_sponsor = None
         try:
-            grant_sponsor = determine_sponsor(self, grant['Sponsor_1'])
+            grant_sponsor = determine_sponsor(self, grant_data['Sponsor_1'])
         except Exception as e:
-            print(e)
+            # print(e)
             self.generated_template_manager.comment_manager.append_comment(
                 SHEET_NAME,
                 index,
@@ -310,9 +331,9 @@ def proposals_sheet_append(self, grants):
             )
             
         grant_prime_sponsor = None
-        if grant['Sponsor_2']:
+        if grant_data['Sponsor_2']:
             try:
-                grant_prime_sponsor = determine_sponsor(self, grant['Sponsor_2'])
+                grant_prime_sponsor = determine_sponsor(self, grant_data['Sponsor_2'])
             except Exception as e:
                 self.generated_template_manager.comment_manager.append_comment(
                     SHEET_NAME,
@@ -321,7 +342,7 @@ def proposals_sheet_append(self, grants):
                     e
                 )
             
-        grant_title = grant['Project_Title'] or existing_grant.get('Title')
+        grant_title = grant_data['Project_Title'] or existing_grant.get('Title')
         if not grant_title:
             self.generated_template_manager.comment_manager.append_comment(
                 SHEET_NAME,
@@ -330,7 +351,7 @@ def proposals_sheet_append(self, grants):
                 "Grant is missing Project_Title in database"
             )
             
-        grant_start_date = grant['Start_Date_Req'] or grant['Start_Date'] or existing_grant.get('Project Start Date')
+        grant_start_date = grant_data['Start_Date_Req'] or grant_data['Start_Date'] or existing_grant.get('Project Start Date')
         if not grant_start_date:
             self.generated_template_manager.comment_manager.append_comment(
                 SHEET_NAME,
@@ -339,7 +360,7 @@ def proposals_sheet_append(self, grants):
                 "Grant is missing Start_Date in database"
             )
             
-        grant_end_date = grant['End_Date_Req'] or grant['End_Date'] or existing_grant.get('Project End Date')
+        grant_end_date = grant_data['End_Date_Req'] or grant_data['End_Date'] or existing_grant.get('Project End Date')
         if not grant_end_date:
             self.generated_template_manager.comment_manager.append_comment(
                 SHEET_NAME,
@@ -348,8 +369,9 @@ def proposals_sheet_append(self, grants):
                 "Grant is missing End_Date in database"
             )
         
+        grant_activity_type = None
         try:
-            grant_activity_type = determine_activity_type(grant)
+            grant_activity_type = determine_activity_type(grant_data)
         except Exception as e:
             self.generated_template_manager.comment_manager.append_comment(
                 SHEET_NAME,
@@ -360,7 +382,7 @@ def proposals_sheet_append(self, grants):
         
         grant_discipline = None
         try:
-            grant_discipline = determine_grant_discipline(self, grant)
+            grant_discipline = determine_grant_discipline(self, grant_data)
         except Exception as e:
             self.generated_template_manager.comment_manager.append_comment(
                 SHEET_NAME,
@@ -371,7 +393,7 @@ def proposals_sheet_append(self, grants):
         if not grant_discipline and existing_grant.get('Discipline'):
             try:
                 grant_discipline = determine_grant_discipline(self, {
-                    **grant,
+                    **grant_data,
                     **{
                         "Discipline": existing_grant['Discipline']
                     }
@@ -379,20 +401,40 @@ def proposals_sheet_append(self, grants):
             except Exception as e:
                 print("Error occured while attempting to use existing grant data to determine a Discipline")
         
-        grant_abstract = strip_html(grant['Abstract']) if grant['Abstract'] else None
+        grant_abstract = strip_html(grant_data['Abstract']) if grant_data['Abstract'] else None
         
-        # Missing budgeting logic
+        grant_num_budget_periods = len(total_data)
+        grant_rate_cost_type = None
+        if grant_data['RIndir%DC']:
+            num_direct = float(grant_data['RIndir%DC'])
+            if num_direct:
+                grant_rate_cost_type = "Total Direct Costs (TDC)"
+        if grant_data['RIndir%Per']:
+            num_wages = float(grant_data['RIndir%Per'])
+            if num_wages:
+                grant_rate_cost_type = "Salary and Wages (SW)"
         
-        grant_has_subrecipient = "Yes" if grant['Subrecipient_1'] else "No"
-        grant_has_human_subjects = "Yes" if grant['Human Subjects'] else "No"
-        grant_has_animal_subjects = "Yes" if grant['Research Animals'] else "No"
-        grant_has_hazard_material = "None"
-        grant_has_export_control = "Yes" if grant['Export Control'] else "No"
-        grant_comments = grant['Comments']
+        grant_idc_rate = round((float(grant_data['RIndir%DC']) if grant_rate_cost_type == "Total Direct Costs (TDC)" else (float(grant_data['RIndir%Per']) if grant_rate_cost_type == "Salary and Wages (SW)" else 0)) * 100, 1)
+        grant_idc_cost_type_explain = grant_data['Indirect_Deviation']
+        grant_total_direct_cost = round(sum(map(lambda fund: fund['RIAmount'], rifunds_data)))
+        grant_sponsor_cost = round(sum(map(lambda fund: fund['RAmount'], total_data)))
+        print(grant_id, grant_num_budget_periods, grant_rate_cost_type, grant_idc_rate, grant_idc_cost_type_explain, grant_total_direct_cost, grant_sponsor_cost)
         
-        # Missing IRB logic
+        grant_has_subrecipient = "Yes" if grant_data['Subrecipient_1'] else "No"
+        grant_has_human_subjects = "Yes" if grant_data['Human Subjects'] else "No"
+        grant_has_animal_subjects = "Yes" if grant_data['Research Animals'] else "No"
+        grant_has_hazard_material = ("Yes" if grant_data['Biohazards'] else "None")
+        grant_has_export_control = "Yes" if grant_data['Export Control'] else "No"
+        grant_comments = grant_data['Comments']
         
-        grant_submit_date = grant['Date_Submitted']
+        grant_has_irb_approval = ("Approved" if grant_data['IRB_Approval'] else None)
+        grant_irb_approval_date = (grant_data['IRB_Start'] if grant_has_irb_approval else None)
+        
+        grant_idc_rate_less_on_campus_rate = "No"
+        reassigned_time_yn = "No"
+        reassigned_time_details = None
+        
+        grant_submit_date = grant_data['Date_Submitted']
         if not grant_submit_date:
             self.generated_template_manager.comment_manager.append_comment(
                 SHEET_NAME,
@@ -403,7 +445,7 @@ def proposals_sheet_append(self, grants):
             
         grant_admin_unit_name, grant_admin_unit_code, grant_admin_unit_center = (None,None,None)
         try:
-            grant_admin_unit_name, grant_admin_unit_code, grant_admin_unit_center = determine_grant_admin_unit(self, grant)
+            grant_admin_unit_name, grant_admin_unit_code, grant_admin_unit_center = determine_grant_admin_unit(self, grant_data)
         except Exception as e:
             self.generated_template_manager.comment_manager.append_comment(
                 SHEET_NAME,
@@ -428,20 +470,20 @@ def proposals_sheet_append(self, grants):
                 "Activity Type": grant_activity_type,
                 "Discipline": grant_discipline,
                 "Abstract": "",
-                "Number of Budget Periods": "",
-                "Indirect Rate Cost Type": "",
-                "IDC Rate": "",
-                "Total Total Total Direct Cost (TDC) (TDC)s": "",
-                "Total InTotal Total Direct Cost (TDC) (TDC)s": "",
-                "Total Sponsor Costs": "",
-                "IDC Rate Less OnCampus Rate": "",
-                "Reassigned Time YN": "",
-                "Reassigned Time YN": "",
-                # Budget Propoerties
+                "Number of Budget Periods": grant_num_budget_periods,
+                "Indirect Rate Cost Type": grant_rate_cost_type,
+                "IDC Rate": grant_idc_rate,
+                "IDC Cost Type Explanation": grant_idc_cost_type_explain,
+                "Total Total Total Direct Cost (TDC) (TDC)s": round(grant_sponsor_cost - grant_total_direct_cost),
+                "Total InTotal Total Direct Cost (TDC) (TDC)s": grant_total_direct_cost,
+                "Total Sponsor Costs": grant_sponsor_cost,
+                "IDC Rate Less OnCampus Rate": grant_idc_rate_less_on_campus_rate,
+                "Reassigned Time YN": reassigned_time_yn,
+                "Reassigned Time Details": reassigned_time_details,
                 "Subrecipient": grant_has_subrecipient,
                 "Human Subjects": grant_has_human_subjects,
-                "IRB Protocol Status": "",
-                "IRB Approval Date": "",
+                "IRB Protocol Status": grant_has_irb_approval,
+                "IRB Approval Date": grant_irb_approval_date,
                 "Animal Subjects": grant_has_animal_subjects,
                 "Hazardous Materials": grant_has_hazard_material,
                 "Export Control": grant_has_export_control,

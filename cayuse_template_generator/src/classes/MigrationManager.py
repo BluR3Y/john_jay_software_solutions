@@ -44,6 +44,7 @@ class MigrationManager:
         self.retrieve_PI_Info()
         self.retrieve_ORG_Info()
         self.retrieve_Disciplines()
+        self.retrieve_Instrument_Types()
                     
         return self
     
@@ -143,6 +144,14 @@ class MigrationManager:
     def retrieve_Disciplines(self):
         select_query = self.db_manager.execute_query("SELECT * FROM LU_Discipline")
         self.DISCIPLINES = {int(item['ID']):item['Name'] for item in select_query}
+        
+    def retrieve_Instrument_Types(self):
+        relevant_data = None
+        with open('./config/john_jay_instrument_and_activity_types.json') as f:
+            relevant_data = json.load(f)
+            
+        self.INSTRUMENT_TYPES = relevant_data["instrument_types"]
+        self.ACTIVITY_TYPES = relevant_data['activity_types']
 
     def start_migration(self, grants):
         # self.proposals_sheet_append(grant)

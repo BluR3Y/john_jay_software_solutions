@@ -74,13 +74,7 @@ def report_generator(self):
     def logic():
         # Retrieve all the tables in the database
         tables = self.db_manager.get_db_tables()
-        generated_reports = {
-            # Table
-            # record_identifier,
-            # record_identifier_ids,
-            # Search Condition
-            # DataFrame
-        }
+        generated_reports = {}
 
         while True:
             try:
@@ -303,6 +297,99 @@ def database_record_plc_populator(self):
                 "UPDATE grants SET Project_Legacy_Number = ? WHERE Grant_ID = ?;", existing_pln
             )
             print(f"Updated {rows_updated} rows in the database.")
+    return Process(
+        logic,
+        process_name,
+        ""
+    )
+    
+def database_discipline_repair(self):
+    process_name = "Database Discipline Fixer"
+    
+    def logic():
+        select_query = self.db_manager.execute_query("SELECT * FROM LU_Discipline")
+        valid_disciplines = {int(item['ID']):item['Name'] for item in select_query}
+        invalid_grants = {}
+        
+        query_grants = self.db_manager.execute_query("SELECT Grant_ID, Discipline FROM grants")
+        grants = {int(grant['Grant_ID']): grant['Discipline'] for grant in query_grants}
+        
+        for grant_id, grant_discipline in grants.items():
+            if not grant_discipline:
+                print(f"Grant {grant_id} doesnt have a discapline")
+                continue
+            
+            if grant_discipline.isnumeric():
+                numeric_discipline = int(grant_discipline)
+                if numeric_discipline in invalid_grants:
+                    invalid_grants[numeric_discipline].append(grant_id)
+                else:
+                    invalid_grants[numeric_discipline] = [grant_id]
+
+        for discipline_id, grants in invalid_grants.items():
+            if discipline_id in valid_disciplines:
+                discipline_name = valid_disciplines[discipline_id]
+                
+                batch_limit = 40
+                num_grants = len(grants)
+                last_index = 0
+                while last_index < num_grants:
+                    new_end = last_index + batch_limit
+                    batch_ids = grants[last_index:new_end]
+                    last_index = new_end
+                    
+                    update_query = f"UPDATE grants SET Discipline = ? WHERE Grant_ID IN ({','.join('?' for _ in batch_ids)})"
+                    self.db_manager.cursor.execute(update_query, discipline_name, *batch_ids)
+                    self.db_manager.connection.commit()
+            else:
+                print(f"No valid discipline associated with: {discipline_id}")
+    
+    return Process(
+        logic,
+        process_name,
+        ""
+    )
+    
+def database_award_type_repair(self):
+    process_name = "Database Award Type Fixer"
+    
+    def logic():
+        select_query = self.db_manager.execute_query("SELECT ID, Field1 FROM LU_AType")
+        valid_types = {int(item['ID']):item['Field1'] for item in select_query}
+        invalid_types = {}
+    
+        query_grants = self.db_manager.execute_query('SELECT Grant_ID, "Award Type" FROM grants')
+        grants = {int(grant['Grant_ID']): grant['Award Type'] for grant in query_grants}
+    
+        for grant_id, award_type in grants.items():
+            if not award_type:
+                continue
+            
+            if award_type.isnumeric():
+                numeric_type = int(award_type)
+                if numeric_type in invalid_types:
+                    invalid_types[numeric_type].append(grant_id)
+                else:
+                    invalid_types[numeric_type] = [grant_id]
+        
+        for award_id, grants in invalid_types.items():
+            if award_id in valid_types:
+                type_name = valid_types[award_id]
+                
+                batch_limit = 40
+                num_grants = len(grants)
+                last_index = 0
+                while last_index < num_grants:
+                    new_end = last_index + batch_limit
+                    batch_ids = grants[last_index:new_end]
+                    last_index = new_end
+                    
+                    update_query = f'UPDATE grants SET "Award Type" = ? WHERE Grant_ID IN ({','.join('?' for _ in batch_ids)})'
+                    self.db_manager.cursor.execute(update_query, type_name, *batch_ids)
+                    self.db_manager.connection.commit()
+            else:
+                print(f"No valid Award Type associated with: {award_id}")
+    
     return Process(
         logic,
         process_name,

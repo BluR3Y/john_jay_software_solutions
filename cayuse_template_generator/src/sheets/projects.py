@@ -5,8 +5,10 @@ SHEET_COLUMNS = ["projectLegacyNumber", "title", "status"]
 
 
 def projects_sheet_append(self, grants):    
-    for index, grant in enumerate(grants, start=1):
-        grant_legacy_num = grant['Project_Legacy_Number']
+    for index, grant_obj in enumerate(grants, start=1):
+        grant_data = grant_obj['grant_data']
+        
+        grant_legacy_num = grant_data['Project_Legacy_Number']
         if not grant_legacy_num:
             self.generated_template_manager.comment_manager.append_comment(
                 SHEET_NAME,
@@ -15,7 +17,7 @@ def projects_sheet_append(self, grants):
                 "Grant was not assigned a title in the database."
             )
             
-        grant_title = grant['Project_Title']
+        grant_title = grant_data['Project_Title']
         if not grant_title:
             self.generated_template_manager.comment_manager.append_comment(
                 SHEET_NAME,
@@ -26,7 +28,7 @@ def projects_sheet_append(self, grants):
             
         grant_status = None
         try:
-            grant_status = determine_grant_status(grant)
+            grant_status = determine_grant_status(grant_data)
         except Exception as e:
             self.generated_template_manager.comment_manager.append_comment(
                 SHEET_NAME,

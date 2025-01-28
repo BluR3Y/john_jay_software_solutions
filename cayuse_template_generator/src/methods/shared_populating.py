@@ -59,18 +59,20 @@ def determine_grant_admin_unit(instance, grant):
     project_primary_dept = grant['Primary_Dept']
     
     if project_primary_dept:
-        if project_primary_dept in org_units.keys():
+        org_unit_keys = [str(item) for item in org_units.keys()]
+        if project_primary_dept in org_unit_keys:
             return project_primary_dept, org_units[project_primary_dept]['Primary Code'], None
         else:
-            closest_valid_dept = find_closest_match(project_primary_dept, org_units.keys())
+            closest_valid_dept = find_closest_match(project_primary_dept, org_unit_keys)
             if closest_valid_dept:
                 return closest_valid_dept, org_units[closest_valid_dept]['Primary Code'], None
             else:
-                if project_primary_dept in org_centers.keys():
+                org_center_keys = [str(item) for item in org_centers.keys()]
+                if project_primary_dept in org_center_keys:
                     project_center = org_centers[project_primary_dept]
                     return project_center['Admin Unit'], project_center['Admin Unit Code'], project_primary_dept
                 else:
-                    closest_valid_center = find_closest_match(project_primary_dept, org_centers.keys())
+                    closest_valid_center = find_closest_match(project_primary_dept, org_center_keys)
                     if closest_valid_center:
                         project_center = org_centers[closest_valid_center]
                         return project_center['Admin Unit'], project_center['Admin Unit Code'], closest_valid_center

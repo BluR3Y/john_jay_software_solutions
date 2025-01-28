@@ -13,7 +13,7 @@ def determine_grant_status(grant):
                 raise Exception("Funded grant is not assigned an 'End_Date_Req' value in the database which is crucial towards determining a status.")
         elif project_status == "Pending":
             pending_threshold =  datetime.strptime('2024-06-30', '%Y-%m-%d')
-            project_start_date = grant['Start_Date_Req'] or grant['Date_Submitted']
+            project_start_date = grant['Start_Date_Req'] or grant['Date_Submitted'] or grant['Start_Date']
             if project_start_date:
                 return ("Active" if project_start_date >= pending_threshold else "Closed")
             else:

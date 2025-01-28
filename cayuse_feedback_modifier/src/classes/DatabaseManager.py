@@ -1,4 +1,6 @@
 import pyodbc
+from typing import Union
+import datetime
 
 from classes.LogManager.DatabaseLogManager import DatabaseLogManager
 
@@ -127,15 +129,12 @@ class DatabaseManager:
         try:
             # Construct query
             query = f"SELECT {','.join(cols)} FROM {table}"
-            passing_values = []
-            if conditions:
-                pass
             
             if conditions:
                 query += " WHERE " + self.conditions_to_string(conditions)
                 
             # Execute query
-            self.cursor.execute(query, *passing_values)
+            self.cursor.execute(query)
             rows = self.cursor.fetchall()
             
             # Convert results to list of dictionaries
@@ -145,7 +144,8 @@ class DatabaseManager:
             if self.connection:
                 self.connection.rollback()
 
-    def update_query(self,process: str, table: str, cols: dict[str, any], condition=None, *args):
+    # Caution: Deprecated
+    def update_query_v1(self,process: str, table: str, cols: dict[str, any], condition=None, *args):
         """Execute an update query."""
         table_columns = self.get_table_columns(table)
         table_row_identifier = table_columns[0]
@@ -163,6 +163,29 @@ class DatabaseManager:
                 print(f"An error occurred while querying the database: {err}")
                 if self.connection:
                     self.connection.rollback()
+
+    def update_query(self, process:str, table: str, cols: dict[str, Union[None,str,int, bool, datetime.date]], conditions = None) -> None:
+        """ Execute an update query """
+        try:
+            table_columns = self.get_table_columns(table)
+            table_row_identifier = table_columns[0]
+            affecting_rows = self.select_query(table, [table_row_identifier, *cols.keys()], conditions)
+            
+            if not affecting_rows:
+                raise Exception("Could not find record with given parameters.")
+            
+            query = f"UPDATE {table} SET {','.join(f"{col}=?" for col in cols.keys())}"
+            if conditions:
+                query += " WHERE " + self.conditions_to_string(conditions)
+            print(query)
+            self.cursor.execute(query, *cols.values())
+            self.log_manager.append_log(process, table, table_row_identifier, affecting_rows, cols)
+            self.connection.commit()
+        except Exception as err:
+            print("An error occured while updating records: ", err)
+            if self.connection:
+                self.connection.rollback()
+
 
     # ** Caution: Deprecated
     def execute_query(self, query, *args):

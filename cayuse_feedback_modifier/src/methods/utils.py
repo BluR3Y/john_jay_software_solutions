@@ -2,7 +2,7 @@ import os
 import difflib
 import re
 
-def request_file_path(requestStr, validTypes):
+def request_file_path(requestStr: str, validTypes: list[str]):
     path = input(requestStr + ': ')
     if os.path.isfile(path):
         fileType = os.path.splitext(path)[1]

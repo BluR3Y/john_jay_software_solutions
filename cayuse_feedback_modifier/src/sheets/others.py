@@ -1,8 +1,10 @@
 from classes.Process import Process
 from methods import utils
 
+import openpyxl
 import os
 import pandas as pd
+import numpy as np
 
 SHEET_NAME = "Other"
 
@@ -72,7 +74,13 @@ def report_generator(self):
     def logic():
         # Retrieve all the tables in the database
         tables = self.db_manager.get_db_tables()
-        generated_reports = {}
+        generated_reports = {
+            # Table
+            # record_identifier,
+            # record_identifier_ids,
+            # Search Condition
+            # DataFrame
+        }
 
         while True:
             try:
@@ -88,6 +96,7 @@ def report_generator(self):
                 selected_search_conditions = input("WHERE: ")
                 if selected_search_conditions:
                     formatted_search_conditions = utils.parse_query_conditions(selected_search_conditions, table_columns)
+                    print("Developer info: ", formatted_search_conditions)
                 else:
                     raise Exception("Failed to provide query search conditions.")
                 
@@ -133,7 +142,14 @@ def report_generator(self):
                     if not selected_report_name:
                         raise Exception("Failed to provide a report name.")
                     
-                    generated_reports[selected_report_name] = pd.DataFrame(report_data)
+                    # generated_reports[selected_report_name] = pd.DataFrame(report_data)
+                    generated_reports[selected_report_name] = {
+                        "table": selected_table,
+                        "record_identifier": record_identifier,
+                        "search_condition": selected_search_conditions,
+                        "formatted_search_condition": formatted_search_conditions,
+                        "data_frame": pd.DataFrame(report_data),
+                    }
             except Exception as e:
                 print(e)
 
@@ -141,8 +157,25 @@ def report_generator(self):
             save_location = os.path.join(os.getenv("SAVE_PATH"), "generated_report.xlsx")
             # Use ExcelWriter to write multiple sheets into an Excel file
             with pd.ExcelWriter(save_location) as writer:
-                for sheet_name, df_sheet in generated_reports.items():
+                report_meta_data = []
+                meta_data_columns = ['sheet_name', 'table', 'search_condition', 'formatted_search_condition']
+                
+                for sheet_name, sheet_info in generated_reports.items():
+                    df_sheet = sheet_info["data_frame"]
                     df_sheet.to_excel(writer, sheet_name=sheet_name, index=False)
+                    report_meta_data.append([sheet_name, sheet_info['table'], sheet_info['search_condition'], sheet_info['formatted_search_condition']])
+                
+                # Create MetaData DataFrame
+                meta_data_frame = pd.DataFrame(report_meta_data, columns=meta_data_columns)
+                meta_data_frame.to_excel(writer, sheet_name="report_meta_data", index=False)
+                
+            # Load the report workbook
+            report_workbook = openpyxl.load_workbook(save_location)
+            # Set the state of the MetaData sheet to hidden
+            report_workbook["report_meta_data"].sheet_state = "hidden"
+            # Save the state change made to the workbook
+            report_workbook.save(save_location)
+                
             print(f"File saved to {save_location}")
 
     return Process(
@@ -150,6 +183,59 @@ def report_generator(self):
         process_name,
         ""
     )
+    
+def report_resolver(self):
+    process_name = "Report Resolver"
+
+    def logic():
+        file_path = utils.request_file_path("Enter the file path of the excel file:", [".xlsx"])
+        
+        # Read the Excel file
+        excel_file = pd.ExcelFile(file_path)
+        # Get the sheet names
+        sheet_names = excel_file.sheet_names
+        if "report_meta_data" in sheet_names:
+           sheet_names.remove("report_meta_data")
+        else:
+            raise Exception("Report is missing metadata sheet.")
+        
+        report_data_frame = pd.read_excel(file_path, sheet_name=None)
+        meta_data_records = report_data_frame["report_meta_data"].to_dict(orient='records')
+        meta_data = {record['sheet_name']: record for record in meta_data_records}
+
+        for sheet_name in sheet_names:
+            if not sheet_name in meta_data:
+                raise Exception(f"Metadata does not include data regarding the sheet {sheet_name}")
+            
+            sheet_meta_data = meta_data[sheet_name]
+            # sheet_data_frame = report_data_frame[sheet_name].to_dict(orient="records")
+            sheet_data_frame = report_data_frame[sheet_name]
+            sheet_data_frame.replace([pd.NaT, np.nan], None, inplace=True)
+            
+            sheet_rows = sheet_data_frame.to_dict(orient="records")
+            sheet_record_identifier = sheet_meta_data['record_identifier']
+            
+            for sheet_row in sheet_rows:
+                record_id = sheet_row[sheet_record_identifier]
+                del sheet_row[sheet_record_identifier]
+                self.db_manager.update_query(
+                    process_name,
+                    sheet_meta_data['table'],
+                    sheet_row,
+                    {
+                        sheet_record_identifier: {
+                            "operator": "=",
+                            "value": record_id
+                        }
+                    }
+                )
+        print("Finished making changes to records in database.")
+    return Process(
+        logic,
+        process_name,
+        ""
+    )    
+    
     
 def database_record_plc_populator(self):
     process_name = "Populate Database Record ProjectLegacyNumber"

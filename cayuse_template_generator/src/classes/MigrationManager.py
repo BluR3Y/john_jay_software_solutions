@@ -156,6 +156,9 @@ class MigrationManager:
         self.ACTIVITY_TYPES = relevant_data['activity_types']
 
     def start_migration(self, grants):
+        self.projects_sheet_append(grants)
+        self.proposals_sheet_append(grants)
+        self.members_sheet_append(grants)
         self.awards_sheet_append(grants)
             
 MigrationManager.projects_sheet_append = projects_sheet_append

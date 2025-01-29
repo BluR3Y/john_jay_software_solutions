@@ -166,27 +166,28 @@ def proposals_sheet_append(self, grants):
         rifunds_data = grant_obj['rifunds_data']
         
         grant_id = grant_data['Grant_ID']
-        existing_grant = {}
-        if grant_id:
-            retrieved_entry = self.feedback_template_manager.get_entry(SHEET_NAME, "proposalLegacyNumber", existing_grant)
-            if retrieved_entry != None:
-                existing_grant = retrieved_entry
-        else:
-            self.generated_template_manager.comment_manager.append_comment(
-                SHEET_NAME,
-                index,
-                1,
-                "Grant is missing Grant_ID in the database"
-            )
-        
         grant_pln = grant_data['Project_Legacy_Number']
-        if not grant_pln:
+        existing_grant = {}
+        if grant_pln:
+            template_row = self.feedback_template_manager.get_entry(SHEET_NAME, "projectLegacyNumber", grant_pln)
+            if template_row != None:
+                existing_grant = template_row
+        else:
             self.generated_template_manager.comment_manager.append_comment(
                 SHEET_NAME,
                 index,
                 0,
                 "Grant is missing Project_Legacy_Number in the database"
             )
+        
+        # grant_pln = grant_data['Project_Legacy_Number']
+        # if not grant_pln:
+        #     self.generated_template_manager.comment_manager.append_comment(
+        #         SHEET_NAME,
+        #         index,
+        #         0,
+        #         "Grant is missing Project_Legacy_Number in the database"
+        #     )
 
         grant_status = None
         grant_oar = None
@@ -200,7 +201,7 @@ def proposals_sheet_append(self, grants):
                 2,
                 e
             )
-        if not grant_status and existing_grant.get('Status'):
+        if not grant_oar and existing_grant.get('Status'):
             try:
                 grant_oar = determine_grant_status(**grant_data, **{
                     "Status": existing_grant['Status'],
@@ -224,6 +225,7 @@ def proposals_sheet_append(self, grants):
         try:
             grant_instrument_type = determine_instrument_type(self, grant_data)
         except Exception as e:
+            grant_instrument_type = existing_grant.get('Instrument Type')
             self.generated_template_manager.comment_manager.append_comment(
                 SHEET_NAME,
                 index,
@@ -235,7 +237,7 @@ def proposals_sheet_append(self, grants):
         try:
             grant_sponsor = determine_sponsor(self, grant_data['Sponsor_1'])
         except Exception as e:
-            # print(e)
+            grant_sponsor = existing_grant.get('Sponsor')
             self.generated_template_manager.comment_manager.append_comment(
                 SHEET_NAME,
                 index,
@@ -248,6 +250,7 @@ def proposals_sheet_append(self, grants):
             try:
                 grant_prime_sponsor = determine_sponsor(self, grant_data['Sponsor_2'])
             except Exception as e:
+                grant_prime_sponsor = existing_grant.get('Prime Sponsor')
                 self.generated_template_manager.comment_manager.append_comment(
                     SHEET_NAME,
                     index,
@@ -286,6 +289,7 @@ def proposals_sheet_append(self, grants):
         try:
             grant_activity_type = determine_activity_type(grant_data)
         except Exception as e:
+            grant_activity_type = existing_grant.get('Activity Type')
             self.generated_template_manager.comment_manager.append_comment(
                 SHEET_NAME,
                 index,

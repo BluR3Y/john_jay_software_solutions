@@ -152,7 +152,7 @@ def report_generator(self):
             # Use ExcelWriter to write multiple sheets into an Excel file
             with pd.ExcelWriter(save_location) as writer:
                 report_meta_data = []
-                meta_data_columns = ['sheet_name', 'table', 'search_condition', 'formatted_search_condition']
+                meta_data_columns = ['sheet_name', 'table', 'record_identifier', 'search_condition', 'formatted_search_condition']
                 
                 for sheet_name, sheet_info in generated_reports.items():
                     df_sheet = sheet_info["data_frame"]
@@ -200,7 +200,7 @@ def report_resolver(self):
         for sheet_name in sheet_names:
             if not sheet_name in meta_data:
                 raise Exception(f"Metadata does not include data regarding the sheet {sheet_name}")
-            
+
             sheet_meta_data = meta_data[sheet_name]
             # sheet_data_frame = report_data_frame[sheet_name].to_dict(orient="records")
             sheet_data_frame = report_data_frame[sheet_name]

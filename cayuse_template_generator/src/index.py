@@ -28,9 +28,11 @@ if __name__ == "__main__":
             
     #     my_instance.start_migration(grants)
     with MigrationManager() as my_instance:
+        existing_grants = my_instance.feedback_template_manager.df["Proposal - Template"]['proposalLegacyNumber'].tolist()
+        
         grants = []
         query_grant_ids = my_instance.db_manager.execute_query("SELECT Grant_ID FROM grants")
-        grant_ids = [grant['Grant_ID'] for grant in query_grant_ids]
+        grant_ids = [grant['Grant_ID'] for grant in query_grant_ids if grant["Grant_ID"] not in existing_grants]
         
         for grant_id in grant_ids:
             select_grant_query = my_instance.db_manager.execute_query("SELECT * FROM grants WHERE Grant_ID = ?", grant_id)

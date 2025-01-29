@@ -1,6 +1,7 @@
 import multiprocessing
 from math import ceil
 import pandas as pd
+import math
 import json
 import re
 from dotenv import load_dotenv
@@ -22,6 +23,7 @@ from sheets.projects import projects_sheet_append
 from sheets.awards import awards_sheet_append
 
 class MigrationManager:
+    INVESTIGATORS_ALT = {}
 
     def __init__(self):
         # Initialize an instance of the TemplateManager class for the feedback file
@@ -59,11 +61,11 @@ class MigrationManager:
         pi_fragments = {}
         people_dataframe = self.feedback_template_manager.df["Data - People"]
         people_sheet_length, people_sheet_width = people_dataframe.shape
-        people_rows = people_dataframe.iloc[1:people_sheet_length]
+        people_rows = people_dataframe.iloc[1:people_sheet_length - 1]
         for index, person in people_rows.iterrows():
-            first_name = person[0]
-            middle_name = person[1]
-            last_name = person[2]
+            first_name = person[0].strip().capitalize()
+            middle_name = (person[1] if isinstance(person[1], str) else "").strip().capitalize()
+            last_name = person[2].strip().capitalize()
             email = person[4]
             empl_id = None
             
@@ -129,7 +131,7 @@ class MigrationManager:
         #                 "email": closest_match,
         #                 "association": pi_info[closest_match]
         #             }
-            
+        
         self.INVESTIGATORS = investigators
         
     def retrieve_ORG_Info(self):
@@ -154,12 +156,9 @@ class MigrationManager:
         self.ACTIVITY_TYPES = relevant_data['activity_types']
 
     def start_migration(self, grants):
-        # self.proposals_sheet_append(grant)
-        # self.projects_sheet_append(grant)
-        # self.members_sheet_append(grant)
-        
-        # self.projects_sheet_append(grants)
-        self.proposals_sheet_append(grants)
+        self.awards_sheet_append(grants)
             
 MigrationManager.projects_sheet_append = projects_sheet_append
 MigrationManager.proposals_sheet_append = proposals_sheet_append
+MigrationManager.members_sheet_append = members_sheet_append
+MigrationManager.awards_sheet_append = awards_sheet_append

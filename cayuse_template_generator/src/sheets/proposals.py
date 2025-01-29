@@ -1,7 +1,6 @@
 from datetime import datetime
 from methods.utils import strip_html, find_closest_match, format_string, extract_titles
-from methods.shared_populating import determine_grant_status, determine_grant_discipline, determine_grant_admin_unit
-import json
+from methods.shared_populating import determine_grant_status, determine_grant_discipline, determine_grant_admin_unit, determine_activity_type, determine_sponsor, determine_instrument_type
 
 SHEET_NAME = "Proposal - Template"
 SHEET_COLUMNS = [
@@ -159,92 +158,6 @@ SHEET_COLUMNS = [
     "Admin Unit Name",
     "Admin Unit Code"
   ]
-    
-ACTIVITY_ASSOCIATIONS = {
-    'Research': 'Research on Campus',
-    'Conference': 'General and Administrative Purpose on Campus',
-    'Other': 'Other Institutional Activity',
-    'Training': 'Instruction on Campus',
-    'Course Development': 'Experimental Development Research on Campus Experimental',
-    'Equipment': 'Equipment on Campus',
-    'Other - Center Development': 'Other Sponsored Activity on Campus',
-    'Program Development': 'Experimental Development Research on Campus Experimental',
-    'Research/Training': 'Research Training on Campus',
-    'Student Support': 'Fellowship'
-}
-
-def determine_instrument_type(self, grant):
-    valid_types = self.INSTRUMENT_TYPES
-    project_award_type = grant['Award Type']
-
-    if project_award_type:
-        type_letter, type_title = project_award_type.split('-')
-        type_letter.strip()
-        type_title.strip()
-
-        for type_name, association in valid_types.items():
-            if type_letter in association.keys():
-                return type_name
-            closest_valid_type = find_closest_match(type_title, [str(item) for item in association.values()], case_sensitive=False)
-            if closest_valid_type:
-                return type_name
-
-    str_id = str(grant['Grant_ID'])
-    if str_id.startswith('6'):
-        return "PSC CUNY"
-        
-
-def determine_sponsor(instance, sponsor):
-    if not sponsor:
-        raise Exception("Grant does not have a sponsor assigned to it in the database.")
-    
-    all_orgs = {
-        **instance.ORGANIZATIONS['existing_external_orgs'],
-        **instance.ORGANIZATIONS['non_existing_external_orgs']
-    }
-    inverse_orgs = {props.get('Alt Name'): name for name, props in all_orgs.items() if props.get('Alt Name')}
-    org_primary_names = list(all_orgs.keys())
-    org_alt_names = list(inverse_orgs.keys())
-    
-    # First, check if the sponsor is an exact match in primary or alternate orgs
-    if sponsor in org_primary_names:
-        return all_orgs[sponsor]["Primary Code"]
-    
-    closest_valid_sponsor = find_closest_match(sponsor, org_primary_names, case_sensitive=False)
-    if closest_valid_sponsor:
-        return all_orgs[closest_valid_sponsor]["Primary Code"]
-    
-    if sponsor in org_alt_names:
-        return all_orgs[inverse_orgs[sponsor]]["Primary Code"]
-    
-    closest_valid_sponsor = find_closest_match(sponsor, org_alt_names, case_sensitive=False)
-    if closest_valid_sponsor:
-        return all_orgs[inverse_orgs[closest_valid_sponsor]]["Primary Code"]
-    
-    # Extract titles and attempt title-based matching
-    titles = extract_titles(sponsor)
-
-    for title in titles:
-        if title in org_primary_names:
-            return all_orgs[title]["Primary Code"]
-        
-        closest_valid_sponsor = find_closest_match(title, org_primary_names, case_sensitive=False)
-        if closest_valid_sponsor:
-            return all_orgs[closest_valid_sponsor]["Primary Code"]
-        
-        if title in org_alt_names:
-            return all_orgs[inverse_orgs[title]]["Primary Code"]
-        
-        closest_valid_sponsor = find_closest_match(title, org_alt_names, case_sensitive=False)
-        if closest_valid_sponsor:
-            return all_orgs[inverse_orgs[closest_valid_sponsor]]["Primary Code"]
-
-    raise Exception(f"Failed to determine a sponsor code for '{sponsor}'")
-
-def determine_activity_type(grant):
-    award_type = grant['Award_Type']
-    if award_type and award_type in ACTIVITY_ASSOCIATIONS:
-        return ACTIVITY_ASSOCIATIONS[award_type]
 
 def proposals_sheet_append(self, grants):
     for index, grant_obj in enumerate(grants, start=1):

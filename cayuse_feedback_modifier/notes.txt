@@ -1,2 +1,0 @@
-Things to do:
-    - Modify processes to retrieve dataframe from "TemplateMananger" instance instead of "self.df"

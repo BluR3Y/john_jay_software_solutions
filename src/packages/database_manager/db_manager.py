@@ -17,11 +17,13 @@ class DatabaseManager:
         log_file_dir = pathlib.Path(db_path)
         self.log_manager = DatabaseLogManager(os.path.join(log_file_dir, "database_logs.json"))
         
+    # Only envoked when using "with"(context manager)
     def __enter__(self):
         """Initialize the database connection when entering the context."""
         self.init_db_connection()
         return self
     
+    # Only envoked when using "with"(context manager)
     def __exit__(self, exc_type, exc_value, traceback):
         """Close the database connection when exiting the context."""
         self.terminate_db_connection()
@@ -46,3 +48,7 @@ class DatabaseManager:
                 self.connection.close()
             except pyodbc.Error as err:
                 raise ConnectionError(f"An error occured while closing the database: {err}")
+        # Save logger changes
+        self.log_manager.save_logs()
+        
+# Missing querying methods

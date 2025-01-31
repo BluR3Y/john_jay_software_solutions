@@ -14,13 +14,11 @@ import os
 from classes.DatabaseManager import DatabaseManager
 from classes.TemplateManager.TemplateManager import TemplateManager
 
-# from sheets.projects import project_sheet_manager
-# from sheets.proposals import proposal_sheet_manager
-# from sheets.members import members_sheet_manager
 from sheets.proposals import proposals_sheet_append
 from sheets.members import members_sheet_append
 from sheets.projects import projects_sheet_append
 from sheets.awards import awards_sheet_append
+from sheets.attachments import attachments_sheet_append
 
 class MigrationManager:
     INVESTIGATORS_ALT = {}
@@ -156,12 +154,14 @@ class MigrationManager:
         self.ACTIVITY_TYPES = relevant_data['activity_types']
 
     def start_migration(self, grants):
-        self.projects_sheet_append(grants)
-        self.proposals_sheet_append(grants)
-        self.members_sheet_append(grants)
-        self.awards_sheet_append(grants)
+        # self.projects_sheet_append(grants)
+        # self.proposals_sheet_append(grants)
+        # self.members_sheet_append(grants)
+        # self.awards_sheet_append(grants)
+        self.attachments_sheet_append(grants)
             
 MigrationManager.projects_sheet_append = projects_sheet_append
 MigrationManager.proposals_sheet_append = proposals_sheet_append
 MigrationManager.members_sheet_append = members_sheet_append
 MigrationManager.awards_sheet_append = awards_sheet_append
+MigrationManager.attachments_sheet_append = attachments_sheet_append

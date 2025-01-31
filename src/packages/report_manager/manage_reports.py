@@ -2,7 +2,7 @@ import os
 import numpy as np
 import pandas as pd
 
-from modules.utils import request_user_selection, request_file_path
+from modules.utils import request_user_selection, request_file_path, request_column_selection
 from . import ReportGenerator
 from packages.database_manager import DatabaseManager
 
@@ -37,16 +37,11 @@ def generate_reports(db_manager: DatabaseManager):
                 print(f"Search returned {len(record_ids)} records.")
                 
                 if record_ids:
-                    selected_properties_input = input(f"Input the name of the columns in the '{selected_table}' table that will be used to populate the report. \n The table has the columns: {", ".join(table_columns)} \n Selection: ")
-                    selected_properties = selected_properties_input.split(' ')
+                    selected_properties = request_column_selection(f"Input the columns in the '{selected_table}' table that will be used to populate the report.", table_columns)
                     if not selected_properties:
                         raise ValueError("Failed to provide table columns.")
                     if record_identifier not in selected_properties:
                         selected_properties.insert(0, record_identifier)
-                    
-                    for prop in selected_properties:
-                        if prop not in table_columns:
-                            raise ValueError(f"The column '{prop}' does not exist in the table '{selected_table}'")
 
                     last_index = 0
                     batch_limit = 40
@@ -73,8 +68,10 @@ def generate_reports(db_manager: DatabaseManager):
                         raise ValueError("Failed to provide a report name.")
                     
                     report_generator.append_report(selected_report_name, selected_table, record_identifier, report_data)
+            except ValueError as err:
+                print(f"Validation Error: {err}")
             except Exception as err:
-                print(err)
+                print(f"An unexpected error occured: {err}")
 
 def resolve_reports(db_manager: DatabaseManager):
     try:
@@ -103,11 +100,7 @@ def resolve_reports(db_manager: DatabaseManager):
             sheet_record_identifier = sheet_meta_data['record_identifier']
             sheet_columns = sheet_data_frame.columns.tolist()
 
-            # Display available columns and get user input
-            print(" | ".join(sheet_columns))
-            selected_properties_input = input(f"Select columns for '{sheet_name}' (comma-separated) or leave blank: ").strip()
-            selected_properties = [col.strip() for col in selected_properties_input.split(',')] if selected_properties_input else []
-            
+            selected_properties = request_column_selection(f"Select columns for '{sheet_name}' (comma-separated) or leave black:", sheet_columns)
             if not selected_properties:
                 continue  # Skip sheet if no columns selected
             
@@ -122,7 +115,7 @@ def resolve_reports(db_manager: DatabaseManager):
                     raise ValueError(f"The column '{prop}' does not exist in the sheet '{sheet_name}'")
                 if prop not in table_columns:
                     raise ValueError(f"The column '{prop}' does not exist in the table '{sheet_meta_data['table']}'")
-            print(sheet_data_frame.to_dict())
+
             # Filter and clean data
             filtered_data_frame = sheet_data_frame[selected_properties].replace({pd.NaT: None, np.nan: None})
             sheet_rows = filtered_data_frame.to_dict(orient='records')
@@ -156,7 +149,7 @@ def manage_reports(db_manager: DatabaseManager):
     print("Current Process: Report Manager")
     while True:
         user_selection = request_user_selection("Select a Report Manager Action:", ["Generate Reports", "Resolve Reports", "Exit Process"])
-        
+
         if user_selection == "Generate Reports":
             generate_reports(db_manager)
         elif user_selection == "Resolve Reports":

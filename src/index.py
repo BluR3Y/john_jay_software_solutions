@@ -4,16 +4,15 @@ import os
 from dotenv import load_dotenv
 
 from modules.utils import request_user_selection
-from scripts import fix_template, generate_template
 from packages.report_manager import manage_reports
 from packages.database_manager import DatabaseManager
 
 # Run the program
 if __name__ == "__main__":
     user_actions = {
-        "Fix Template": fix_template,
+        "Fix Template": None,
         "Manage Reports": manage_reports,
-        "Generate Template": generate_template
+        "Generate Template": None
     }
     
     # Initialize the argument parser
@@ -44,8 +43,10 @@ if __name__ == "__main__":
     load_dotenv(os.path.join(parent_dir, f"env/.env.{args.env}"))
     
     with DatabaseManager(os.getenv('ACCESS_DB_PATH')) as db_manager:
-        if args.process:
-            pass
+        selected_process = args.process
+        if selected_process:
+            process_script = user_actions[selected_process]
+            process_script(db_manager)
         else:
             while True:
                 user_selection = request_user_selection("Select an action:", [*user_actions.keys(), "Exit Program"])

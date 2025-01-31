@@ -66,3 +66,20 @@ def request_user_selection(requestStr: str, validSelections: list[str]) -> str:
                 raise Exception(f"{user_input} is not a valid selection.")
     else:
         raise Exception("Did not make a selection. Is required to continue.")
+    
+def request_column_selection(requestStr: str, valid_columns: list[str]) -> list[str]:
+    input_str = " | ".join(valid_columns) + f"\n{requestStr} "
+    user_input = input(input_str)
+    selected_properties = []
+    
+    if not user_input:
+        return selected_properties
+    # selected_properties = [col.strip() for col in user_input.split(',')] if user_input else []
+
+    for prop in user_input.split(','):
+        formatted_prop = prop.strip()
+        if formatted_prop not in valid_columns:
+            raise ValueError(f"The column '{formatted_prop}' does not exist in the table.")
+        
+        selected_properties.append(formatted_prop)
+    return selected_properties

@@ -138,7 +138,7 @@ class DatabaseManager:
             if self.connection:
                 self.connection.rollback()
                 
-    def update_query(self, process:str, table: str, cols: dict[str, Union[None,str,int, bool, datetime.date]], conditions = None) -> None:
+    def update_query(self, process:str, table: str, cols: dict[str, Union[None,str,int, bool, datetime.date]], conditions = None):
         """ Execute an update query """
         try:
             table_columns = self.get_table_columns(table)
@@ -159,6 +159,28 @@ class DatabaseManager:
             print("An error occured while updating records: ", err)
             if self.connection:
                 self.connection.rollback()
+    # Last Here: Developing changes
+    # def update_query(self, process:str, table: str, cols: dict[str, Union[None,str,int, bool, datetime.date]], conditions = None):
+    #     """Execute an update query."""
+    #     try:
+    #         table_columns = self.get_table_columns(table)
+    #         table_row_identifier = table_columns[0]
+    #         affecting_rows = self.select_query(table, [table_row_identifier, *cols.keys()], conditions)
+            
+    #         if not affecting_rows:
+    #             raise ValueError("Could not find records with given paramenters.")
+            
+    #         # changing_fields = [{key: val} for key, val in cols.items() if affecting_rows[key] != val]
+    #         # print(changing_fields)
+    #         changing_rows = [
+    #             ({key,val} for key, val in row.items()) 
+    #                 for row in affecting_rows]
+    #         print(changing_rows)
+            
+    #     except ValueError as err:
+    #         print("An error occured while updating records: ", err)
+    #         if self.connection:
+    #             self.connection.rollback()
 
     # Caution Deprecated
     def select_query_v1(self, table: str, cols: list[str], condition=None, *args) -> list[dict]:

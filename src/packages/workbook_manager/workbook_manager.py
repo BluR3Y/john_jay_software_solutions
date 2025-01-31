@@ -57,8 +57,68 @@ class WorkbookManager:
         # Append using pd.concat
         self.df[sheet] = pd.concat([self.df[sheet], new_row], ignore_index=True)
         
-    def get_entry(self, sheet_name: str, conditions: dict, value: any, all: bool = False):
+    def row_follows_condition(self, row, conditions: dict) -> bool:
+        for identifier, value in conditions.items():
+            if row[identifier] != value:
+                return False
+        return True
+        
+    def get_entries(self, sheet_name: str, conditions: dict, all: bool = False):
+        """Retrieve rows from the given sheet matching conditions."""
+        if sheet_name not in self.df:
+            raise ValueError(f"The sheet '{sheet_name}' was not found in the workbook.")
+        
         try:
-            # Retrieve the sheet
             sheet_data_frame = self.df[sheet_name]
-            # Last Here
+            
+            # Apply filtering directly
+            mask = pd.Series(True, index=sheet_data_frame.index)
+            for column, value in conditions.items():
+                mask &= (sheet_data_frame[column] == value)
+                
+            filtered_rows = sheet_data_frame[mask]
+            
+            if filtered_rows.empty:
+                return None
+            
+            return filtered_rows if all else filtered_rows.iloc[0]
+        except KeyError as err:
+            raise KeyError(f"An error occured while searching rows in workbook: {err}")
+    
+    def save_changes(self, write_file_path: str, index=False):
+        """
+        Saves the data stored in the pandas dataframes by converting each dataframe into an excel sheet in the same workbook.
+        Additionally, function also sets the 'sheet_state' property to that of the sheet in the workbook that was imported.
+        
+        # Parameters:
+        - write_file_path: file path where the migration data will be stored.
+        - index: Will determine if the index column from the DataFrame will persist in the stored excel sheet.
+        """
+        try:
+            # Use ExcelWriter to write multiple sheets back into the Excel file
+            with pd.ExcelWriter(write_file_path, engine='openpyxl', mode='w') as writer:
+                for sheet_name, df_sheet in self.df.items():
+                    df_sheet.to_excel(writer, sheet_name=sheet_name, index=index)
+                    
+            if self.read_file_path:
+                # Load the feedback workbook
+                feedback_wb = openpyxl.load_workbook(self.read_file_path)
+                # Load the newly created workbook with the migration data
+                migration_wb = openpyxl.load_workbook(write_file_path)
+            
+                for sheet in migration_wb.sheetnames:
+                    if sheet in feedback_wb.sheetnames:
+                        feedback_wb[sheet].sheet_state
+                        migration_wb[sheet].sheet_state = feedback_wb[sheet].sheet_state
+                    else:
+                        migration_wb[sheet].sheet_state = "visible"
+                        
+                # Save the state changes made to the migration workbook
+                migration_wb.save(write_file_path)
+                    
+            # Save logger changes
+            self.log_manager.save_logs()
+            # Save comments
+            self.comment_manager.create_comments(write_file_path)
+        except Exception as e:
+            raise Exception(f"Error occured while attempting to save template data: {e}")

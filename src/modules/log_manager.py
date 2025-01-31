@@ -41,8 +41,9 @@ class LogManager:
                 
     def save_logs(self):
         """Save logs to the Json file."""
-        try:
-            with open(self.file_path, 'w', encoding='utf-8') as json_file:
-                json.dump(self.logs, json_file, indent=4)
-        except IOError as err:
-            raise Exception(f"An error occured while attempting to save logs to file: {err}")
+        if self.logs:
+            try:
+                with open(self.file_path, 'w', encoding='utf-8') as json_file:
+                    json.dump(self.logs, json_file, indent=4)
+            except IOError as err:
+                raise Exception(f"An error occured while attempting to save logs to file: {err}")

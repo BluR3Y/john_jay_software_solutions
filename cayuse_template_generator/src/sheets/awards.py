@@ -239,8 +239,16 @@ SHEET_COLUMNS = [
 #     })
 
 def awards_sheet_append(self, grants):
-    for index, grant_obj in enumerate(grants, start=1):
+    sheet_df = self.generated_template_manager.df[SHEET_NAME]
+    for grant_obj in grants:
+        next_row = sheet_df.shape[0] + 1
         grant_data = grant_obj['grant_data']
+        
+        grant_id = grant_data['Grant_ID']
+        grant_status = grant_data['Status']
+        if grant_status != "Funded":
+            continue
+        
         total_data = grant_obj['total_data']
         rifunds_data = grant_obj['rifunds_data']
         dates_data = grant_obj['dates_data']
@@ -249,19 +257,17 @@ def awards_sheet_append(self, grants):
         fifunds_data = grant_obj['fifunds_data']
         
         grant_pln = grant_data['Project_Legacy_Number']
-        grant_id = grant_data['Grant_ID']
         existing_grant = self.feedback_template_manager.get_entry(SHEET_NAME, "awardLegacyNumber", f"{grant_id}-award")
         if existing_grant == None:
             existing_grant = {}
         
-        grant_status = grant_data['Status']
         grant_oar = None
         try:
             grant_oar = determine_grant_status(grant_data)
         except Exception as err:
             self.generated_template_manager.comment_manager.append_comment(
                 SHEET_NAME,
-                index,
+                next_row,
                 4,
                 err
             )
@@ -285,7 +291,7 @@ def awards_sheet_append(self, grants):
             grant_instrument_type = existing_grant.get("Instrument Type")
             self.generated_template_manager.comment_manager.append_comment(
                 SHEET_NAME,
-                index,
+                next_row,
                 7,
                 err
             )
@@ -300,7 +306,7 @@ def awards_sheet_append(self, grants):
             grant_sponsor_code = existing_grant.get("Sponsor Code")
             self.generated_template_manager.comment_manager.append_comment(
                 SHEET_NAME,
-                index,
+                next_row,
                 8,
                 err
             )
@@ -313,7 +319,7 @@ def awards_sheet_append(self, grants):
                 grant_prime_sponsor = existing_grant.get('Prime Sponsor')
                 self.generated_template_manager.comment_manager.append_comment(
                     SHEET_NAME,
-                    index,
+                    next_row,
                     12,
                     err
                 )
@@ -332,7 +338,7 @@ def awards_sheet_append(self, grants):
             grant_activity_type = existing_grant.get('Activity Type')
             self.generated_template_manager.comment_manager.append_comment(
                 SHEET_NAME,
-                index,
+                next_row,
                 22,
                 err
             )
@@ -344,7 +350,7 @@ def awards_sheet_append(self, grants):
             grant_discipline = existing_grant.get('Discipline')
             self.generated_template_manager.comment_manager.append_comment(
                 SHEET_NAME,
-                index,
+                next_row,
                 26,
                 err
             )
@@ -362,7 +368,7 @@ def awards_sheet_append(self, grants):
             grant_admin_unit_name = existing_grant.get('Admin Unit Name')
             self.generated_template_manager.comment_manager.append_comment(
                 SHEET_NAME,
-                index,
+                next_row,
                 25,
                 err
             )

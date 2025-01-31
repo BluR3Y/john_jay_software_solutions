@@ -3,16 +3,32 @@ from bs4 import BeautifulSoup
 import rapidfuzz
 import re
 
+# def request_file_path(requestStr: str, validTypes: list[str]):
+#     path = input(requestStr + ': ')
+#     if os.path.isfile(path):
+#         fileType = os.path.splitext(path)[1]
+#         if fileType in validTypes:
+#             return path
+#         else:
+#             raise Exception(f"The provided file has the extension {fileType} which is not a valid type for this request")
+#     else:
+#         raise Exception("The file does not exist at the provided path")
 def request_file_path(requestStr: str, validTypes: list[str]):
-    path = input(requestStr + ': ')
-    if os.path.isfile(path):
-        fileType = os.path.splitext(path)[1]
-        if fileType in validTypes:
-            return path
-        else:
-            raise Exception(f"The provided file has the extension {fileType} which is not a valid type for this request")
-    else:
-        raise Exception("The file does not exist at the provided path")
+    if not validTypes:
+        raise ValueError("No file extensions were provided.")
+    
+    selected_path = input(requestStr)
+    if not selected_path:
+        raise ValueError("Failed to provide file path.")
+    
+    if not os.path.isfile(selected_path):
+        raise FileExistsError(f"The file does not exist at the provided path: {selected_path}")
+    
+    file_type = os.path.splitext(selected_path)[1]
+    if file_type not in validTypes:
+        raise ValueError(f"The provided file has the extension {file_type} which is not a valid type for this request.")
+    
+    return selected_path
     
 def find_closest_match(input, string_list, threshold=80, case_sensitive=True):
     if not isinstance(input, str):

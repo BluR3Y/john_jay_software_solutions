@@ -1,6 +1,8 @@
 import os
+import numpy as np
+import pandas as pd
 
-from modules.utils import request_user_selection
+from modules.utils import request_user_selection, request_file_path
 from . import ReportGenerator
 from packages.database_manager import DatabaseManager
 
@@ -75,12 +77,85 @@ def generate_reports(db_manager: DatabaseManager):
                 print(err)
 
 def resolve_reports(db_manager: DatabaseManager):
-    pass
+    try:
+        file_path = request_file_path("Enter the file path of the Excel file:", [".xlsx"])
+        
+        # Read the Excel file once
+        report_data_frame = pd.read_excel(file_path, sheet_name=None)
+        
+        # Validate metadata presence
+        if "report_meta_data" not in report_data_frame:
+            raise KeyError("Report is missing metadata sheet.")
+        
+        # Load metadata
+        meta_data_records = report_data_frame["report_meta_data"].to_dict(orient='records')
+        meta_data = {record['sheet_name']: record for record in meta_data_records}
+        
+        # Process each sheet except metadata
+        sheet_names = [s for s in report_data_frame.keys() if s != "report_meta_data"]
+        
+        for sheet_name in sheet_names:
+            if sheet_name not in meta_data:
+                raise KeyError(f"Metadata does not include data regarding the sheet '{sheet_name}'")
+            
+            sheet_meta_data = meta_data[sheet_name]
+            sheet_data_frame = report_data_frame[sheet_name]
+            sheet_record_identifier = sheet_meta_data['record_identifier']
+            sheet_columns = sheet_data_frame.columns.tolist()
+
+            # Display available columns and get user input
+            print(" | ".join(sheet_columns))
+            selected_properties_input = input(f"Select columns for '{sheet_name}' (comma-separated) or leave blank: ").strip()
+            selected_properties = [col.strip() for col in selected_properties_input.split(',')] if selected_properties_input else []
+            
+            if not selected_properties:
+                continue  # Skip sheet if no columns selected
+            
+            # Ensure record identifier is included
+            if sheet_record_identifier not in selected_properties:
+                selected_properties.insert(0, sheet_record_identifier)
+
+            # Validate column existence
+            table_columns = db_manager.get_table_columns(sheet_meta_data['table'])
+            for prop in selected_properties:
+                if prop not in sheet_columns:
+                    raise ValueError(f"The column '{prop}' does not exist in the sheet '{sheet_name}'")
+                if prop not in table_columns:
+                    raise ValueError(f"The column '{prop}' does not exist in the table '{sheet_meta_data['table']}'")
+            print(sheet_data_frame.to_dict())
+            # Filter and clean data
+            filtered_data_frame = sheet_data_frame[selected_properties].replace({pd.NaT: None, np.nan: None})
+            sheet_rows = filtered_data_frame.to_dict(orient='records')
+
+            for row in sheet_rows:
+                record_id = row[sheet_record_identifier]
+                db_manager.update_query(
+                    "Report Resolver",
+                    sheet_meta_data['table'],
+                    {name:val for name, val in row.items() if name != sheet_record_identifier},
+                    {
+                        sheet_record_identifier: {
+                            "operator": "=",
+                            "value": record_id
+                        }
+                    }
+                )
+
+        print("Finished making changes to records in the database.")
+
+    except FileNotFoundError:
+        print("Error: The specified file was not found.")
+    except KeyError as e:
+        print(f"Error: Missing key in metadata or sheet - {e}")
+    except ValueError as e:
+        print(f"Validation Error: {e}")
+    except Exception as err:
+        print(f"An unexpected error occurred: {err}")
 
 def manage_reports(db_manager: DatabaseManager):
     print("Current Process: Report Manager")
     while True:
-        user_selection = request_user_selection("Select a Report Manager Action:", ["Generate Reports", "Manage Reports", "Exit Process"])
+        user_selection = request_user_selection("Select a Report Manager Action:", ["Generate Reports", "Resolve Reports", "Exit Process"])
         
         if user_selection == "Generate Reports":
             generate_reports(db_manager)

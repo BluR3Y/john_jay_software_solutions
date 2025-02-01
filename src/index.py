@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 
 from modules.utils import request_user_selection
 from packages.report_manager import manage_reports
-from packages.database_manager import DatabaseManager
+from packages.database_manager import DatabaseManager, parse_sql_condition
 
 # Run the program
 if __name__ == "__main__":
@@ -55,3 +55,4 @@ if __name__ == "__main__":
                 
                 action_fn = user_actions[user_selection]
                 action_fn(db_manager)
+                

@@ -1,5 +1,6 @@
 import os
 
+from datetime import datetime
 from packages.workbook_manager import WorkbookManager
 
 class MigrationManager:
@@ -11,15 +12,20 @@ class MigrationManager:
             raise ValueError(f"The Workbook Manager was provided an invalid file path: {read_file_path}")
         
         # Initialize an instance of the WorkbookManager class for the feedback file
-        self.feedback_template_manager = WorkbookManager(
-            read_file_path=read_file_path,
-            log_file_path=()
-        )
+        self.feedback_template_manager = WorkbookManager(read_file_path=read_file_path)
+        
+        # Initialize an instance of the WorkbookManager class for the generated data
+        self.generated_template_manager = WorkbookManager()
+        
+        self.save_path = save_path
     
     def __enter__(self):
-        pass
+        
+        return self
     
-    def __exit__(self):
-        pass
+    def __exit__(self, exc_type, exc_value, traceback):
+        current_time = datetime.now()
+        formatted_time = current_time.strftime('%d_%m_%Y')
+        self.generated_template_manager.save_changes(os.path.join(self.save_path, f"generated_data_{formatted_time}.xlsx"))
     
-# Missing
+    # Last Here: Do we need separate sheets?

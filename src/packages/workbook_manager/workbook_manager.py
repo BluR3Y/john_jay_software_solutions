@@ -4,7 +4,7 @@ import openpyxl
 import pathlib
 from typing import Union
 
-from . import CommentManager, WorkbookLogManager
+from . import PropertyManager, WorkbookLogManager
 
 class WorkbookManager:
     read_file_path = None
@@ -29,7 +29,7 @@ class WorkbookManager:
             self.df = {sheet_name: pd.DataFrame(sheet_rows) for sheet_name, sheet_rows in create_sheets.items()}
         
         # Initialize an instance of the Comment Manager
-        self.comment_manager = CommentManager(read_file_path, self.df.keys())
+        self.property_manager = PropertyManager(read_file_path, self.df.keys())
         
     def create_sheet(self, sheet_name: str, sheet_columns: list):
         if sheet_name in self.df.keys():
@@ -105,6 +105,10 @@ class WorkbookManager:
         - write_file_path: file path where the migration data will be stored.
         - index: Will determine if the index column from the DataFrame will persist in the stored excel sheet.
         """
+        
+        if write_file_path == self.read_file_path:
+            raise ValueError(f"As a precaution, the save path cannot be the same as the read path.")
+        
         try:
             # Use ExcelWriter to write multiple sheets back into the Excel file
             with pd.ExcelWriter(write_file_path, engine='openpyxl', mode='w') as writer:
@@ -130,6 +134,6 @@ class WorkbookManager:
                 # Save logger changes
                 self.log_manager.save_logs()
             # Save comments
-            self.comment_manager.create_comments(write_file_path)
+            self.property_manager.apply_changes(write_file_path)
         except Exception as e:
             raise Exception(f"Error occured while attempting to save template data: {e}")

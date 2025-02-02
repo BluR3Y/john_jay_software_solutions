@@ -7,14 +7,14 @@ from modules.utils import request_user_selection
 from packages.report_manager import manage_reports
 
 from packages.database_manager import DatabaseManager
-from packages.migration_manager import migration_manager
+from packages.migration_manager import manage_migration
 
 # Run the program
 if __name__ == "__main__":
     user_actions = {
         "Fix Template": None,
         "Manage Reports": manage_reports,
-        "Generate Template": migration_manager
+        "Generate Template": manage_migration
     }
     
     # Initialize the argument parser

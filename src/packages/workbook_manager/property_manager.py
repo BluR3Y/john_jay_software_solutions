@@ -5,9 +5,15 @@ from openpyxl.comments import Comment
 from openpyxl.styles import PatternFill
 from typing import Literal
 
-# Available openpyxl cell properties: Value, Font, Fill (Background Color), Border, Alignment, Number Format, Comment, Hyperlink, Merge Cells, Unmerge Cells
+# openpyxl cell properties: Value, Font, Fill (Background Color), Border, Alignment, Number Format, Comment, Hyperlink, Merge Cells, Unmerge Cells
+CELL_PROPS = ["font", "fill", "border", "comment"]
+# openpyxl sheet properties: Title, col/row height/width, lock row/col, tab color, hide/Unhide col/rows, lock cells, modify print settings, hide sheets, add header/footer, Set gridline visibility
+SHEET_PROPS = ["sheet_state"]
+
+
 class PropertyManager:
     property_store = {}
+    hidden_sheets = []
     
     def __init__(self, read_file_path: str = None, sheet_names: list[str] = None) -> None:
         if read_file_path:
@@ -16,14 +22,8 @@ class PropertyManager:
             
             # Load the workbook
             wb = openpyxl.load_workbook(read_file_path)
-            existing_comments = {name: {} for name in wb.sheetnames}
-            # Commented for debugging purposes ----- Intended to collect existing comments from read workbook
-            # for sheet_name in workbook.sheetnames:
-            #     sheet = workbook[sheet_name]
-            #     existing_comments[sheet_name] = {
-            #         f"{cell.row}:{cell.column}": cell.comment for row in sheet.iter_rows() for cell in row if cell.comment
-            #     }
-            self.property_store = existing_comments
+            self.property_store = {name: {} for name in wb.sheetnames}
+            self.hidden_sheets = [sheet_name for sheet_name in wb.sheetnames if wb[sheet_name].sheet_state == "hidden"]
             
         elif sheet_names:
             self.property_store = {name: {} for name in sheet_names}
@@ -52,6 +52,8 @@ class PropertyManager:
                 raise ValueError(f"The sheet '{sheet_name}' does not exist in the workbook.")
             
             sheet_content = workbook[sheet_name]
+            if sheet_name in self.hidden_sheets:
+                sheet_content.sheet_state = "hidden"
             for (row, col), comments in affected_cells.items():
                 cell = sheet_content.cell(row + 1, col + 1) # Plus 1 accounts for rows/cols being 1-based index
                 comment_text = ""

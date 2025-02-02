@@ -2,6 +2,8 @@ import os
 import pandas as pd
 import openpyxl
 import pathlib
+import warnings
+
 from typing import Union
 
 from . import PropertyManager, WorkbookLogManager
@@ -45,12 +47,17 @@ class WorkbookManager:
         self.df[sheet_name] = sheet_data_frame
         
     def update_cell(self, process: str, sheet: str, row: int, col: int, new_val):
-        if sheet not in list(self.df.keys()):
+        if sheet not in self.df:
             raise ValueError(f"THe sheet with the name '{sheet}' does not exist in the workbook.")
         
         sheet_data_frame = self.df[sheet]
-        cell_prev_value = sheet_data_frame.iloc[row][col]
-        sheet_data_frame.loc[row, col] = new_val
+        num_rows, num_cols = sheet_data_frame.shape
+        # Ensure row and col are within valid bounds
+        if not (0 <= row < num_rows) or not (0 <= col < num_cols):
+            raise IndexError(f"Row {row} or Column {col} is out of bound for the sheet '{sheet}'.")
+        
+        cell_prev_value = sheet_data_frame.iat[row, col]
+        sheet_data_frame.iat[row, col] = new_val
 
         if self.log_manager:
             self.log_manager.append_log(
@@ -105,9 +112,9 @@ class WorkbookManager:
         - write_file_path: file path where the migration data will be stored.
         - index: Will determine if the index column from the DataFrame will persist in the stored excel sheet.
         """
-        
+                
         if write_file_path == self.read_file_path:
-            raise ValueError(f"As a precaution, the save path cannot be the same as the read path.")
+            warnings.warn(f"The save path is the same as the read path, meaning that file will be overwritten with changes.")
         
         try:
             # Use ExcelWriter to write multiple sheets back into the Excel file
@@ -115,25 +122,11 @@ class WorkbookManager:
                 for sheet_name, df_sheet in self.df.items():
                     df_sheet.to_excel(writer, sheet_name=sheet_name, index=index)
                     
-            if self.read_file_path:
-                # Load the feedback workbook
-                feedback_wb = openpyxl.load_workbook(self.read_file_path)
-                # Load the newly created workbook with the migration data
-                migration_wb = openpyxl.load_workbook(write_file_path)
-            
-                for sheet in migration_wb.sheetnames:
-                    if sheet in feedback_wb.sheetnames:
-                        feedback_wb[sheet].sheet_state
-                        migration_wb[sheet].sheet_state = feedback_wb[sheet].sheet_state
-                    else:
-                        migration_wb[sheet].sheet_state = "visible"
-                        
-                # Save the state changes made to the migration workbook
-                migration_wb.save(write_file_path)
-                    
-                # Save logger changes
+            # Save LogManager changes
+            if self.log_manager:
                 self.log_manager.save_logs()
-            # Save comments
+                
+            # Save Workbook Properties
             self.property_manager.apply_changes(write_file_path)
-        except Exception as e:
-            raise Exception(f"Error occured while attempting to save template data: {e}")
+        except Exception as err:
+            raise Exception(f"Error occured while attempting to save Workbook data: {err}")

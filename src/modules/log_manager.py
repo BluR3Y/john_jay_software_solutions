@@ -22,7 +22,13 @@ class LogManager:
         except (IOError, json.JSONDecodeError) as err:
             raise Exception(f"An error occured while attempting to retrieve logs from file: {err}")
         
-    def append_runtime_log(self, process, log):
+    def get_runtime_dates(self):
+        return self.logs.keys()
+        
+    def get_runtime_logs(self, date: str):
+        return self.logs.get(date)
+        
+    def append_runtime_log(self, process:str, log: dict):
         """Add or update logs for the current runtime."""
         runtime_logs = self.logs.setdefault(self.runtime_date_time, {})
         if process in runtime_logs:
@@ -41,9 +47,13 @@ class LogManager:
                 
     def save_logs(self):
         """Save logs to the Json file."""
-        if self.logs:
-            try:
-                with open(self.file_path, 'w', encoding='utf-8') as json_file:
-                    json.dump(self.logs, json_file, indent=4)
-            except IOError as err:
-                raise Exception(f"An error occured while attempting to save logs to file: {err}")
+        logs = self.logs
+        if not logs.get(self.runtime_date_time):
+            print(f"No logs to create. Exiting LogManager.")
+            return
+
+        try:
+            with open(self.file_path, 'w', encoding='utf-8') as json_file:
+                json.dump(logs, json_file, indent=4)
+        except IOError as err:
+            raise Exception(f"An error occured while attempting to save logs to file: {err}")

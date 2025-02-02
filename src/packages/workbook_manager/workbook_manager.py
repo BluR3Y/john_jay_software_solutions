@@ -2,38 +2,47 @@ import os
 import pandas as pd
 import openpyxl
 import pathlib
+from typing import Union
 
-from workbook_manager.comment_manager import CommentManager
-from workbook_manager.workbook_log_manager import WorkbookLogManager
+from . import CommentManager, WorkbookLogManager
 
 class WorkbookManager:
     read_file_path = None
+    log_manager = None
+    df = {}
     
-    def __init__(self, read_file_path: str = None, create_sheets: dict = None, log_file_path: str = None):
+    def __init__(self, read_file_path: str = None, create_sheets: dict = None):
         if read_file_path:
             if not os.path.exists(read_file_path):
-                raise Exception("The WorkbookManager was provided an invalid file path: ", read_file_path)
-                    
-            # Store the read file's path
+                raise ValueError(f"The WorkbookManager was provided an invalid file path: {read_file_path}")
+            
+            # Store the file path
             self.read_file_path = read_file_path
+            
             # Read the contents of the workbook
             self.df = pd.read_excel(read_file_path, sheet_name=None)
-            log_path_obj = pathlib.Path(log_file_path)
-            log_file_path = os.path.join(log_path_obj, f"{log_path_obj.stem}.json")
-        elif create_sheets:
-            if not log_file_path:
-                raise ValueError("The WorkbookManager was not provided a file path for logs.")
             
-            self.df = {sheet_name: pd.DataFrame({col_name: col_data for col_name, col_data in props.items()})
-                       for sheet_name, props in create_sheets.items()}
-        else:
-            raise Exception("Neither a file path or a list of sheet names were provided to the WorkbookManager.")
+            file_path_obj = pathlib.Path(read_file_path)
+            log_file_path = os.path.join(file_path_obj.parent, f"{file_path_obj.stem}_workbook_logs.json")
+            self.log_manager = WorkbookLogManager(log_file_path)
+        elif create_sheets:
+            self.df = {sheet_name: pd.DataFrame(sheet_rows) for sheet_name, sheet_rows in create_sheets.items()}
         
         # Initialize an instance of the Comment Manager
         self.comment_manager = CommentManager(read_file_path, self.df.keys())
         
-        # Initialize an instance of the Logger
-        self.log_manager = WorkbookLogManager(log_file_path)
+    def create_sheet(self, sheet_name: str, sheet_columns: list):
+        if sheet_name in self.df.keys():
+            raise ValueError(f"A sheet with the name '{sheet_name}' already exists in the workbook.")
+        
+        sheet_data_frame = None
+        populated_data = all(isinstance(item, dict) for item in sheet_columns)
+        if populated_data:
+            sheet_data_frame = pd.DataFrame(sheet_columns)
+        else:
+            sheet_data_frame = pd.DataFrame(columns=sheet_columns)
+            
+        self.df[sheet_name] = sheet_data_frame
         
     def update_cell(self, process: str, sheet: str, row: int, col: int, new_val):
         if sheet not in list(self.df.keys()):
@@ -42,14 +51,16 @@ class WorkbookManager:
         sheet_data_frame = self.df[sheet]
         cell_prev_value = sheet_data_frame.iloc[row][col]
         sheet_data_frame.loc[row, col] = new_val
-        self.log_manager.append_log(
-            process,
-            sheet,
-            row,
-            col,
-            cell_prev_value,
-            new_val
-        )
+
+        if self.log_manager:
+            self.log_manager.append_log(
+                process,
+                sheet,
+                row,
+                col,
+                cell_prev_value,
+                new_val
+            )
         
     def append_row(self, sheet: str, props: dict):
         # Create a new DataFrame
@@ -116,8 +127,8 @@ class WorkbookManager:
                 # Save the state changes made to the migration workbook
                 migration_wb.save(write_file_path)
                     
-            # Save logger changes
-            self.log_manager.save_logs()
+                # Save logger changes
+                self.log_manager.save_logs()
             # Save comments
             self.comment_manager.create_comments(write_file_path)
         except Exception as e:

@@ -12,7 +12,7 @@ def generate_reports(db_manager: DatabaseManager):
         db_tables = db_manager.get_db_tables()
         while True:
             try:
-                if report_generator.generated_reports:
+                if report_generator.get_num_reports():
                     selected_action = request_user_selection("Enter a next step:", ["Generate another report", "Save and Exit"])
                     if selected_action == "Save and Exit":
                         break

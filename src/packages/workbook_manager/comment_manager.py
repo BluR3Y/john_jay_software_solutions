@@ -4,14 +4,16 @@ import os
 import openpyxl.comments
 
 class CommentManager:
+    comment_cache = {}
+    
     def __init__(self, read_file_path: str = None, sheet_names: list[str] = None) -> None:
         if read_file_path:
             if not os.path.exists(read_file_path):
-                raise Exception("Invalid file path provided: ", read_file_path)
+                raise FileNotFoundError(f"Invalid file path provided to CommentManager: {read_file_path}")
             
-            existing_comments = {}
             # Load the workbook
-            workbook = openpyxl.load_workbook(read_file_path)
+            wb = openpyxl.load_workbook(read_file_path)
+            existing_comments = {name: {} for name in wb.sheetnames}
             # Commented for debugging purposes ----- Intended to collect existing comments from read workbook
             # for sheet_name in workbook.sheetnames:
             #     sheet = workbook[sheet_name]
@@ -19,18 +21,15 @@ class CommentManager:
             #         f"{cell.row}:{cell.column}": cell.comment for row in sheet.iter_rows() for cell in row if cell.comment
             #     }
             self.comment_cache = existing_comments
-            self.sheets = workbook.sheetnames
+            
         elif sheet_names:
-            self.comment_cache = {}
-            self.sheets = sheet_names
-        else:
-            raise Exception("Neither a file path or list of sheet names was provided.")
+            self.comment_cache = {name: {} for name in sheet_names}
         
     # Add cell comments to the object's comment cache
     def append_comment(self, sheet: str, row: int, col: int, comment: str, account_headers) -> None:
         """ Add a comment to a specific cell in the cache. """
-        if sheet not in self.sheets:
-            raise Exception(f"The sheet '{sheet}' does not exist in the workbook")
+        # if sheet not in self.sheets:
+        #     raise Exception(f"The sheet '{sheet}' does not exist in the workbook")
         
         if sheet not in self.comment_cache:
             self.comment_cache[sheet] = {}
@@ -69,3 +68,6 @@ class CommentManager:
                 cell.comment = comment_obj
         # Save the workbook with the comments
         workbook.save(write_file_path)
+        
+# Rename module to styling_manager.py
+# Include highlighting methods

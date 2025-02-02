@@ -1,18 +1,20 @@
 # Main actions: Fix Template, Manage Reports, Generate Template
 import argparse
 import os
-from dotenv import load_dotenv
 
+from dotenv import load_dotenv
 from modules.utils import request_user_selection
 from packages.report_manager import manage_reports
-from packages.database_manager import DatabaseManager, parse_sql_condition
+
+from packages.database_manager import DatabaseManager
+from packages.migration_manager import migration_manager
 
 # Run the program
 if __name__ == "__main__":
     user_actions = {
         "Fix Template": None,
         "Manage Reports": manage_reports,
-        "Generate Template": None
+        "Generate Template": migration_manager
     }
     
     # Initialize the argument parser

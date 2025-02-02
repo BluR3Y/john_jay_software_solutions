@@ -5,7 +5,7 @@ import os
 from modules.log_manager import LogManager
 
 # Use inheritance to create a child class for Workbook logs
-def WorkbookLogManager(LogManager):
+class WorkbookLogManager(LogManager):
     def __init__(self, log_file_path: str):
         if not log_file_path:
             raise ValueError("A file path for logs was not provided to Workbook LogManager.")

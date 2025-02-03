@@ -1,0 +1,59 @@
+{
+    "instrument_types": {
+        "Grant": {
+            "G": "Grant",
+            "H": "Forward Funding/Guarantee"
+        },
+        "Contract": {
+            "C": "Contract",
+            "P": "Purchase Order"
+        },
+        "Cooperative Agreement": {
+            "A": "Cooperative Agreement"
+        },
+        "Incoming Subaward": {
+            "S": "Subcontract"
+        },
+        "NYC/NYS MOU - Interagency Agreement": {
+            "B": "NYC - Gov't to Gov't Contract",
+            "U": "NYC MOU - FMS Pay (Cost Reimburse)",
+            "V": "NYS MOU - Add to CUNY Bud: ADV PMT by CUNY",
+            "M": "Memorandum of Understanding",
+            "J": "Mixed-Type Contracts (NYC Funded)",
+            "I": "NYC Allocation to CUNY Bud (ADV PAY) - No MOU",
+            "K": "NYC Allocation-CUNY Bud (Cost Reimb) - No MOU",
+            "L": "NYS MOU- Bud Sub Allocation to CUNY",
+            "Q": "NYS MOU - Journal Voucher",
+            "W": "MOU - Direct Pay to RF by Agency (NYS & NYC)",
+            "X": "NYC MOU - FMS PAY (Performance Based)",
+            "Y": "NYC MOU - ADD to CUNY Bud (Cost Reimb.)"
+        },
+        "CUNY Internal": {
+            "D": "Funding from CUNY or CUNY Auxiliary"
+        }
+    },
+    "activity_types": [
+        "Applied Research on Campus",
+        "Applied Research off Campus",
+        "Departmental Administration",
+        "Equipment on Campus",
+        "Equipment off Campus",
+        "Experimental Development Research on Campus Experimental",
+        "Experimental Development Research off Campus Experimental",
+        "Fellowship",
+        "General and Administrative Purpose on Campus",
+        "Instruction on Campus",
+        "Intergovernmental Personnel Act (IPA)",
+        "Library",
+        "Other Institutional Activity",
+        "Other Sponsored Activity on Campus",
+        "Other Sponsored Activity off Campus",
+        "Physical Plant on Campus",
+        "Research on Campus",
+        "Research off Campus",
+        "Research Training on Campus",
+        "Research Training off Campus",
+        "Training Grant on Campus",
+        "Training Grant off Campus"
+    ]
+}

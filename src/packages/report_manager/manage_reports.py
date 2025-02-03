@@ -6,6 +6,8 @@ from modules.utils import request_user_selection, request_file_path, request_col
 from . import ReportGenerator
 from packages.database_manager import DatabaseManager
 
+PROCESS_NAME = "Report Manager"
+
 def generate_reports(db_manager: DatabaseManager):
     with ReportGenerator(os.getenv('SAVE_PATH')) as report_generator:
         # Retrieve all the tables in the database
@@ -123,7 +125,6 @@ def resolve_reports(db_manager: DatabaseManager):
             for row in sheet_rows:
                 record_id = row[sheet_record_identifier]
                 db_manager.update_query(
-                    "Report Resolver",
                     sheet_meta_data['table'],
                     {name:val for name, val in row.items() if name != sheet_record_identifier},
                     {
@@ -145,14 +146,15 @@ def resolve_reports(db_manager: DatabaseManager):
     except Exception as err:
         print(f"An unexpected error occurred: {err}")
 
-def manage_reports(db_manager: DatabaseManager):
-    print("Current Process: Report Manager")
-    while True:
-        user_selection = request_user_selection("Select a Report Manager Action:", ["Generate Reports", "Resolve Reports", "Exit Process"])
+def manage_reports(db_path: str):
+    with DatabaseManager(db_path, PROCESS_NAME) as db_manager:
+        print(f"Current Process: {PROCESS_NAME}")
+        while True:
+            user_selection = request_user_selection("Select a Report Manager Action:", ["Generate Reports", "Resolve Reports", "Exit Process"])
 
-        if user_selection == "Generate Reports":
-            generate_reports(db_manager)
-        elif user_selection == "Resolve Reports":
-            resolve_reports(db_manager)
-        else:
-            return
+            if user_selection == "Generate Reports":
+                generate_reports(db_manager)
+            elif user_selection == "Resolve Reports":
+                resolve_reports(db_manager)
+            else:
+                return

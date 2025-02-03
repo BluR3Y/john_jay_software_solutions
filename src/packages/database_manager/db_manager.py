@@ -6,13 +6,16 @@ from typing import Union
 from . import DatabaseLogManager, destruct_query_conditions, parse_sql_condition
 
 class DatabaseManager:
-    def __init__(self, db_path: str):
+    def __init__(self, db_path: str, process: str):
         if not db_path:
             raise ValueError("A database file path was not provided to the DatabaseManager.")
         if not os.path.exists(db_path):
             raise ValueError(f"No database exists at the path: {db_path}")
+        if not process:
+            raise ValueError("A process name is required to initalize a database connection.")
         
         self.db_path = db_path
+        self.process = process
         self.connection = None
         self.cursor = None
         log_file_dir = os.path.dirname(db_path)
@@ -71,13 +74,13 @@ class DatabaseManager:
             if self.connection:
                 self.connection.rollback()
     
-    def select_query(self, table: str, cols: list[Union[str, tuple]], conditions: dict = None, all: bool = True) -> list[dict]:
+    def select_query(self, table: str, cols: list[Union[str, tuple]] = None, conditions: dict = None, all: bool = True) -> list[dict]:
         """Execute a 'SELECT' query to the database."""
         db_tables = self.get_db_tables()
         if table not in db_tables:
             raise ValueError(f"The table '{table}' does not exist in the database.")
 
-        formatted_cols = ', '.join([(f"{col[0]} AS {col[1]}" if isinstance(col, tuple) else col) for col in cols])
+        formatted_cols = ', '.join([(f"{col[0]} AS {col[1]}" if isinstance(col, tuple) else col) for col in cols] if cols else '*')
         query = f"SELECT {formatted_cols} FROM {table}"
         values = []
 
@@ -97,7 +100,7 @@ class DatabaseManager:
         row = self.cursor.fetchone()
         return dict(zip([column[0] for column in self.cursor.description], row)) if row else None
     
-    def update_query(self, process: str, table: str, cols: dict[str, Union[None, str, int, bool, datetime.date]], conditions: dict = None):
+    def update_query(self, table: str, cols: dict[str, Union[None, str, int, bool, datetime.date]], conditions: dict = None):
         "Execute an update query."
         try:
             if table not in self.get_db_tables():
@@ -124,7 +127,7 @@ class DatabaseManager:
 
                 self.cursor.execute(query_str, [*query_vals, row_id])
                 
-                self.log_manager.append_runtime_log(process, {row_id: changing_fields})
+                self.log_manager.append_runtime_log(self.process, {row_id: changing_fields})
             
             self.connection.commit()
         except ValueError as err:

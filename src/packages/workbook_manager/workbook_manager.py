@@ -3,6 +3,7 @@ import pandas as pd
 import openpyxl
 import pathlib
 import warnings
+import numpy as np
 
 from typing import Union
 
@@ -45,6 +46,7 @@ class WorkbookManager:
             sheet_data_frame = pd.DataFrame(columns=sheet_columns)
             
         self.df[sheet_name] = sheet_data_frame
+        self.property_manager.property_store[sheet_name] = {}
         
     def update_cell(self, process: str, sheet: str, row: int, col: int, new_val):
         if sheet not in self.df:
@@ -81,27 +83,54 @@ class WorkbookManager:
                 return False
         return True
         
-    def get_entries(self, sheet_name: str, conditions: dict, all: bool = False):
-        """Retrieve rows from the given sheet matching conditions."""
+    # def get_entries(self, sheet_name: str, conditions: dict, all: bool = False):
+    #     """Retrieve rows from the given sheet matching conditions."""
+    #     if sheet_name not in self.df:
+    #         raise ValueError(f"The sheet '{sheet_name}' was not found in the workbook.")
+        
+    #     try:
+    #         sheet_data_frame = self.df[sheet_name]
+            
+    #         # Apply filtering directly
+    #         mask = pd.Series(True, index=sheet_data_frame.index)
+    #         for column, value in conditions.items():
+    #             mask &= (sheet_data_frame[column] == value)
+                
+    #         filtered_rows = sheet_data_frame[mask]
+            
+    #         if filtered_rows.empty:
+    #             return None
+            
+    #         filtered_rows.replace([pd.NaT, np.nan], None, inplace=False)
+            
+    #         return filtered_rows.to_dict() if all else filtered_rows.iloc[0].to_dict()
+    def get_entries(self, sheet_name: str, conditions: dict, return_all: bool = False):
+        """Retreive rows from the given sheet matching conditions."""
+        
         if sheet_name not in self.df:
             raise ValueError(f"The sheet '{sheet_name}' was not found in the workbook.")
         
-        try:
-            sheet_data_frame = self.df[sheet_name]
-            
-            # Apply filtering directly
-            mask = pd.Series(True, index=sheet_data_frame.index)
-            for column, value in conditions.items():
-                mask &= (sheet_data_frame[column] == value)
-                
-            filtered_rows = sheet_data_frame[mask]
-            
-            if filtered_rows.empty:
-                return None
-            
-            return filtered_rows if all else filtered_rows.iloc[0]
-        except KeyError as err:
-            raise KeyError(f"An error occured while searching rows in workbook: {err}")
+        sheet_data_frame = self.df[sheet_name]
+        
+        # Ensure that conditions refer to existing columns
+        invalid_columns = [col for col in conditions if col not in sheet_data_frame.columns]
+        if invalid_columns:
+            raise KeyError(f"Invalid column names in conditions: {invalid_columns}")
+        
+        # Apply filtering
+        mask = pd.Series(True, index=sheet_data_frame.index)
+        for column, value in conditions.items():
+            mask &= (sheet_data_frame[column] == value)
+        
+        filtered_rows = sheet_data_frame[mask]
+        
+        if filtered_rows.empty:
+            return None
+        
+        # Replace NaN and NaT with None
+        filtered_rows = filtered_rows.replace([pd.NaT, np.nan], None)
+        
+        return filtered_rows.to_dict(orient="records") if return_all else filtered_rows.iloc[0].to_dict()
     
     def save_changes(self, write_file_path: str, index=False):
         """
@@ -115,6 +144,11 @@ class WorkbookManager:
                 
         if write_file_path == self.read_file_path:
             warnings.warn(f"The save path is the same as the read path, meaning that file will be overwritten with changes.")
+        
+        # populated_sheets = {sheet_name: sheet_content for sheet_name, sheet_content in self.df.items() if not sheet_content.empty}
+        is_empty = all([sheet_content.empty for sheet_content in self.df.values()])
+        if is_empty:
+            print("Workbook is empty. Now exiting Workbook Manager.")
         
         try:
             # Use ExcelWriter to write multiple sheets back into the Excel file

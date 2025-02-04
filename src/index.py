@@ -1,6 +1,10 @@
 # Main actions: Fix Template, Manage Reports, Generate Template
 import argparse
 import os
+import warnings
+
+# Ignore Pandas Warnings
+warnings.simplefilter(action='ignore', category=FutureWarning)
 
 from dotenv import load_dotenv
 from modules.utils import request_user_selection

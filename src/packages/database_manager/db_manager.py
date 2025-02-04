@@ -74,31 +74,28 @@ class DatabaseManager:
             if self.connection:
                 self.connection.rollback()
     
-    def select_query(self, table: str, cols: list[Union[str, tuple]] = None, conditions: dict = None, all: bool = True) -> list[dict]:
+    def select_query(self, table: str, cols: list[Union[str, tuple]] = None, conditions: dict = None, limit: int = None) -> list[dict]:
         """Execute a 'SELECT' query to the database."""
         db_tables = self.get_db_tables()
         if table not in db_tables:
             raise ValueError(f"The table '{table}' does not exist in the database.")
 
-        formatted_cols = ', '.join([(f"{col[0]} AS {col[1]}" if isinstance(col, tuple) else col) for col in cols] if cols else '*')
-        query = f"SELECT {formatted_cols} FROM {table}"
+        formatted_limit = f"TOP {limit}" if limit else ""
+        formatted_cols = ', '.join([(f"{col[0]} AS {col[1]}" if isinstance(col, tuple) else col) for col in cols]) if cols else '*'
+        query = f"SELECT {formatted_limit} {formatted_cols} FROM {table}"
         values = []
 
         if conditions:
             cond_str, cond_vals = self.destruct_query_conditions(conditions)
-            print(cond_str, cond_vals)
+
             query += f" WHERE {cond_str}"
             values = cond_vals
             
         # Execute query
         self.cursor.execute(query, values)
         
-        if all:
-            rows = self.cursor.fetchall()
-            return [dict(zip([column[0] for column in self.cursor.description], row)) for row in rows] if rows else []
-        
-        row = self.cursor.fetchone()
-        return dict(zip([column[0] for column in self.cursor.description], row)) if row else None
+        rows = self.cursor.fetchall()
+        return [dict(zip([column[0] for column in self.cursor.description], row)) for row in rows] if rows else []
     
     def update_query(self, table: str, cols: dict[str, Union[None, str, int, bool, datetime.date]], conditions: dict = None):
         "Execute an update query."

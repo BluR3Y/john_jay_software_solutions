@@ -6,6 +6,7 @@ from pathlib import Path
 from datetime import datetime
 from packages.workbook_manager import WorkbookManager
 from packages.database_manager import DatabaseManager
+from . import projects_sheet_append, proposals_sheet_append, members_sheet_append, awards_sheet_append
 
 class MigrationManager:
     
@@ -118,6 +119,12 @@ class MigrationManager:
         # Determine the path of the current module
         config_folder_path = Path(__file__).resolve().parent / 'config'
         
+        # Retrieve template Sheets/Columns
+        with open(config_folder_path / 'gen_sheets.json') as f:
+            gen_sheets = json.load(f)
+            for sheet_name, sheet_columns in gen_sheets.items():
+                self.generated_template_manager.create_sheet(sheet_name, sheet_columns)
+        
         # Retrieve Organization related Information
         with open(config_folder_path / 'john_jay_org_units.json') as f:
             self.ORG_UNITS = json.load(f)
@@ -138,3 +145,8 @@ class MigrationManager:
             table="LU_Discipline"
         )
         self.DISCIPLINES = {int(item['ID']):item['Name'] for item in select_query}
+        
+MigrationManager.projects_sheet_append = projects_sheet_append
+MigrationManager.proposals_sheet_append = proposals_sheet_append
+MigrationManager.members_sheet_append = members_sheet_append
+MigrationManager.awards_sheet_append = awards_sheet_append

@@ -83,3 +83,58 @@ def request_column_selection(requestStr: str, valid_columns: list[str]) -> list[
         
         selected_properties.append(formatted_prop)
     return selected_properties
+
+def find_closest_match(input, string_list, threshold=80, case_sensitive=True):
+    if not isinstance(input, str):
+        raise ValueError("The input must be a string.")
+    
+    if not isinstance(string_list, list) or not all(isinstance(s, str) for s in string_list):
+        raise ValueError("string_list must be a list of strings.")
+    
+    # Use rapidfuzz.process to calculate similarity scores for all strings
+    matches = rapidfuzz.process.extract(input if case_sensitive else input.lower(), string_list if case_sensitive else [item.lower() for item in string_list], scorer=rapidfuzz.fuzz.ratio, score_cutoff=threshold)
+    
+    if not matches:
+        return None
+    
+    # Extract the best match
+    best_match, best_score, best_index = max(matches, key=lambda x: x[1])
+    return string_list[best_index]
+
+def extract_titles(input_string):
+    """
+    Extracts key titles and abbreviations from a string:
+    - Always includes the main title.
+    - Extracts abbreviations inside parentheses.
+    - Extracts titles before and after a dash (-), cleaning out the abbreviations.
+    
+    Parameters:
+        input_string (str): The input string to extract titles from.
+
+    Returns:
+        list: A list of extracted titles, including any additional abbreviations or components.
+    """
+    titles = []
+    
+    # Always add the full title as the first entry (strip any extra whitespace)
+    main_title = input_string.split('-')[0].strip()  # Capture everything before the dash
+    main_title = re.sub(r"\s\([^()]*\)", "", main_title)  # Remove abbreviations inside parentheses
+    if main_title:
+        titles.append(main_title)
+    
+    # Extract abbreviations inside parentheses
+    abbreviations = re.findall(r"\(([^()]+)\)", input_string)
+    for abbr in abbreviations:
+        abbr = abbr.strip()
+        if abbr and abbr not in titles:
+            titles.append(abbr)
+    
+    # Extract any part of the title after a dash, and clean it by removing parentheses
+    after_dash = re.findall(r"(?<=\s-\s)(.*)", input_string)
+    for part in after_dash:
+        part = part.strip()
+        cleaned_part = re.sub(r"\s\([^()]+\)", "", part)  # Remove parentheses from after-dash part
+        if cleaned_part and cleaned_part not in titles:
+            titles.append(cleaned_part)
+    
+    return titles

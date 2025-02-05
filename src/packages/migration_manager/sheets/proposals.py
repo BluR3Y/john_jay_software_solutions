@@ -146,6 +146,8 @@ def proposals_sheet_append(
             grant_instrument_type = determined_instrument_type
         except Exception as err:
             gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 5, 'error', err)
+    else:
+        gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 5, 'error', "Grant is missing Award Type in database.")
 
     if not grant_instrument_type:
         str_id = str(grant_id)
@@ -209,13 +211,14 @@ def proposals_sheet_append(
     grant_activity_type = None
     if grant_data['Award_Type']:
         try:
-            # grant_activity_type = determine_activity_type(grant_data['Award_Type'])
             determined_activity_type = determine_activity_type(grant_data['Award_Type'])
             if not determined_activity_type:
                 raise ValueError(f"Grant has invalid Award_Type in database: {err}")
             grant_activity_type = determined_activity_type
         except Exception as err:
             gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 11, 'error', err)
+    else:
+        gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 11, 'error', "Grant is missing Award_Type in database")
     if not grant_activity_type:
         existing_activity_type = existing_data.get('Activity Type')
         if existing_activity_type:
@@ -228,6 +231,7 @@ def proposals_sheet_append(
             determined_discipline = determine_grant_discipline(self, grant_data['Discipline'])
             if not determined_discipline:
                 raise ValueError(f"Grant has invalid Discipline in database: {grant_data['Discipline']}")
+            determined_discipline = grant_discipline
         except Exception as err:
             gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 12, 'error', err)
     else:
@@ -236,9 +240,12 @@ def proposals_sheet_append(
     if not grant_discipline and grant_data['Primary_Dept']:
         alt_search = None
         try:
-            alt_search = determine_grant_discipline(self, grant_data['Primary_Dept'])
+            determined_alt_search = determine_grant_discipline(self, grant_data['Primary_Dept'])
+            if not determined_alt_search:
+                raise ValueError(f"Discipline could not be determined with Primary_Dept: {grant_data['Primary_Dept']}")
+            alt_search = determined_alt_search
         except Exception as err:
-            gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 12, 'warning', "Discipline could not be determined with Primary Dept.")
+            gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 12, 'warning', err)
         if alt_search:
             grant_discipline = alt_search
             gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 12, 'notice', "Discipline was determined using Primary Dept.")

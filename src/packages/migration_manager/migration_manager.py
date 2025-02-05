@@ -142,8 +142,10 @@ class MigrationManager:
         
     def retrieve_Disciplines(self):
         select_query = self.db_manager.select_query(
-            table="LU_Discipline"
+            table="LU_Discipline",
+            cols=["ID", "Name"]
         )
+        print(select_query)
         self.DISCIPLINES = {int(item['ID']):item['Name'] for item in select_query}
         
 MigrationManager.projects_sheet_append = projects_sheet_append

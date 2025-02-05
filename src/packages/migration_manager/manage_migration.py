@@ -19,8 +19,8 @@ def manage_migration(db_path: str):
             categorized_grants = [(grant['Grant_ID'], grant['Grant_ID'] in existing_grants) for grant in query_grant_ids]
 
             for grant_id, exists in categorized_grants:
-                if exists:
-                    continue
+                # if exists:
+                #     continue
                 
                 select_grant_query = db_manager.select_query(
                     table="grants",

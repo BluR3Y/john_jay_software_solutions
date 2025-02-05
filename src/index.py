@@ -3,7 +3,6 @@ import argparse
 import os
 import warnings
 
-# Ignore Pandas Warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
 from dotenv import load_dotenv

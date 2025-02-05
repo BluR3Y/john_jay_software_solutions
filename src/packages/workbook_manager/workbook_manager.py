@@ -50,7 +50,7 @@ class WorkbookManager:
         
     def update_cell(self, process: str, sheet: str, row: int, col: int, new_val):
         if sheet not in self.df:
-            raise ValueError(f"THe sheet with the name '{sheet}' does not exist in the workbook.")
+            raise ValueError(f"The sheet with the name '{sheet}' does not exist in the workbook.")
         
         sheet_data_frame = self.df[sheet]
         num_rows, num_cols = sheet_data_frame.shape

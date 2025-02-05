@@ -138,3 +138,11 @@ def extract_titles(input_string):
             titles.append(cleaned_part)
     
     return titles
+
+def get_valid_filename() -> str:
+    """Ensures the user provides a valid file name."""
+    while True:
+        file_name = input("Enter new file name: ").strip()
+        if file_name and not any(char in file_name for char in r'\/:*?"<>|'):
+            return file_name
+        print("Invalid file name, try again.\n")

@@ -12,8 +12,7 @@ def manage_migration(db_path: str):
             
             query_grant_ids = db_manager.select_query(
                 table="grants",
-                cols=["Grant_ID"],
-                limit=1000
+                cols=["Grant_ID"]
             )
             
             categorized_grants = [(grant['Grant_ID'], grant['Grant_ID'] in existing_grants) for grant in query_grant_ids]

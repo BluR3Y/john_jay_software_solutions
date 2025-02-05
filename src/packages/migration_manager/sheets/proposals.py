@@ -184,8 +184,8 @@ def proposals_sheet_append(
     if grant_data['Sponsor_1']:
         try:
             determined_sponsor = determine_sponsor(self, grant_data['Sponsor_1'])
-            if not determine_sponsor:
-                raise ValueError(f"Grant has invalid Sponsor_1 in database: {err}")
+            if not determined_sponsor:
+                raise ValueError(f"Grant has invalid Sponsor_1 in database: {grant_data['Sponsor_1']}")
             grant_sponsor = determined_sponsor
         except Exception as err:
             gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 6, 'error', err)

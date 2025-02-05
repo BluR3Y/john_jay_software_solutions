@@ -145,8 +145,7 @@ class MigrationManager:
             table="LU_Discipline",
             cols=["ID", "Name"]
         )
-        print(select_query)
-        self.DISCIPLINES = {int(item['ID']):item['Name'] for item in select_query}
+        self.DISCIPLINES = {str(item['Name']) for item in select_query}
         
 MigrationManager.projects_sheet_append = projects_sheet_append
 MigrationManager.proposals_sheet_append = proposals_sheet_append

@@ -79,9 +79,22 @@ def determine_activity_type(award_type):
     if award_type in ACTIVITY_ASSOCIATIONS:
         return ACTIVITY_ASSOCIATIONS[award_type]
 
-# Fix
-def determine_grant_discipline(instance, discipline):
+def validate_grant_discipline(instance, discipline) -> dict:
+    """Validate if a discipline is in the list of valid disciplines."""
+
+    # Retrieve list of valid disciplines
     valid_disciplines = instance.DISCIPLINES
+    
+    if discipline in valid_disciplines:
+        return {"valid": True}
+    
+    # Attempt to find a close match
+    closest_valid_discipline = find_closest_match(discipline, valid_disciplines)
+    
+    return {
+        "valid": False,
+        "suggestion": closest_valid_discipline
+    }
 
 def determine_grant_admin_unit(instance, grant):
     org_units = instance.ORG_UNITS
@@ -126,7 +139,15 @@ def proposals_sheet_append(
         existing_data = ft_manager.get_entries(SHEET_NAME, {"proposalLegacyNumber": grant_id}) or {}
     project_sheet_entry = gt_manager.get_entries("Project - Template", {"projectLegacyNumber": grant_pln}) or {}
 
-    grant_status = existing_data.get('status')
+    grant_status = grant_data['Status']
+    if not grant_status:
+        gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 3, 'error', "Grant is missing Status in database.")
+        existing_status = existing_data.get('Status')
+        if existing_status:
+            grant_status = existing_status
+            gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 3, 'notice', "Status was determined using feedback file.")
+    
+    
     grant_oar = project_sheet_entry.get('status')
 
     grant_primary_college = grant_data['Prim_College']
@@ -224,31 +245,29 @@ def proposals_sheet_append(
         if existing_activity_type:
             grant_activity_type = existing_activity_type
             gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 11, "notice", "Award Type was retrieved from template file")
-        
+
     grant_discipline = None
     if grant_data['Discipline']:
-        try:
-            determined_discipline = determine_grant_discipline(self, grant_data['Discipline'])
-            if not determined_discipline:
-                raise ValueError(f"Grant has invalid Discipline in database: {grant_data['Discipline']}")
-            determined_discipline = grant_discipline
-        except Exception as err:
-            gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 12, 'error', err)
+        discipline_validation = validate_grant_discipline(self, grant_data['Discipline'])
+        if discipline_validation['valid']:
+            grant_discipline = grant_data['Discipline']
+        elif discipline_validation['suggestion']:
+            grant_discipline = discipline_validation['suggestion']
+            gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 12, 'notice', f"Grant discipline value '{grant_data['Discipline']}' is not valid but a similar one was found.")
+        else:
+            gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 12, 'error', f"Grant discipline value '{grant_data['Discipline']} is not valid'")
     else:
         gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 12, 'error', "Grant does not have a discipline in database.")
         
     if not grant_discipline and grant_data['Primary_Dept']:
-        alt_search = None
-        try:
-            determined_alt_search = determine_grant_discipline(self, grant_data['Primary_Dept'])
-            if not determined_alt_search:
-                raise ValueError(f"Discipline could not be determined with Primary_Dept: {grant_data['Primary_Dept']}")
-            alt_search = determined_alt_search
-        except Exception as err:
-            gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 12, 'warning', err)
-        if alt_search:
-            grant_discipline = alt_search
+        alt_discipline_validation = validate_grant_discipline(self, grant_data['Primary_Dept'])
+        if alt_discipline_validation['valid']:
+            grant_discipline = grant_data['Primary_Dept']
             gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 12, 'notice', "Discipline was determined using Primary Dept.")
+        elif alt_discipline_validation['suggestion']:
+            grant_discipline = alt_discipline_validation['suggestion']
+            gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 12, 'notice', "Primary Dept. assimilated a valid Discipline.")
+            
     if not grant_discipline:
         existing_discipline = existing_data.get('Discipline')
         if existing_discipline:

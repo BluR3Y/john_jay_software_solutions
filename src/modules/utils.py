@@ -30,7 +30,7 @@ def request_file_path(requestStr: str, validTypes: list[str]):
     
     return selected_path
     
-def find_closest_match(input, string_list, threshold=80, case_sensitive=True):
+def find_closest_match(input: str, string_list: list[str], threshold:int = 80, case_sensitive: bool = True):
     if not isinstance(input, str):
         raise ValueError("The input must be a string.")
     

@@ -6,7 +6,7 @@ from pathlib import Path
 from datetime import datetime
 from packages.workbook_manager import WorkbookManager
 from packages.database_manager import DatabaseManager
-from . import projects_sheet_append, proposals_sheet_append, members_sheet_append, awards_sheet_append
+from . import projects_sheet_append, proposals_sheet_append, members_sheet_append, awards_sheet_append, attachments_sheet_append
 
 class MigrationManager:
     
@@ -151,3 +151,4 @@ MigrationManager.projects_sheet_append = projects_sheet_append
 MigrationManager.proposals_sheet_append = proposals_sheet_append
 MigrationManager.members_sheet_append = members_sheet_append
 MigrationManager.awards_sheet_append = awards_sheet_append
+MigrationManager.attachments_sheet_append = attachments_sheet_append

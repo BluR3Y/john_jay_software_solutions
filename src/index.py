@@ -1,4 +1,3 @@
-# Main actions: Fix Template, Manage Reports, Generate Template
 import argparse
 import os
 import warnings
@@ -46,20 +45,6 @@ if __name__ == "__main__":
     file_dir = os.path.dirname(file_path)
     parent_dir = os.path.dirname(file_dir)
     load_dotenv(os.path.join(parent_dir, f"env/.env.{args.env}"))
-    
-    # with DatabaseManager(os.getenv('ACCESS_DB_PATH')) as db_manager:
-    #     selected_process = args.process
-    #     if selected_process:
-    #         process_script = user_actions[selected_process]
-    #         process_script(db_manager)
-    #     else:
-    #         while True:
-    #             user_selection = request_user_selection("Select an action:", [*user_actions.keys(), "Exit Program"])
-    #             if user_selection == "Exit Program":
-    #                 break
-                
-    #             action_fn = user_actions[user_selection]
-    #             action_fn(db_manager)
     
     selected_process = args.process
     db_path = os.getenv('ACCESS_DB_PATH')

@@ -27,16 +27,14 @@ def determine_pi_info(instance, grant_data, pi_data):
     last_name.strip()
     return f"{first_name} {last_name}", investigator_role, None
 
-def members_sheet_append(self: "MigrationManager", grant_data, pi_data, existing_grant):
+def members_sheet_append(self: "MigrationManager", grant_data, pi_data):
     gt_manager = self.generated_template_manager
     ft_manager = self.feedback_template_manager
     next_row = gt_manager.df[SHEET_NAME].shape[0] + 1
     # existing_data = ft_manager.get_entries(SHEET_NAME, {"projectLegacyNumber": grant_data['Project_Legacy_Number']}).to_dict() if existing_grant else {}
     grant_pln = grant_data['Project_Legacy_Number']
     
-    existing_data = {}
-    if existing_grant:
-        existing_data = ft_manager.get_entries(SHEET_NAME, {"projectLegacyNumber": grant_pln}) or {}
+    existing_data = ft_manager.get_entries(SHEET_NAME, {"projectLegacyNumber": grant_pln}) or {}
     
     grant_user_name = None
     grant_user_association = None

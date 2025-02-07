@@ -29,7 +29,7 @@ def determine_grant_status(grant_data: dict):
         return "Closed"
     
 
-def projects_sheet_append(self: "MigrationManager", grant_data: dict, existing_grant: bool = False):
+def projects_sheet_append(self: "MigrationManager", grant_data: dict):
     gt_manager = self.generated_template_manager
     ft_manager = self.feedback_template_manager
     next_row = gt_manager.df[SHEET_NAME].shape[0] + 1
@@ -38,9 +38,7 @@ def projects_sheet_append(self: "MigrationManager", grant_data: dict, existing_g
     if not grant_pln:
         gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 0, "error", "Grant is missing Project Legacy Number")
 
-    existing_data = {}
-    if existing_grant:
-        existing_data = ft_manager.get_entries(SHEET_NAME, {"projectLegacyNumber": grant_pln}) or {}
+    existing_data = ft_manager.get_entries(SHEET_NAME, {"projectLegacyNumber": grant_pln}) or {}
     
     grant_title = grant_data['Project_Title']
     if not grant_title:

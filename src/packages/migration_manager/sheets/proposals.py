@@ -124,8 +124,7 @@ def proposals_sheet_append(
     self: "MigrationManager",
     grant_data,
     total_data,
-    rifunds_data,
-    existing_grant = False
+    rifunds_data
     ):
     gt_manager = self.generated_template_manager
     ft_manager = self.feedback_template_manager
@@ -134,9 +133,7 @@ def proposals_sheet_append(
     grant_id = grant_data['Grant_ID']
     grant_pln = grant_data['Project_Legacy_Number']
     
-    existing_data = {}
-    if existing_grant:
-        existing_data = ft_manager.get_entries(SHEET_NAME, {"proposalLegacyNumber": grant_id}) or {}
+    existing_data = existing_data = ft_manager.get_entries(SHEET_NAME, {"proposalLegacyNumber": grant_id}) or {}
     project_sheet_entry = gt_manager.get_entries("Project - Template", {"projectLegacyNumber": grant_pln}) or {}
 
     grant_status = grant_data['Status']

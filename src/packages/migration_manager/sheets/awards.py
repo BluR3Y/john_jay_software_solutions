@@ -22,8 +22,7 @@ def awards_sheet_append(
         dates_data, 
         costshare_data,
         ffunds_data,
-        fifunds_data,
-        existing_grant
+        fifunds_data
     ):
     gt_manager = self.generated_template_manager
     ft_manager = self.feedback_template_manager
@@ -32,9 +31,7 @@ def awards_sheet_append(
     grant_id = grant_data['Grant_ID']
     grant_pln = grant_data['Project_Legacy_Number']
     
-    existing_data = {}
-    if existing_grant:
-        existing_data = ft_manager.get_entries(SHEET_NAME, {"projectLegacyNumber": grant_pln}) or {}
+    existing_data = ft_manager.get_entries(SHEET_NAME, {"projectLegacyNumber": grant_pln}) or {}
     proposal_sheet_entry = gt_manager.get_entries("Proposal - Template", {"proposalLegacyNumber"}) or {}
     
     grant_status = grant_data['Status']

@@ -34,7 +34,7 @@ def members_sheet_append(self: "MigrationManager", grant_data, pi_data):
     # existing_data = ft_manager.get_entries(SHEET_NAME, {"projectLegacyNumber": grant_data['Project_Legacy_Number']}).to_dict() if existing_grant else {}
     grant_pln = grant_data['Project_Legacy_Number']
     
-    existing_data = ft_manager.get_entries(SHEET_NAME, {"projectLegacyNumber": grant_pln}) or {}
+    existing_data = ft_manager.find(SHEET_NAME, {"projectLegacyNumber": grant_pln}, return_one=True) or {}
     
     grant_user_name = None
     grant_user_association = None

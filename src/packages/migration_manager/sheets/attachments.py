@@ -49,11 +49,10 @@ def attachments_sheet_append(self: "MigrationManager", grant_data: dict):
     grant_pln = grant_data['Project_Legacy_Number']
     dir_path = os.getenv("PROPOSAL_PATH")
     
-    grant_attachments = ft_manager.get_entries(
+    grant_attachments = ft_manager.find(
         SHEET_NAME, {
             "projectLegacyNumber": grant_pln
-        },
-        return_all=True
+        }
     )
     if grant_attachments:
         for attachment in grant_attachments:

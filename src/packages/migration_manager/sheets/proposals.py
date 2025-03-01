@@ -133,8 +133,8 @@ def proposals_sheet_append(
     grant_id = grant_data['Grant_ID']
     grant_pln = grant_data['Project_Legacy_Number']
     
-    existing_data = existing_data = ft_manager.get_entries(SHEET_NAME, {"proposalLegacyNumber": grant_id}) or {}
-    project_sheet_entry = gt_manager.get_entries("Project - Template", {"projectLegacyNumber": grant_pln}) or {}
+    existing_data = existing_data = ft_manager.find(SHEET_NAME, {"proposalLegacyNumber": grant_id}, return_one=True) or {}
+    project_sheet_entry = gt_manager.find("Project - Template", {"projectLegacyNumber": grant_pln}, return_one=True) or {}
 
     grant_status = grant_data['Status']
     if not grant_status:
@@ -187,12 +187,15 @@ def proposals_sheet_append(
         except Exception as err:
             gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 6, 'error', err)
     else:
-        gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 6, 'error', "Grant does not have a Sponsor_1 in database.")
+        gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 6, 'warning', "Grant does not have a Sponsor_1 in database.")
     if not grant_sponsor:
         existing_sponsor = existing_data.get('Sponsor')
         if existing_sponsor:
             grant_sponsor = existing_sponsor
             gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 6, "notice", "Sponsor was retrieved from template file")
+        elif (grant_data['Sponsor_1']):
+            grant_sponsor = grant_data['Sponsor_1']
+            gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 6, "warning", "Sponsor does not exist in external orgs sheet.")
     
     grant_prime_sponsor = None
     if grant_data['Sponsor_2']:
@@ -208,6 +211,8 @@ def proposals_sheet_append(
         if existing_prime_sponsor:
             grant_prime_sponsor = existing_prime_sponsor
             gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 7, "notice", "Sponsor was retrieved from template file")
+        elif (grant_data['Sponsor_2']):
+            grant_prime_sponsor = grant_data['Sponsor_2']
             
     grant_title = project_sheet_entry.get('title')
     grant_start_date = grant_data['Start_Date_Req'] or grant_data['Start_Date']

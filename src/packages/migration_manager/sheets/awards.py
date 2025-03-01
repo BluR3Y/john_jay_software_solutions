@@ -1,3 +1,9 @@
+import pandas as pd
+import numpy as np
+
+from datetime import datetime
+from dateutil.relativedelta import relativedelta
+
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -31,8 +37,10 @@ def awards_sheet_append(
     grant_id = grant_data['Grant_ID']
     grant_pln = grant_data['Project_Legacy_Number']
     
-    existing_data = ft_manager.get_entries(SHEET_NAME, {"projectLegacyNumber": grant_pln}) or {}
-    proposal_sheet_entry = gt_manager.get_entries("Proposal - Template", {"proposalLegacyNumber"}) or {}
+    existing_data = ft_manager.find(SHEET_NAME, {"projectLegacyNumber": grant_pln}, return_one=True) or {}
+    # proposal_sheet_entry = gt_manager.find("Proposal - Template", {"proposalLegacyNumber": grant_id}, return_one=True) or {}
+    proposal_sheet_entry_ref = gt_manager.find("Proposal - Template", { "proposalLegacyNumber": grant_id }, return_one=True, as_ref=True)
+    proposal_sheet_entry = proposal_sheet_entry_ref.replace([pd.NaT, np.nan], None).to_dict() if not proposal_sheet_entry_ref.empty else {}
     
     grant_status = grant_data['Status']
     grant_oar = proposal_sheet_entry.get('status')
@@ -56,6 +64,10 @@ def awards_sheet_append(
             grant_instrument_type = existing_instrument
             gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 7, 'warning', "Instrument Type was determined using feedback file.")
             
+            proposal_sheet_entry_ref = gt_manager.update_cell("Feedback Generator", "Proposal - Template", proposal_sheet_entry_ref, "Instrument Type", existing_instrument)
+            # Add comment in proposal record regarding found instrument
+            
+            
     grant_sponsor = None
     grant_sponsor_code = proposal_sheet_entry.get('Sponsor')
     if not grant_sponsor_code:
@@ -77,7 +89,7 @@ def awards_sheet_append(
         existing_award_no = existing_data.get('Sponsor Award Number')
         if existing_award_no:
             grant_award_no = existing_award_no
-            gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 15, 'warning', "Award Number was determined using feedback file.")
+            gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 10, 'warning', "Award Number was determined using feedback file.")
             
     grant_title = proposal_sheet_entry.get('Title')
     if not grant_title:
@@ -86,12 +98,25 @@ def awards_sheet_append(
             grant_title = existing_title
             gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 18, 'warning', "Title was determined using feedback file.")
     
-    award_notice_date = dates_data['StatusDate']
+    award_notice_date = None
+    for date_obj in sorted(dates_data, key=lambda d: safe_convert(d.get('DatePeriod'))):
+        status_date = date_obj.get('StatusDate')
+        if status_date is not None:
+            award_notice_date = status_date
+            break
+    
     if not award_notice_date:
         existing_notice_date = existing_data.get('Award Notice Received')
         if existing_notice_date:
             award_notice_date = existing_notice_date
             gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 18, 'warning', "Status Date was determined using feedback file.")
+            
+    if award_notice_date and grant_sponsor_code.lower() == "jjcoar":
+        if not proposal_sheet_entry.get('Project Start Date'):
+            proposal_sheet_entry_ref = gt_manager.update_cell("Feedback Generator", "Proposal - Template", proposal_sheet_entry_ref, "Project Start Date", award_notice_date)
+        if not proposal_sheet_entry.get('Project End Date'):
+            proposal_sheet_entry_ref = gt_manager.update_cell("Feedback Generator", "Proposal - Template", proposal_sheet_entry_ref, "Project End Date", award_notice_date)
+        
             
     project_start_date = proposal_sheet_entry.get('Project Start Date')
     if not project_start_date:
@@ -121,6 +146,9 @@ def awards_sheet_append(
             grant_activity_type = existing_activity
             gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 20, 'warning', "Activity Type was determined using feedback file.")
             
+    if grant_activity_type and not proposal_sheet_entry.get('Activity Type'):
+        proposal_sheet_entry_ref = gt_manager.update_cell("Feedback Generator", "Proposal - Template", proposal_sheet_entry_ref, "Activity Type", grant_activity_type)
+            
     grant_discipline = proposal_sheet_entry.get('Discipline')
     if not grant_discipline:
         existing_discipline = existing_data.get('Discipline')
@@ -129,11 +157,11 @@ def awards_sheet_append(
             gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 25, 'warning', "Discipline was determined using feedback file.")
             
     grant_abstract = proposal_sheet_entry.get('Abstract')
-    if not grant_abstract:
-        existing_abstract = existing_data.get('Abstract')
-        if existing_abstract:
-            grant_abstract = existing_abstract
-            gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 18, 'warning', "Abstract was determined using feedback file.")
+    # if not grant_abstract:
+    #     existing_abstract = existing_data.get('Abstract')
+    #     if existing_abstract:
+    #         grant_abstract = existing_abstract
+    #         gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 18, 'warning', "Abstract was determined using feedback file.")
     
     award_legacy_no = grant_data['Award_No']
     if not award_legacy_no:
@@ -181,7 +209,7 @@ def awards_sheet_append(
             existing_rate_cost_type = existing_data.get('Indirect Rate Cost Type')
             if existing_rate_cost_type:
                 grant_rate_cost_type = existing_rate_cost_type
-                gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 50, "warning", "Cost Type was determined using feedback file.")
+                gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 36, "warning", "Cost Type was determined using feedback file.")
         
     if grant_data['RIndir%Per']:
         num_wages = float(grant_data['RIndir%Per'])
@@ -191,7 +219,7 @@ def awards_sheet_append(
             existing_rate_cost_type = existing_data.get('Indirect Rate Cost Type')
             if existing_rate_cost_type:
                 grant_rate_cost_type = existing_rate_cost_type
-                gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 50, 'warning', "Cost Type was determined using feedback file.")
+                gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 36, 'warning', "Cost Type was determined using feedback file.")
     
     grant_idc_rate = round((float(grant_data['RIndir%DC']) if grant_rate_cost_type == "Total Direct Costs (TDC)" else (float(grant_data['RIndir%Per']) if grant_rate_cost_type == "Salary and Wages (SW)" else 0)) * 100, 1)
     grant_idc_cost_type_explain = grant_data['Indirect_Deviation']
@@ -199,7 +227,7 @@ def awards_sheet_append(
         existing_cost_explain = existing_data.get('IDC Cost Type Explain')
         if existing_cost_explain:
             grant_idc_cost_type_explain = existing_cost_explain
-            gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 50, 'warning', "Cost Type Explaination was determined using feedback file.")
+            gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 38, 'warning', "Cost Type Explaination was determined using feedback file.")
     
     grant_total_expected_amount = round(sum(map(lambda fund: fund['RAmount'], total_data)))
     grant_total_awarded_indirect_amount = round(sum(map(lambda fund: fund['RIAmount'], rifunds_data)))

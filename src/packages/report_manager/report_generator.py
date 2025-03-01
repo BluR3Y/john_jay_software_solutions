@@ -40,7 +40,7 @@ class ReportGenerator:
                         continue
                     
                     existing_workbook.create_sheet(sheet_name, sheet_content.to_dict(orient='records'))
-                    sheet_meta_data = self.report_workbook.get_entries("report_meta_data", {"sheet_name": sheet_name})
+                    sheet_meta_data = self.report_workbook.find("report_meta_data", {"sheet_name": sheet_name}, return_one=True)
                     existing_workbook.append_row("report_meta_data", {
                         "sheet_name": sheet_name,
                         "table": sheet_meta_data.get('table'),

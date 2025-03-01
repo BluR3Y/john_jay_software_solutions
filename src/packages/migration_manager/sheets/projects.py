@@ -38,7 +38,7 @@ def projects_sheet_append(self: "MigrationManager", grant_data: dict):
     if not grant_pln:
         gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 0, "error", "Grant is missing Project Legacy Number")
 
-    existing_data = ft_manager.get_entries(SHEET_NAME, {"projectLegacyNumber": grant_pln}) or {}
+    existing_data = ft_manager.find(SHEET_NAME, {"projectLegacyNumber": grant_pln}, return_one=True) or {}
     
     grant_title = grant_data['Project_Title']
     if not grant_title:

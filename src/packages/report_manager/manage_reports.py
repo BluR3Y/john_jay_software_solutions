@@ -40,8 +40,8 @@ def generate_reports(db_manager: DatabaseManager):
                 
                 if record_ids:
                     selected_properties = request_column_selection(f"Input the columns in the '{selected_table}' table that will be used to populate the report.", table_columns)
-                    if not selected_properties:
-                        raise ValueError("Failed to provide table columns.")
+                    # if not selected_properties:
+                    #     raise ValueError("Failed to provide table columns.")
                     if record_identifier not in selected_properties:
                         selected_properties.insert(0, record_identifier)
 

@@ -74,7 +74,7 @@ class DatabaseManager:
             if self.connection:
                 self.connection.rollback()
     
-    def select_query(self, table: str, cols: list[Union[str, tuple]] = None, conditions: dict = None, limit: int = None) -> list[dict]:
+    def select_query(self, table: str, cols: list[Union[str, tuple]] = None, conditions: Union[dict, str] = None, limit: int = None) -> list[dict]:
         """Execute a 'SELECT' query to the database."""
         db_tables = self.get_db_tables()
         if table not in db_tables:
@@ -86,10 +86,12 @@ class DatabaseManager:
         values = []
 
         if conditions:
-            cond_str, cond_vals = self.destruct_query_conditions(conditions)
-
-            query += f" WHERE {cond_str}"
-            values = cond_vals
+            if (isinstance(conditions, dict)):
+                cond_str, cond_vals = self.destruct_query_conditions(conditions)
+                values = cond_vals
+                query += f" WHERE {cond_str}"
+            else:
+                query += f" WHERE {conditions}"
             
         # Execute query
         self.cursor.execute(query, values)

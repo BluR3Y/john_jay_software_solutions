@@ -36,7 +36,11 @@ def manage_migration(db_path: str):
                             "value": grant_id
                         }
                     }
-                )[0]
+                )
+                if (not select_grant_query):
+                    print(f"Could not find grant: {grant_id}")
+                    continue
+                select_grant_query = select_grant_query[0]
                 
                 # Append grant to "projects" sheet
                 try:
@@ -85,6 +89,7 @@ def manage_migration(db_path: str):
                 try:
                     migration_manager.proposals_sheet_append(select_grant_query, select_total_query, select_ri_funds_query)
                 except Exception as err:
+                    print(err)
                     print(f"Error while adding to proposals sheet: {err}")
                 
                 # Retrieve "updates" records relating to grant

@@ -27,13 +27,13 @@ def generate_reports(db_manager: DatabaseManager):
                 if not selected_search_conditions:
                     raise ValueError("Failed to provide query search conditions")
                 
-                formatted_search_conditions = db_manager.parse_sql_condition(selected_search_conditions)
-                print(f"Developer Info: {formatted_search_conditions}")
+                # formatted_search_conditions = db_manager.parse_sql_condition(selected_search_conditions)
+                # print(f"Developer Info: {formatted_search_conditions}")
                 
                 search_result = db_manager.select_query(
                     selected_table,
                     [record_identifier],
-                    formatted_search_conditions
+                    selected_search_conditions
                 )
                 record_ids = [item[record_identifier] for item in search_result]
                 print(f"Search returned {len(record_ids)} records.")

@@ -1,5 +1,7 @@
 from typing import TYPE_CHECKING
 from modules.utils import find_closest_match, extract_titles
+from datetime import datetime
+from dateutil.relativedelta import relativedelta
 
 if TYPE_CHECKING:
     # Only imported for type checking
@@ -156,16 +158,16 @@ def proposals_sheet_append(
             gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 4, 'notice', "Primary College was determined using feedback file.")
         
     grant_instrument_type = None
-    if grant_data['Award Type']:
+    if grant_data['Instrument_Type']:
         try:
-            determined_instrument_type = determine_instrument_type(self, grant_data['Award Type'])
+            determined_instrument_type = determine_instrument_type(self, grant_data['Instrument_Type'])
             if not determined_instrument_type:
-                raise ValueError(f"Grant has invalid Award Type in database: {grant_data['Award Type']}")
+                raise ValueError(f"Grant has invalid Instrument_Type in database: {grant_data['Instrument_Type']}")
             grant_instrument_type = determined_instrument_type
         except Exception as err:
             gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 5, 'error', err)
     else:
-        gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 5, 'error', "Grant is missing Award Type in database.")
+        gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 5, 'error', "Grant is missing Instrument_Type in database.")
 
     if not grant_instrument_type:
         str_id = str(grant_id)
@@ -222,7 +224,19 @@ def proposals_sheet_append(
         if existing_start_date:
             grant_start_date = existing_start_date
             gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 9, "notice", "Start Date was retrieved from template file")
-
+        elif (("OAR" or " oar " in grant_title) or (grant_sponsor == "JJCOAR") and grant_data['Status_Date']):
+            grant_start_date = grant_data['Status_Date']
+            # log
+        if (grant_start_date):
+            self.db_manager.update_query(
+                "grants",
+                { "Start_Date": grant_start_date },
+                { "Grant_ID": {
+                    "operator": "=",
+                    "value": grant_id
+                } }
+            )
+    
     grant_end_date = grant_data['End_Date_Req'] or grant_data['End_Date']
     if not grant_end_date:
         gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 10, 'error', "Grant does not have a end date in database.")
@@ -230,6 +244,17 @@ def proposals_sheet_append(
         if existing_end_date:
             grant_end_date = existing_end_date
             gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 10, "notice", "End Date was retrieved from template file")
+        elif (("OAR" or " oar " in grant_title) or (grant_sponsor == "JJCOAR") and grant_data['Status_Date']):
+            grant_end_date = grant_data['Status_Date']
+        if (grant_end_date):
+            self.db_manager.update_query(
+                "grants",
+                { "End_Date": grant_start_date + relativedelta(years=1) },
+                { "Grant_ID": {
+                    "operator": "=",
+                    "value": grant_id
+                } }
+            )
     
     grant_activity_type = None
     if grant_data['Award_Type']:
@@ -350,6 +375,29 @@ def proposals_sheet_append(
         if existing_unit_center:
             grant_admin_unit_center = existing_unit_center
             gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 33, 'notice', f"Admin Unit Code was retrieved from feedback file.")
+            
+    # if (not grant_start_date and grant_data['Date_Submitted'] and (grant_sponsor == "JJCOAR" or "OAR" in grant_title)):
+    #     print(f"Marker: {grant_data['Status_Date']}")
+    #     self.db_manager.update_query(
+    #         "grants",
+    #         {
+    #             "Start_Date": grant_data['Status_Date']
+    #         },
+    #         {
+    #             "Grant_ID": grant_id
+    #         }
+    #     )
+    # if (not grant_end_date and grant_data['Status_Date'] and (grant_sponsor == "JJCOAR" or "OAR" or " oar " in grant_title)):
+    #     self.db_manager.update_query(
+    #         "grants",
+    #         {
+    #             "Start_Date": grant_data['Status_Date'] + relativedelta(years=1)
+    #         },
+    #         {
+    #             "Grant_ID": grant_id
+    #         }
+    #     )
+            
     
     self.generated_template_manager.append_row(
         SHEET_NAME, {

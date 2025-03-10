@@ -178,6 +178,12 @@ def proposals_sheet_append(
             if existing_instrument_type:
                 grant_instrument_type = existing_instrument_type
                 gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 5, 'notice', "Instrument Type was determined using feedback file.")
+        if (grant_instrument_type and not grant_data['Instrument_Type']):
+            self.db_manager.update_query(
+                "grants",
+                { "Instrument_Type": grant_instrument_type },
+                { "Grant_ID": { "operator": "=", "value": grant_id } }
+            )
     
     grant_sponsor = None
     if grant_data['Sponsor_1']:

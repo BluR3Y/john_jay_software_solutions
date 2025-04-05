@@ -8,7 +8,31 @@ if TYPE_CHECKING:
     from packages.migration_manager import MigrationManager
 
 SHEET_NAME = "Proposal - Template"
-ACTIVITY_ASSOCIATIONS = {
+ACTIVITY_ASSOCIATIONS = [
+    'Applied Research on Campus',
+    'Applied Research off Campus',
+    'Departmental Administration',
+    'Equipment on Campus',
+    'Equipment off Campus',
+    'Experimental Development Research on Campus Experimental',
+    'Experimental Development Research off Campus Experimental',
+    'Fellowship',
+    'General and Administrative Purpose on Campus',
+    'Instruction on Campus',
+    'Intergovernmental Personnel Act (IPA)',
+    'Library',
+    'Other Institutional Activity',
+    'Other Sponsored Activity on Campus',
+    'Other Sponsored Activity off Campus',
+    'Physical Plant on Campus',
+    'Research on Campus',
+    'Research off Campus',
+    'Research Training on Campus',
+    'Research Training off Campus',
+    'Training Grant on Campus',
+    'Training Grant off Campus'
+]
+ACTIVITY_FALLBACK_ASSOCIATIONS = {
     'Research': 'Research on Campus',
     'Conference': 'General and Administrative Purpose on Campus',
     'Other': 'Other Institutional Activity',
@@ -23,9 +47,12 @@ ACTIVITY_ASSOCIATIONS = {
 
 def determine_instrument_type(instance, award_type):
     valid_types = instance.INSTRUMENT_TYPES
-    type_letter, type_title = award_type.split('-')
-    type_letter.strip()
-    type_title.strip()
+    type_letter = None
+    type_title = None
+    if ('-' in award_type):
+        type_letter, type_title = award_type.split('-')
+    else:
+        type_title = award_type
 
     for type_name, association in valid_types.items():
         if type_letter in association.keys():
@@ -78,8 +105,17 @@ def determine_sponsor(instance, sponsor):
 
 # Fix
 def determine_activity_type(award_type):
-    if award_type in ACTIVITY_ASSOCIATIONS:
-        return ACTIVITY_ASSOCIATIONS[award_type]
+    for type in ACTIVITY_ASSOCIATIONS:
+        if type.startswith(award_type):
+            return award_type
+    closest_match = find_closest_match(award_type, ACTIVITY_ASSOCIATIONS)
+    if closest_match:
+        return closest_match
+    if award_type in ACTIVITY_FALLBACK_ASSOCIATIONS:
+        return ACTIVITY_FALLBACK_ASSOCIATIONS[award_type]
+    closest_backup_match = find_closest_match(award_type, list(ACTIVITY_FALLBACK_ASSOCIATIONS.keys()))
+    if closest_backup_match:
+        return ACTIVITY_FALLBACK_ASSOCIATIONS[closest_backup_match]
 
 def validate_grant_discipline(instance, discipline) -> dict:
     """Validate if a discipline is in the list of valid disciplines."""
@@ -135,7 +171,7 @@ def proposals_sheet_append(
     grant_id = grant_data['Grant_ID']
     grant_pln = grant_data['Project_Legacy_Number']
     
-    existing_data = existing_data = ft_manager.find(SHEET_NAME, {"proposalLegacyNumber": grant_id}, return_one=True) or {}
+    existing_data = ft_manager.find(SHEET_NAME, {"proposalLegacyNumber": grant_id}, return_one=True) or {}
     project_sheet_entry = gt_manager.find("Project - Template", {"projectLegacyNumber": grant_pln}, return_one=True) or {}
 
     grant_status = grant_data['Status']
@@ -168,7 +204,7 @@ def proposals_sheet_append(
             gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 5, 'error', err)
     else:
         gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 5, 'error', "Grant is missing Instrument_Type in database.")
-
+    # Instrument Type should be PSC CUNY
     if not grant_instrument_type:
         str_id = str(grant_id)
         if str_id.startswith('6'):
@@ -267,7 +303,7 @@ def proposals_sheet_append(
         try:
             determined_activity_type = determine_activity_type(grant_data['Award_Type'])
             if not determined_activity_type:
-                raise ValueError(f"Grant has invalid Award_Type in database: {err}")
+                raise ValueError(f"Grant has invalid Award_Type in database: {grant_data['Award_Type']}")
             grant_activity_type = determined_activity_type
         except Exception as err:
             gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 11, 'error', err)

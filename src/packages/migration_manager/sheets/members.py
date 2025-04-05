@@ -1,4 +1,5 @@
 from typing import TYPE_CHECKING
+from modules.utils import find_closest_match, extract_titles
 
 if TYPE_CHECKING:
     # Only imported for type checking
@@ -7,79 +8,90 @@ if TYPE_CHECKING:
 SHEET_NAME = "Members - Template"
 
 def determine_pi_info(instance, grant_data, pi_data):
+    grant_pi = grant_data['Primary_PI']
+    
+    closest_pi = find_closest_match(grant_pi, [pi['PI_name'] for pi in pi_data], case_sensitive=False)
+    if (closest_pi):
+        pi_obj = next((item for item in pi_data if item['PI_name'] == closest_pi), None)
+        return (pi_obj['PI_name'], pi_obj['PI_role'] or 'PI')
+
+def determine_pi_association(instance, pi_name):
     investigators = instance.INVESTIGATORS
-    project_investigator = grant_data['Primary_PI']
-    reverse_investigators = {f"{props['name']['last']}, {props['name']['first']}": name for name, props in investigators.items()}
-    num_investigators_involved = len(pi_data)
-    investigator_role = ("Principal Investigator" if num_investigators_involved < 2 else ("Co-Principal Investigator" if num_investigators_involved < 3 else "Other Participant"))
 
-    if project_investigator in reverse_investigators:
-        investigator_info = investigators[reverse_investigators[project_investigator]]
-        return investigator_info['email'], investigator_role, investigator_info['association']
-        
-    alt_investigators = instance.INVESTIGATORS_ALT
-    if project_investigator in alt_investigators:
-        investigator_info = alt_investigators[project_investigator]
-        return investigator_info['username'], investigator_role, investigator_info['association']
-        
-    first_name, last_name = project_investigator.split(',')
-    first_name.strip()
-    last_name.strip()
-    return f"{first_name} {last_name}", investigator_role, None
+    closest_pi = find_closest_match(pi_name, [pi['name']['full'] for pi in investigators.values()], case_sensitive=False)
+    if (closest_pi):
+        pi_obj = next((pi for pi in investigators.values() if pi['name']['full'] == closest_pi), None)
+        return pi_obj['email'] ,pi_obj['association']
 
-def members_sheet_append(self: "MigrationManager", grant_data, pi_data):
+def members_sheet_append(
+        self: "MigrationManager",
+        grant_data,
+        pi_data
+    ):
     gt_manager = self.generated_template_manager
     ft_manager = self.feedback_template_manager
     next_row = gt_manager.df[SHEET_NAME].shape[0] + 1
-    # existing_data = ft_manager.get_entries(SHEET_NAME, {"projectLegacyNumber": grant_data['Project_Legacy_Number']}).to_dict() if existing_grant else {}
     grant_pln = grant_data['Project_Legacy_Number']
-    
     existing_data = ft_manager.find(SHEET_NAME, {"projectLegacyNumber": grant_pln}, return_one=True) or {}
     
-    grant_user_name = None
-    grant_user_association = None
-    grant_user_role = None
-    if grant_data['Primary_PI']:
+    investigator_name = None
+    investigator_role = None
+    if len(pi_data) == 1:
+        investigator_name = pi_data[0]['PI_name']
+        investigator_role = pi_data[0]['PI_role'] or 'PI'
+    elif len(pi_data):
         try:
-            grant_user_name, grant_user_role, grant_user_association = determine_pi_info(self, grant_data, pi_data)
+            determined_pi_info = determine_pi_info(self, grant_data, pi_data)
+            if not determine_pi_info:
+                raise ValueError(f"Could not determine pi info")
+            investigator_name, investigator_role = determined_pi_info
         except Exception as err:
-            existing_name = existing_data.get('username')
-            existing_role = existing_data.get('role')
-            existing_association = existing_data.get('association 1')
-            if existing_name:
-                grant_user_name = existing_name
-                grant_user_association = existing_association
-                grant_user_role = existing_role
-                gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 4, 'warning', "Investigator was determined using feedback file.")
-            gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 4, 'error', "Grant has invalid Primary_PI in database")
-            
-    # if not grant_user_association:
-    #     existing_entry = self.feedback_template_manager.get_entry(SHEET_NAME, "projectLegacyNumber", grant_data['Project_Legacy_Number'])
-    #     if existing_entry != None:
-    #         grant_user_name = existing_entry['username']
-    #         grant_user_role = existing_entry['role']
-    #         grant_user_association = existing_entry['association 1']
-            
-    #         if grant_data['Primary_PI'] not in self.INVESTIGATORS_ALT:
-    #             self.INVESTIGATORS_ALT[grant_data['Primary_PI']] = {
-    #                 "username": existing_entry['username'],
-    #                 "association": existing_entry['association 1']
-    #             }
+            gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 4, 'error', err)
     
+    if not investigator_name:
+        investigator_name = grant_data['Primary_PI']
+
+    investigator_association = None
+    investigator_email = None
+    if (investigator_name):
+        try:
+            retrieved_association = determine_pi_association(self, investigator_name)
+            if not retrieved_association:
+                raise ValueError(f"Could not determine pi association for: {investigator_name}")
+            investigator_email, investigator_association = retrieved_association
+        except Exception as err:
+            gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 7, 'error', err)
+    if (not investigator_association):
+        existing_association = existing_data.get('association 1')
+        if existing_association:
+            investigator_association = existing_association
+            gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 7, 'notice', "Association was retrieved from template file")
+    if (not investigator_email):
+        existing_email = existing_data.get('username')
+        if existing_email:
+            investigator_email = existing_email
+            gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 4, 'notice', "Username was retrieved from template file")
+        else:
+            l_name, f_name = investigator_name.split(',')
+            l_name.strip()
+            f_name.strip()
+            investigator_email = f"{f_name} {l_name}"
+
+    # Last Here: Fixing Members
     self.generated_template_manager.append_row(SHEET_NAME, {
         "projectLegacyNumber": grant_pln,
         "form": "proposal",
         "legacyNumber": grant_data['Grant_ID'],
-        "username": grant_user_name,
-        "role": grant_user_role,
-        "association 1": grant_user_association
+        "username": investigator_email,
+        "role": investigator_role,
+        "association 1": investigator_association
     })
     if grant_data['Status'] == "Funded":
         self.generated_template_manager.append_row(SHEET_NAME, {
             "projectLegacyNumber": grant_pln,
             "form": "award",
             "legacyNumber": (str(grant_data['Grant_ID']) + "-award"),
-            "username": grant_user_name,
-            "role": grant_user_role,
-            "association 1": grant_user_association
+            "username": investigator_email,
+            "role": investigator_role,
+            "association 1": investigator_association
         })

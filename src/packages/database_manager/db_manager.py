@@ -62,15 +62,15 @@ class DatabaseManager:
                 tables.append(row.table_name)
         return tables
 
-    def get_table_columns(self, table):
-        """Retrieve table columns."""
+    def get_table_columns(self, table: str):
+        """Retrieve table column name and type"""
         try:
             query = f"SELECT * FROM {table} WHERE 1=0"
             self.cursor.execute(query)
-            columns = [column[0] for column in self.cursor.description]
-            return columns
+            # columns = [column[0] for column in self.cursor.description]
+            return {column[0]:column[1] for column in self.cursor.description}
         except pyodbc.Error as err:
-            print(f"An error occurred while querying the database: {err}")
+            print(f"An error occured while querying the database: {err}")
             if self.connection:
                 self.connection.rollback()
     
@@ -98,9 +98,9 @@ class DatabaseManager:
         
         rows = self.cursor.fetchall()
         return [dict(zip([column[0] for column in self.cursor.description], row)) for row in rows] if rows else []
-    
+
     def update_query(self, table: str, cols: dict[str, Union[None, str, int, bool, datetime.date]], conditions: dict = None):
-        "Execute an update query."
+        """Execute an update query"""
         try:
             if table not in self.get_db_tables():
                 raise ValueError(f"The table '{table}' does not exist in the database.")
@@ -108,9 +108,19 @@ class DatabaseManager:
                 raise ValueError("No columns provided for update.")
             
             table_columns = self.get_table_columns(table)
-            table_row_identifier = table_columns[0]
+            for col_key, col_prop in cols.items():
+                if not col_prop:
+                    continue
+
+                col_type = table_columns.get(col_key)
+                if not col_type:
+                    raise ValueError(f"Table '{table}' does not have column '{col_key}'")
+                if not isinstance(col_prop, col_type):
+                    cols[col_key] = col_type(col_prop)
+                    print(f"Value for column '{col_key}' in table '{table}' was converted from '{type(col_prop)}' to '{col_type}'")
+            table_row_identifier = list(table_columns.keys())[0]
             affecting_rows = self.select_query(table, [table_row_identifier, *cols.keys()], conditions)
-            
+
             if not affecting_rows:
                 raise ValueError("Could not find records that satisfied given parameters.")
             
@@ -118,21 +128,19 @@ class DatabaseManager:
                 changing_fields = {key:{"prev_value": row[key], "new_value": val} for key, val in cols.items() if (key in row and row[key] != val)}
                 if not changing_fields:
                     continue
-                
+
                 row_id = row[table_row_identifier]
                 formatted_cols = ', '.join([f"{col} = ?" for col in changing_fields.keys()])
                 query_str = f"UPDATE {table} SET {formatted_cols} WHERE {table_row_identifier} = ?"
                 query_vals = [values['new_value'] for values in changing_fields.values()]
 
                 self.cursor.execute(query_str, [*query_vals, row_id])
-                
                 self.log_manager.append_runtime_log(self.process, {row_id: changing_fields})
-            
             self.connection.commit()
         except ValueError as err:
-            print(f"ValueError: {err}")
             if self.connection:
                 self.connection.rollback()
+                raise err
                 
    # ** Caution: Deprecated
     def execute_query_legacy(self, query, *args):

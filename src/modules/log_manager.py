@@ -63,6 +63,8 @@ class LogManager:
         """Convert Python data types into JSON-serializable types."""
         if isinstance(obj, (int, float, str, bool, type(None))):
             return obj  # Already JSON serializable
+        elif isinstance(obj, (datetime.datetime, datetime.date)):
+            return obj.isoformat()
         elif isinstance(obj, (list, tuple, set)):
             return [LogManager.convert_to_json_serializable(item) for item in obj]
         elif isinstance(obj, dict):

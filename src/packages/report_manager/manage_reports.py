@@ -20,7 +20,7 @@ def generate_reports(db_manager: DatabaseManager):
                         break
                     
                 selected_table = request_user_selection("Enter the name of the table whose records will be used to populate the report:", db_tables)
-                table_columns = db_manager.get_table_columns(selected_table)
+                table_columns = db_manager.get_table_columns(selected_table).keys()
                 record_identifier = table_columns[0]
                 
                 selected_search_conditions = input("WHERE: ")
@@ -95,7 +95,8 @@ def resolve_reports(db_manager: DatabaseManager):
         
         for sheet_name in sheet_names:
             if sheet_name not in meta_data:
-                raise KeyError(f"Metadata does not include data regarding the sheet '{sheet_name}'")
+                # raise KeyError(f"Metadata does not include data regarding the sheet '{sheet_name}'")
+                continue
             
             sheet_meta_data = meta_data[sheet_name]
             sheet_data_frame = report_data_frame[sheet_name]
@@ -111,15 +112,14 @@ def resolve_reports(db_manager: DatabaseManager):
                 selected_properties.insert(0, sheet_record_identifier)
 
             # Validate column existence
-            table_columns = db_manager.get_table_columns(sheet_meta_data['table'])
             for prop in selected_properties:
                 if prop not in sheet_columns:
                     raise ValueError(f"The column '{prop}' does not exist in the sheet '{sheet_name}'")
-                if prop not in table_columns:
-                    raise ValueError(f"The column '{prop}' does not exist in the table '{sheet_meta_data['table']}'")
 
             # Filter and clean data
             filtered_data_frame = sheet_data_frame[selected_properties].replace({pd.NaT: None, np.nan: None})
+            for col in filtered_data_frame.select_dtypes(include=["datetime64[ns]"]):
+                filtered_data_frame[col] = filtered_data_frame[col].apply(lambda x: x.to_pydatetime() if pd.notnull(x) else None)
             sheet_rows = filtered_data_frame.to_dict(orient='records')
 
             for row in sheet_rows:
@@ -139,10 +139,10 @@ def resolve_reports(db_manager: DatabaseManager):
 
     except FileNotFoundError:
         print("Error: The specified file was not found.")
-    except KeyError as e:
-        print(f"Error: Missing key in metadata or sheet - {e}")
-    except ValueError as e:
-        print(f"Validation Error: {e}")
+    except KeyError as err:
+        print(f"Error: Missing key in metadata or sheet - {err}")
+    except ValueError as err:
+        print(f"Validation Error: {err}")
     except Exception as err:
         print(f"An unexpected error occurred: {err}")
 

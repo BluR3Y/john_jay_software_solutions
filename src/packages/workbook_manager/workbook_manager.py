@@ -33,7 +33,19 @@ class WorkbookManager:
         
         # Initialize an instance of the Comment Manager
         self.property_manager = PropertyManager(read_file_path, self.df.keys())
-        
+
+    def get_sheet(self, sheet_name: str, cols: list[str] = None, format = False):
+        cols = cols or []
+        sheet_df = self.df[sheet_name] if cols else self.df[sheet_name]
+        sheet_df = sheet_df.copy()
+
+        if format:
+            sheet_df = sheet_df.replace({pd.NaT: None, np.nan: None})
+            for col in sheet_df.select_dtypes(include=["datetime64[ns]"]):
+                sheet_df[col] = sheet_df[col].apply(lambda x: x.to_pydatetime() if pd.notnull(x) else None)
+        return sheet_df
+    #     return sheet_df.to_dict(orient='records')
+
     def create_sheet(self, sheet_name: str, sheet_columns: list):
         if sheet_name in self.df.keys():
             raise ValueError(f"A sheet with the name '{sheet_name}' already exists in the workbook.")
@@ -47,48 +59,6 @@ class WorkbookManager:
             
         self.df[sheet_name] = sheet_data_frame
         self.property_manager.property_store[sheet_name] = {}
-        
-    # def update_cell(self, process: str, sheet: str, row: int, col: int, new_val):
-    #     if sheet not in self.df:
-    #         raise ValueError(f"The sheet with the name '{sheet}' does not exist in the workbook.")
-        
-    #     sheet_data_frame = self.df[sheet]
-    #     num_rows, num_cols = sheet_data_frame.shape
-    #     # Ensure row and col are within valid bounds
-    #     if not (0 <= row < num_rows) or not (0 <= col < num_cols):
-    #         raise IndexError(f"Row {row} or Column {col} is out of bound for the sheet '{sheet}'.")
-        
-    #     cell_prev_value = sheet_data_frame.iat[row, col]
-    #     sheet_data_frame.iat[row, col] = new_val
-
-    #     if self.log_manager:
-    #         self.log_manager.append_log(
-    #             process,
-    #             sheet,
-    #             row,
-    #             col,
-    #             cell_prev_value,
-    #             new_val
-    #         )
-    
-    # def series_indices(self, sheet: str, obj: pd.Series):
-    #     """Return a list of row indices where the Series matches exactly in the given sheet."""
-        
-    #     if sheet not in self.df:
-    #         raise ValueError(f"The sheet '{sheet}' does not exist in the workbook.")
-        
-    #     sheet_df = self.df[sheet]
-
-    #     if not isinstance(obj, pd.Series):
-    #         raise TypeError("obj must be a pandas Series.")
-
-    #     # Ensure obj has the same index (columns) as sheet_df before comparison
-    #     obj = obj.reindex(sheet_df.columns)  # Align Series with DataFrame columns
-
-    #     # Find matching rows (handling NaN values correctly)
-    #     mask = sheet_df.apply(lambda row: row.equals(obj), axis=1)
-
-    #     return sheet_df.index[mask].tolist()  # Convert index to list
     
     def series_indices(self, sheet: str, obj: pd.Series):
         """Return a list of row indices where the Series matches exactly in the given sheet."""

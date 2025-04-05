@@ -5,6 +5,7 @@ import pandas as pd
 from modules.utils import request_user_selection, request_file_path, request_column_selection
 from . import ReportGenerator
 from packages.database_manager import DatabaseManager
+from packages.workbook_manager import WorkbookManager
 
 PROCESS_NAME = "Report Manager"
 
@@ -75,54 +76,117 @@ def generate_reports(db_manager: DatabaseManager):
             except Exception as err:
                 print(f"An unexpected error occured: {err}")
 
+# def resolve_reports(db_manager: DatabaseManager):
+#     try:
+#         file_path = request_file_path("Enter the file path of the Excel file:", [".xlsx"])
+        
+#         # Read the Excel file once
+#         report_data_frame = pd.read_excel(file_path, sheet_name=None)
+        
+#         # Validate metadata presence
+#         if "report_meta_data" not in report_data_frame:
+#             raise KeyError("Report is missing metadata sheet.")
+        
+#         # Load metadata
+#         meta_data_records = report_data_frame["report_meta_data"].to_dict(orient='records')
+#         meta_data = {record['sheet_name']: record for record in meta_data_records}
+        
+#         # Process each sheet except metadata
+#         sheet_names = [s for s in report_data_frame.keys() if s != "report_meta_data"]
+        
+#         for sheet_name in sheet_names:
+#             if sheet_name not in meta_data:
+#                 # raise KeyError(f"Metadata does not include data regarding the sheet '{sheet_name}'")
+#                 continue
+            
+#             sheet_meta_data = meta_data[sheet_name]
+#             sheet_data_frame = report_data_frame[sheet_name]
+#             sheet_record_identifier = sheet_meta_data['record_identifier']
+#             sheet_columns = sheet_data_frame.columns.tolist()
+
+#             selected_properties = request_column_selection(f"Select columns for '{sheet_name}' (comma-separated) or leave black:", sheet_columns)
+#             if not selected_properties:
+#                 continue  # Skip sheet if no columns selected
+            
+#             # Ensure record identifier is included
+#             if sheet_record_identifier not in selected_properties:
+#                 selected_properties.insert(0, sheet_record_identifier)
+
+#             # Validate column existence
+#             for prop in selected_properties:
+#                 if prop not in sheet_columns:
+#                     raise ValueError(f"The column '{prop}' does not exist in the sheet '{sheet_name}'")
+
+#             # Filter and clean data
+#             filtered_data_frame = sheet_data_frame[selected_properties].replace({pd.NaT: None, np.nan: None})
+#             for col in filtered_data_frame.select_dtypes(include=["datetime64[ns]"]):
+#                 filtered_data_frame[col] = filtered_data_frame[col].apply(lambda x: x.to_pydatetime() if pd.notnull(x) else None)
+#             sheet_rows = filtered_data_frame.to_dict(orient='records')
+
+#             for row in sheet_rows:
+#                 record_id = row[sheet_record_identifier]
+#                 db_manager.update_query(
+#                     sheet_meta_data['table'],
+#                     {name:val for name, val in row.items() if name != sheet_record_identifier},
+#                     {
+#                         sheet_record_identifier: {
+#                             "operator": "=",
+#                             "value": record_id
+#                         }
+#                     }
+#                 )
+
+#         print("Finished making changes to records in the database.")
+
+#     except FileNotFoundError:
+#         print("Error: The specified file was not found.")
+#     except KeyError as err:
+#         print(f"Error: Missing key in metadata or sheet - {err}")
+#     except ValueError as err:
+#         print(f"Validation Error: {err}")
+#     except Exception as err:
+#         print(f"An unexpected error occurred: {err}")
+
 def resolve_reports(db_manager: DatabaseManager):
     try:
         file_path = request_file_path("Enter the file path of the Excel file:", [".xlsx"])
-        
-        # Read the Excel file once
-        report_data_frame = pd.read_excel(file_path, sheet_name=None)
-        
+
+        # Create a workbook for the Excel file
+        report_wb = WorkbookManager(file_path)
+
         # Validate metadata presence
-        if "report_meta_data" not in report_data_frame:
-            raise KeyError("Report is missing metadata sheet.")
-        
-        # Load metadata
-        meta_data_records = report_data_frame["report_meta_data"].to_dict(orient='records')
-        meta_data = {record['sheet_name']: record for record in meta_data_records}
-        
+        report_meta = report_wb.get_sheet("report_meta_data")
+        if report_meta.empty:
+            raise FileExistsError("Report is missing metadata")
+        meta_data = {record['sheet_name']: record for record in report_meta.to_dict(orient='records')}
+
         # Process each sheet except metadata
-        sheet_names = [s for s in report_data_frame.keys() if s != "report_meta_data"]
-        
+        sheet_names = [s for s in report_wb.df.keys() if s != "report_meta_data"]
+
         for sheet_name in sheet_names:
             if sheet_name not in meta_data:
-                # raise KeyError(f"Metadata does not include data regarding the sheet '{sheet_name}'")
+                print(f"Skipped sheet '{sheet_name}' as metadata did not contain info regarding sheet.")
                 continue
-            
+
             sheet_meta_data = meta_data[sheet_name]
-            sheet_data_frame = report_data_frame[sheet_name]
             sheet_record_identifier = sheet_meta_data['record_identifier']
+            sheet_data_frame = report_wb.get_sheet(sheet_name)
             sheet_columns = sheet_data_frame.columns.tolist()
 
             selected_properties = request_column_selection(f"Select columns for '{sheet_name}' (comma-separated) or leave black:", sheet_columns)
             if not selected_properties:
-                continue  # Skip sheet if no columns selected
-            
-            # Ensure record identifier is included
-            if sheet_record_identifier not in selected_properties:
-                selected_properties.insert(0, sheet_record_identifier)
+                continue    # Skip sheet if not columns selected
 
-            # Validate column existence
+           # Validate column existance
             for prop in selected_properties:
                 if prop not in sheet_columns:
                     raise ValueError(f"The column '{prop}' does not exist in the sheet '{sheet_name}'")
 
-            # Filter and clean data
-            filtered_data_frame = sheet_data_frame[selected_properties].replace({pd.NaT: None, np.nan: None})
-            for col in filtered_data_frame.select_dtypes(include=["datetime64[ns]"]):
-                filtered_data_frame[col] = filtered_data_frame[col].apply(lambda x: x.to_pydatetime() if pd.notnull(x) else None)
-            sheet_rows = filtered_data_frame.to_dict(orient='records')
+            # Ensure record identifier is included
+            if sheet_record_identifier not in selected_properties:
+                selected_properties.insert(0, sheet_record_identifier)
 
-            for row in sheet_rows:
+            for row in report_wb.get_sheet(sheet_name, cols=selected_properties, format=True).to_dict(orient='records'):
                 record_id = row[sheet_record_identifier]
                 db_manager.update_query(
                     sheet_meta_data['table'],
@@ -134,17 +198,16 @@ def resolve_reports(db_manager: DatabaseManager):
                         }
                     }
                 )
-
         print("Finished making changes to records in the database.")
-
-    except FileNotFoundError:
-        print("Error: The specified file was not found.")
+    except FileNotFoundError as err:
+        print(f"File Error: {err}")
     except KeyError as err:
-        print(f"Error: Missing key in metadata or sheet - {err}")
+        print(f"Key Error: {err}")
     except ValueError as err:
-        print(f"Validation Error: {err}")
+        print(f"Value Error: {err}")
     except Exception as err:
         print(f"An unexpected error occurred: {err}")
+        
 
 def manage_reports(db_path: str):
     with DatabaseManager(db_path, PROCESS_NAME) as db_manager:

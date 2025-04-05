@@ -36,7 +36,7 @@ class WorkbookManager:
 
     def get_sheet(self, sheet_name: str, cols: list[str] = None, format = False):
         cols = cols or []
-        sheet_df = self.df[sheet_name] if cols else self.df[sheet_name]
+        sheet_df = self.df[sheet_name][cols] if cols else self.df[sheet_name]
         sheet_df = sheet_df.copy()
 
         if format:

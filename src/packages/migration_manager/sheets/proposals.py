@@ -8,30 +8,7 @@ if TYPE_CHECKING:
     from packages.migration_manager import MigrationManager
 
 SHEET_NAME = "Proposal - Template"
-ACTIVITY_ASSOCIATIONS = [
-    'Applied Research on Campus',
-    'Applied Research off Campus',
-    'Departmental Administration',
-    'Equipment on Campus',
-    'Equipment off Campus',
-    'Experimental Development Research on Campus Experimental',
-    'Experimental Development Research off Campus Experimental',
-    'Fellowship',
-    'General and Administrative Purpose on Campus',
-    'Instruction on Campus',
-    'Intergovernmental Personnel Act (IPA)',
-    'Library',
-    'Other Institutional Activity',
-    'Other Sponsored Activity on Campus',
-    'Other Sponsored Activity off Campus',
-    'Physical Plant on Campus',
-    'Research on Campus',
-    'Research off Campus',
-    'Research Training on Campus',
-    'Research Training off Campus',
-    'Training Grant on Campus',
-    'Training Grant off Campus'
-]
+
 ACTIVITY_FALLBACK_ASSOCIATIONS = {
     'Research': 'Research on Campus',
     'Conference': 'General and Administrative Purpose on Campus',
@@ -45,21 +22,32 @@ ACTIVITY_FALLBACK_ASSOCIATIONS = {
     'Student Support': 'Fellowship'
 }
 
-def determine_instrument_type(instance, award_type):
+# def determine_instrument_type(instance, award_type):
+#     valid_types = instance.INSTRUMENT_TYPES
+#     type_letter = None
+#     type_title = None
+#     if ('-' in award_type):
+#         type_letter, type_title = award_type.split('-')
+#     else:
+#         type_title = award_type
+
+#     for type_name, association in valid_types.items():
+#         if type_letter in association.keys():
+#             return type_name
+#         closest_valid_type = find_closest_match(type_title, [str(item) for item in association.values()], case_sensitive=False)
+#         if closest_valid_type:
+#             return type_name
+def determine_instrument_type(instance, type):
     valid_types = instance.INSTRUMENT_TYPES
     type_letter = None
     type_title = None
-    if ('-' in award_type):
-        type_letter, type_title = award_type.split('-')
+    if ('-' in type):
+        type_letter, type_title = type.split('-')
     else:
-        type_title = award_type
+        type_title = type
 
-    for type_name, association in valid_types.items():
-        if type_letter in association.keys():
-            return type_name
-        closest_valid_type = find_closest_match(type_title, [str(item) for item in association.values()], case_sensitive=False)
-        if closest_valid_type:
-            return type_name
+    closest_valid_type = find_closest_match(type_title, valid_types, case_sensitive=False, threshold=85)
+    return closest_valid_type
     
 def determine_sponsor(instance, sponsor):    
     all_orgs = {
@@ -74,14 +62,14 @@ def determine_sponsor(instance, sponsor):
     if sponsor in org_primary_names:
         return all_orgs[sponsor]["Primary Code"]
     
-    closest_valid_sponsor = find_closest_match(sponsor, org_primary_names, case_sensitive=False)
+    closest_valid_sponsor = find_closest_match(sponsor, org_primary_names, case_sensitive=False, threshold=85)
     if closest_valid_sponsor:
         return all_orgs[closest_valid_sponsor]["Primary Code"]
     
     if sponsor in org_alt_names:
         return all_orgs[inverse_orgs[sponsor]]["Primary Code"]
     
-    closest_valid_sponsor = find_closest_match(sponsor, org_alt_names, case_sensitive=False)
+    closest_valid_sponsor = find_closest_match(sponsor, org_alt_names, case_sensitive=False, threshold=85)
     if closest_valid_sponsor:
         return all_orgs[inverse_orgs[closest_valid_sponsor]]["Primary Code"]
     
@@ -92,30 +80,24 @@ def determine_sponsor(instance, sponsor):
         if title in org_primary_names:
             return all_orgs[title]["Primary Code"]
         
-        closest_valid_sponsor = find_closest_match(title, org_primary_names, case_sensitive=False)
+        closest_valid_sponsor = find_closest_match(title, org_primary_names, case_sensitive=False, threshold=85)
         if closest_valid_sponsor:
             return all_orgs[closest_valid_sponsor]["Primary Code"]
         
         if title in org_alt_names:
             return all_orgs[inverse_orgs[title]]["Primary Code"]
         
-        closest_valid_sponsor = find_closest_match(title, org_alt_names, case_sensitive=False)
+        closest_valid_sponsor = find_closest_match(title, org_alt_names, case_sensitive=False, threshold=85)
         if closest_valid_sponsor:
             return all_orgs[inverse_orgs[closest_valid_sponsor]]["Primary Code"]
 
-# Fix
-def determine_activity_type(award_type):
-    for type in ACTIVITY_ASSOCIATIONS:
-        if type.startswith(award_type):
-            return award_type
-    closest_match = find_closest_match(award_type, ACTIVITY_ASSOCIATIONS)
-    if closest_match:
-        return closest_match
-    if award_type in ACTIVITY_FALLBACK_ASSOCIATIONS:
-        return ACTIVITY_FALLBACK_ASSOCIATIONS[award_type]
-    closest_backup_match = find_closest_match(award_type, list(ACTIVITY_FALLBACK_ASSOCIATIONS.keys()))
-    if closest_backup_match:
-        return ACTIVITY_FALLBACK_ASSOCIATIONS[closest_backup_match]
+def determine_activity_type(instance, type, on_site):
+    activity_types = instance.ACTIVITY_TYPES
+    if type in activity_types:
+        return type
+
+    closest_match = find_closest_match(f"{type} {'on' if on_site else 'off'} Campus", activity_types, threshold=85, case_sensitive=False)
+    return closest_match
 
 def validate_grant_discipline(instance, discipline) -> dict:
     """Validate if a discipline is in the list of valid disciplines."""
@@ -127,7 +109,7 @@ def validate_grant_discipline(instance, discipline) -> dict:
         return {"valid": True}
     
     # Attempt to find a close match
-    closest_valid_discipline = find_closest_match(discipline, valid_disciplines)
+    closest_valid_discipline = find_closest_match(discipline, valid_disciplines, threshold=85)
     
     return {
         "valid": False,
@@ -143,7 +125,7 @@ def determine_grant_admin_unit(instance, grant):
     if project_primary_dept in org_unit_keys:
         return project_primary_dept, org_units[project_primary_dept]['Primary Code'], None
     
-    closest_valid_dept = find_closest_match(project_primary_dept, org_unit_keys)
+    closest_valid_dept = find_closest_match(project_primary_dept, org_unit_keys, threshold=85)
     if closest_valid_dept:
         return closest_valid_dept, org_units[closest_valid_dept]['Primary Code'], None
     
@@ -152,7 +134,7 @@ def determine_grant_admin_unit(instance, grant):
         project_center = org_centers[project_primary_dept]
         return project_center['Admin Unit'], project_center['Admin Unit Code'], project_primary_dept
     
-    closest_valid_center = find_closest_match(project_primary_dept, org_center_keys)
+    closest_valid_center = find_closest_match(project_primary_dept, org_center_keys, threshold=85)
     if closest_valid_center:
         project_center = org_centers[closest_valid_center]
         return project_center['Admin Unit'], project_center['Admin Unit Code'], closest_valid_center
@@ -204,22 +186,6 @@ def proposals_sheet_append(
             gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 5, 'error', err)
     else:
         gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 5, 'error', "Grant is missing Instrument_Type in database.")
-    # Instrument Type should be PSC CUNY
-    if not grant_instrument_type:
-        str_id = str(grant_id)
-        if str_id.startswith('6'):
-            grant_instrument_type = "PSC CUNY"
-        else:
-            existing_instrument_type = existing_data.get('Instrument Type')
-            if existing_instrument_type:
-                grant_instrument_type = existing_instrument_type
-                gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 5, 'notice', "Instrument Type was determined using feedback file.")
-        if (grant_instrument_type and not grant_data['Instrument_Type']):
-            self.db_manager.update_query(
-                "grants",
-                { "Instrument_Type": grant_instrument_type },
-                { "Grant_ID": { "operator": "=", "value": grant_id } }
-            )
     
     grant_sponsor = None
     if grant_data['Sponsor_1']:
@@ -241,6 +207,25 @@ def proposals_sheet_append(
             grant_sponsor = grant_data['Sponsor_1']
             gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 6, "warning", "Sponsor does not exist in external orgs sheet.")
     
+    if not grant_instrument_type:
+        str_id = str(grant_data['RF_Account'])
+        if str_id.startswith('6'):
+            grant_instrument_type = "PSC CUNY"
+        elif grant_sponsor == 'CUNY':
+            grant_instrument_type = 'CUNY Internal'
+        else:
+            existing_instrument_type = existing_data.get('Instrument Type')
+            if existing_instrument_type:
+                grant_instrument_type = existing_instrument_type
+                gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 5, 'notice', "Instrument Type was determined using feedback file.")
+        # if (grant_instrument_type and not grant_data['Instrument_Type']):
+        #     self.db_manager.update_query(
+        #         "grants",
+        #         { "Instrument_Type": grant_instrument_type },
+        #         { "Grant_ID": { "operator": "=", "value": grant_id } }
+        #     )
+        #     print(f"Updated Instrument Type to '{grant_instrument_type}' for grant:{grant_id}")
+
     grant_prime_sponsor = None
     if grant_data['Sponsor_2']:
         try:
@@ -259,7 +244,7 @@ def proposals_sheet_append(
             grant_prime_sponsor = grant_data['Sponsor_2']
             
     grant_title = project_sheet_entry.get('title')
-    grant_start_date = grant_data['Start_Date_Req'] or grant_data['Start_Date']
+    grant_start_date = grant_data['Start_Date'] or grant_data['Start_Date_Req']
     if not grant_start_date:
         gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 9, 'error', "Grant does not have a start date in database.")
         existing_start_date = existing_data.get('Project Start Date')
@@ -269,17 +254,17 @@ def proposals_sheet_append(
         elif (("OAR" or " oar " in grant_title) or (grant_sponsor == "JJCOAR") and grant_data['Status_Date']):
             grant_start_date = grant_data['Status_Date']
             # log
-        if (grant_start_date):
-            self.db_manager.update_query(
-                "grants",
-                { "Start_Date": grant_start_date },
-                { "Grant_ID": {
-                    "operator": "=",
-                    "value": grant_id
-                } }
-            )
+        # if (grant_start_date):
+        #     self.db_manager.update_query(
+        #         "grants",
+        #         { "Start_Date": grant_start_date },
+        #         { "Grant_ID": {
+        #             "operator": "=",
+        #             "value": grant_id
+        #         } }
+        #     )
     
-    grant_end_date = grant_data['End_Date_Req'] or grant_data['End_Date']
+    grant_end_date = grant_data['End_Date'] or grant_data['End_Date_Req']
     if not grant_end_date:
         gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 10, 'error', "Grant does not have a end date in database.")
         existing_end_date = existing_data.get('Project End Date')
@@ -288,20 +273,20 @@ def proposals_sheet_append(
             gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 10, "notice", "End Date was retrieved from template file")
         elif (("OAR" or " oar " in grant_title) or (grant_sponsor == "JJCOAR") and grant_data['Status_Date']):
             grant_end_date = grant_data['Status_Date']
-        if (grant_end_date):
-            self.db_manager.update_query(
-                "grants",
-                { "End_Date": grant_start_date + relativedelta(years=1) },
-                { "Grant_ID": {
-                    "operator": "=",
-                    "value": grant_id
-                } }
-            )
+        # if (grant_end_date):
+        #     self.db_manager.update_query(
+        #         "grants",
+        #         { "End_Date": grant_start_date + relativedelta(years=1) },
+        #         { "Grant_ID": {
+        #             "operator": "=",
+        #             "value": grant_id
+        #         } }
+        #     )
     
     grant_activity_type = None
     if grant_data['Award_Type']:
         try:
-            determined_activity_type = determine_activity_type(grant_data['Award_Type'])
+            determined_activity_type = determine_activity_type(self, grant_data['Award_Type'], grant_data['Purpose'] != None)
             if not determined_activity_type:
                 raise ValueError(f"Grant has invalid Award_Type in database: {grant_data['Award_Type']}")
             grant_activity_type = determined_activity_type
@@ -310,10 +295,11 @@ def proposals_sheet_append(
     else:
         gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 11, 'error', "Grant is missing Award_Type in database")
     if not grant_activity_type:
-        existing_activity_type = existing_data.get('Activity Type')
-        if existing_activity_type:
-            grant_activity_type = existing_activity_type
+        if existing_data.get('Activity Type'):
+            grant_activity_type = existing_data.get('Activity Type')
             gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 11, "notice", "Award Type was retrieved from template file")
+        elif grant_instrument_type == 'PSC CUNY' or grant_instrument_type == 'CUNY Internal':
+            grant_activity_type = 'Research on Campus'
 
     grant_discipline = None
     if grant_data['Discipline']:

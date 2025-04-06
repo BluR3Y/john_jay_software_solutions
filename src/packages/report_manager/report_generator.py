@@ -54,12 +54,13 @@ class ReportGenerator:
         except Exception as err:
             print(f"Error occured while saving report: {err}")
     
-    def append_report(self, report_name: str, table: str, record_identifier: str, report_data: list[dict]):
+    def append_report(self, report_name: str, table: str, record_identifier: str, search_query: dict, report_data: list[dict]):
         self.report_workbook.create_sheet(report_name, report_data)
         self.report_workbook.append_row("report_meta_data", {
             "sheet_name": report_name,
             "table": table,
-            "record_identifier": record_identifier
+            "record_identifier": record_identifier,
+            "search_query": search_query
         })
         
     def get_num_reports(self) -> int:

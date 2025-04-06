@@ -55,13 +55,13 @@ class MigrationManager:
             self.ORG_CENTERS = json.load(f)
         with open(config_folder_path / 'john_jay_external_orgs.json') as f:
             self.ORGANIZATIONS = json.load(f)
-            
-        # Retrueve Instrument/Activty Types
-        with open(config_folder_path / 'john_jay_instrument_and_activity_types.json', 'r') as f:
-            relevant_data = json.load(f)
-            
-        self.INSTRUMENT_TYPES = relevant_data["instrument_types"]
-        self.ACTIVITY_TYPES = relevant_data['activity_types']
+
+        # Retrieve Instrument/Activity Types
+        with open(config_folder_path / 'associated_data.json', 'r') as f:
+            associated_data = json.load(f)
+
+        self.INSTRUMENT_TYPES = associated_data["instrument_types"]
+        self.ACTIVITY_TYPES = associated_data["activity_types"]
         
     def retrieve_Disciplines(self):
         select_query = self.db_manager.select_query(

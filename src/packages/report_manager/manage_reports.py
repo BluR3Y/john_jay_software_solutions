@@ -70,7 +70,7 @@ def generate_reports(db_manager: DatabaseManager):
                     if not selected_report_name:
                         raise ValueError("Failed to provide a report name.")
                     
-                    report_generator.append_report(selected_report_name, selected_table, record_identifier, report_data)
+                    report_generator.append_report(selected_report_name, selected_table, record_identifier, formatted_search_conditions, report_data)
             except ValueError as err:
                 print(f"Validation Error: {err}")
             except Exception as err:

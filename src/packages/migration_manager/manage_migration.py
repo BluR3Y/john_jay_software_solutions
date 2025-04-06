@@ -13,19 +13,16 @@ def manage_migration(db_path: str):
             
             query_grant_ids = db_manager.select_query(
                 table="grants",
-                cols=["Grant_ID"]
+                cols=["Grant_ID"],
+                conditions={
+                    "End_Date": {
+                        "operator": ">",
+                        "value": "2016-12-31"
+                    }
+                }
             )
             grant_ids = [grant['Grant_ID'] for grant in query_grant_ids]
-            
-            # Append Existing grants
-            append_existing = True
-            # Append Non-Existing grants
-            append_new = False
-
             for grant_id in tqdm(existing_grants, "Processing grants", unit="grant"):
-                exists = grant_id in existing_grants
-                if (exists and not append_existing) or (not exists and not append_new):
-                    continue
                 
                 # Retrieve primary grant data
                 select_grant_query = db_manager.select_query(
@@ -92,68 +89,68 @@ def manage_migration(db_path: str):
                     print(err)
                     print(f"Error while adding to proposals sheet: {err}")
                 
-                # Retrieve "updates" records relating to grant
-                select_dates_query = db_manager.select_query(
-                    table="Dates",
-                    conditions={
-                        "Date_GrantID": {
-                            "operator": "=",
-                            "value": grant_id
-                        }
-                    }
-                )
+                # # Retrieve "updates" records relating to grant
+                # select_dates_query = db_manager.select_query(
+                #     table="Dates",
+                #     conditions={
+                #         "Date_GrantID": {
+                #             "operator": "=",
+                #             "value": grant_id
+                #         }
+                #     }
+                # )
                 
-                # Retrieve "constshare" records relating to grant
-                select_costshare_query = db_manager.select_query(
-                    table="CostShare",
-                    conditions={
-                        "GrantID": {
-                            "operator": "=",
-                            "value": grant_id
-                        }
-                    }
-                )
+                # # Retrieve "constshare" records relating to grant
+                # select_costshare_query = db_manager.select_query(
+                #     table="CostShare",
+                #     conditions={
+                #         "GrantID": {
+                #             "operator": "=",
+                #             "value": grant_id
+                #         }
+                #     }
+                # )
                 
-                # Retrieve "f funds" records relating to grant
-                select_ffunds_query = db_manager.select_query(
-                    table="Ffunds",
-                    conditions={
-                        "FFunds_Grant_ID": {
-                            "operator": "=",
-                            "value": grant_id
-                        }
-                    }
-                )
+                # # Retrieve "f funds" records relating to grant
+                # select_ffunds_query = db_manager.select_query(
+                #     table="Ffunds",
+                #     conditions={
+                #         "FFunds_Grant_ID": {
+                #             "operator": "=",
+                #             "value": grant_id
+                #         }
+                #     }
+                # )
                 
-                # Retrieve "fi funds" relating to grant
-                select_fifunds_query = db_manager.select_query(
-                    table="FIFunds",
-                    conditions={
-                        "FIFunds_Grant_ID": {
-                            "operator": "=",
-                            "value": grant_id
-                        }
-                    }
-                )
+                # # Retrieve "fi funds" relating to grant
+                # select_fifunds_query = db_manager.select_query(
+                #     table="FIFunds",
+                #     conditions={
+                #         "FIFunds_Grant_ID": {
+                #             "operator": "=",
+                #             "value": grant_id
+                #         }
+                #     }
+                # )
                 
-                # If grant is funded or has an 'RF_Account' number, all funded grants are assigned one:
-                if select_grant_query['Status'] == "Funded" or select_grant_query['RF_Account'] != None:
-                    # Append grant to "awards" sheet
-                    try:
-                        migration_manager.awards_sheet_append(
-                            select_grant_query,
-                            select_total_query,
-                            select_ri_funds_query,
-                            select_dates_query,
-                            select_costshare_query,
-                            select_ffunds_query,
-                            select_fifunds_query
-                        )
-                    except Exception as err:
-                        print(f"Error occured while appending to awards sheet: {err}")
+                # # If grant is funded or has an 'RF_Account' number, all funded grants are assigned one:
+                # if select_grant_query['Status'] == "Funded" or select_grant_query['RF_Account'] != None:
+                #     # Append grant to "awards" sheet
+                #     try:
+                #         migration_manager.awards_sheet_append(
+                #             select_grant_query,
+                #             select_total_query,
+                #             select_ri_funds_query,
+                #             select_dates_query,
+                #             select_costshare_query,
+                #             select_ffunds_query,
+                #             select_fifunds_query
+                #         )
+                #     except Exception as err:
+                #         print(f"Error occured while appending to awards sheet: {err}")
                     
-                    # Append grant to "attachments" sheet
-                    try:
-                        migration_manager.attachments_sheet_append(select_grant_query)
-                    except Exception as err:
-                        print(f"Error occured while appending to attachments sheet: {err}")
+                #     # Append grant to "attachments" sheet
+                #     try:
+                #         migration_manager.attachments_sheet_append(select_grant_query)
+                #     except Exception as err:
+                #         print(f"Error occured while appending to attachments sheet: {err}")

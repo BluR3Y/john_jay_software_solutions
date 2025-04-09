@@ -46,7 +46,7 @@ def determine_instrument_type(instance, type):
     else:
         type_title = type
 
-    closest_valid_type = find_closest_match(type_title, valid_types, case_sensitive=False, threshold=85)
+    closest_valid_type = find_closest_match(type_title, valid_types, case_sensitive=False)
     return closest_valid_type
     
 def determine_sponsor(instance, sponsor):    
@@ -62,14 +62,14 @@ def determine_sponsor(instance, sponsor):
     if sponsor in org_primary_names:
         return all_orgs[sponsor]["Primary Code"]
     
-    closest_valid_sponsor = find_closest_match(sponsor, org_primary_names, case_sensitive=False, threshold=85)
+    closest_valid_sponsor = find_closest_match(sponsor, org_primary_names, case_sensitive=False)
     if closest_valid_sponsor:
         return all_orgs[closest_valid_sponsor]["Primary Code"]
     
     if sponsor in org_alt_names:
         return all_orgs[inverse_orgs[sponsor]]["Primary Code"]
     
-    closest_valid_sponsor = find_closest_match(sponsor, org_alt_names, case_sensitive=False, threshold=85)
+    closest_valid_sponsor = find_closest_match(sponsor, org_alt_names, case_sensitive=False)
     if closest_valid_sponsor:
         return all_orgs[inverse_orgs[closest_valid_sponsor]]["Primary Code"]
     
@@ -80,14 +80,14 @@ def determine_sponsor(instance, sponsor):
         if title in org_primary_names:
             return all_orgs[title]["Primary Code"]
         
-        closest_valid_sponsor = find_closest_match(title, org_primary_names, case_sensitive=False, threshold=85)
+        closest_valid_sponsor = find_closest_match(title, org_primary_names, case_sensitive=False)
         if closest_valid_sponsor:
             return all_orgs[closest_valid_sponsor]["Primary Code"]
         
         if title in org_alt_names:
             return all_orgs[inverse_orgs[title]]["Primary Code"]
         
-        closest_valid_sponsor = find_closest_match(title, org_alt_names, case_sensitive=False, threshold=85)
+        closest_valid_sponsor = find_closest_match(title, org_alt_names, case_sensitive=False)
         if closest_valid_sponsor:
             return all_orgs[inverse_orgs[closest_valid_sponsor]]["Primary Code"]
 
@@ -96,7 +96,7 @@ def determine_activity_type(instance, type, on_site):
     if type in activity_types:
         return type
 
-    closest_match = find_closest_match(f"{type} {'on' if on_site else 'off'} Campus", activity_types, threshold=85, case_sensitive=False)
+    closest_match = find_closest_match(f"{type} {'on' if on_site else 'off'} Campus", activity_types, case_sensitive=False)
     return closest_match
 
 def validate_grant_discipline(instance, discipline) -> dict:
@@ -109,7 +109,7 @@ def validate_grant_discipline(instance, discipline) -> dict:
         return {"valid": True}
     
     # Attempt to find a close match
-    closest_valid_discipline = find_closest_match(discipline, valid_disciplines, threshold=85)
+    closest_valid_discipline = find_closest_match(discipline, valid_disciplines)
     
     return {
         "valid": False,
@@ -125,7 +125,7 @@ def determine_grant_admin_unit(instance, grant):
     if project_primary_dept in org_unit_keys:
         return project_primary_dept, org_units[project_primary_dept]['Primary Code'], None
     
-    closest_valid_dept = find_closest_match(project_primary_dept, org_unit_keys, threshold=85)
+    closest_valid_dept = find_closest_match(project_primary_dept, org_unit_keys)
     if closest_valid_dept:
         return closest_valid_dept, org_units[closest_valid_dept]['Primary Code'], None
     
@@ -134,7 +134,7 @@ def determine_grant_admin_unit(instance, grant):
         project_center = org_centers[project_primary_dept]
         return project_center['Admin Unit'], project_center['Admin Unit Code'], project_primary_dept
     
-    closest_valid_center = find_closest_match(project_primary_dept, org_center_keys, threshold=85)
+    closest_valid_center = find_closest_match(project_primary_dept, org_center_keys)
     if closest_valid_center:
         project_center = org_centers[closest_valid_center]
         return project_center['Admin Unit'], project_center['Admin Unit Code'], closest_valid_center
@@ -153,8 +153,8 @@ def proposals_sheet_append(
     grant_id = grant_data['Grant_ID']
     grant_pln = grant_data['Project_Legacy_Number']
     
-    existing_data = ft_manager.find(SHEET_NAME, {"proposalLegacyNumber": grant_id}, return_one=True) or {}
-    project_sheet_entry = gt_manager.find("Project - Template", {"projectLegacyNumber": grant_pln}, return_one=True) or {}
+    existing_data = ft_manager.find(SHEET_NAME, {"proposalLegacyNumber": grant_id}, return_one=True, to_dict='records') or {}
+    project_sheet_entry = gt_manager.find("Project - Template", {"projectLegacyNumber": grant_pln}, return_one=True, to_dict='records') or {}
 
     grant_status = grant_data['Status']
     if not grant_status:
@@ -213,6 +213,10 @@ def proposals_sheet_append(
             grant_instrument_type = "PSC CUNY"
         elif grant_sponsor == 'CUNY':
             grant_instrument_type = 'CUNY Internal'
+        elif grant_sponsor.startswith('NYC') or grant_sponsor.startswith('NYS'):
+            grant_instrument_type = "NYC/NYS MOU - Interagency Agreement"
+        elif grant_sponsor == 'NSF' or grant_sponsor == 'JJCOAR':
+            grant_instrument_type = "Grant"
         else:
             existing_instrument_type = existing_data.get('Instrument Type')
             if existing_instrument_type:
@@ -300,6 +304,8 @@ def proposals_sheet_append(
             gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 11, "notice", "Award Type was retrieved from template file")
         elif grant_instrument_type == 'PSC CUNY' or grant_instrument_type == 'CUNY Internal':
             grant_activity_type = 'Research on Campus'
+        elif grant_sponsor == 'JJCOAR' or grant_sponsor == 'NSF' or grant_sponsor == 'NEH':
+            grant_activity_type = 'Research on Campus'
 
     grant_discipline = None
     if grant_data['Discipline']:
@@ -342,10 +348,17 @@ def proposals_sheet_append(
     if not grant_rate_cost_type:
         existing_rate_cost_type = existing_data.get('Indirect Rate Cost Type')
         if existing_rate_cost_type:
+            if existing_rate_cost_type not in ['Total Direct Costs (TDC)','Salary and Wages (SW)']:
+                print('Invalid cost type')
             grant_rate_cost_type = existing_rate_cost_type
             gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 15, "notice", "Rate Cost Type was retrieved from template file.")
             
     grant_idc_rate = round((float(grant_data['RIndir%DC']) if grant_rate_cost_type == "Total Direct Costs (TDC)" else (float(grant_data['RIndir%Per']) if grant_rate_cost_type == "Salary and Wages (SW)" else 0)) * 100, 1)
+    if not grant_idc_rate:
+        existing_idc_rate = existing_data.get('IDC Rate')
+        if existing_idc_rate:
+            grant_idc_rate = existing_idc_rate
+            gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 16, "IDC Rate was determined from template file.")
     
     grant_idc_cost_type_explain = grant_data['Indirect_Deviation']
     if not grant_idc_cost_type_explain:

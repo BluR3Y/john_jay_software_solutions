@@ -52,11 +52,13 @@ def attachments_sheet_append(self: "MigrationManager", grant_data: dict):
     grant_attachments = ft_manager.find(
         SHEET_NAME, {
             "projectLegacyNumber": grant_pln
-        }
+        },
+        to_dict='records'
     )
     if grant_attachments:
         for attachment in grant_attachments:
             file_path = attachment['filePath']
+            file_type = attachment['attachment type']
             attachment_form = attachment['form']
             
             if file_path:
@@ -74,6 +76,7 @@ def attachments_sheet_append(self: "MigrationManager", grant_data: dict):
                 "projectLegacyNumber": grant_pln,
                 "form": attachment_form,    # Subawards -> Proposals
                 "legacyNumber": str(grant_id) + ("-award" if attachment_form == "Award" else ''),
+                "attachment type": file_type,
                 "filePath": file_path
             })
             next_row += 1

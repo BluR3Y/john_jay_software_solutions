@@ -84,10 +84,10 @@ def resolve_reports(db_manager: DatabaseManager):
         report_wb = WorkbookManager(file_path)
 
         # Validate metadata presence
-        report_meta = report_wb.get_sheet("report_meta_data")
-        if report_meta.empty:
+        report_meta = report_wb.get_sheet("report_meta_data", orient='records')
+        if not report_meta:
             raise FileExistsError("Report is missing metadata")
-        meta_data = {record['sheet_name']: record for record in report_meta.to_dict(orient='records')}
+        meta_data = {record['sheet_name']: record for record in report_meta}
 
         # Process each sheet except metadata
         sheet_names = [s for s in report_wb.df.keys() if s != "report_meta_data"]
@@ -96,12 +96,13 @@ def resolve_reports(db_manager: DatabaseManager):
             if sheet_name not in meta_data:
                 print(f"Skipped sheet '{sheet_name}' as metadata did not contain info regarding sheet.")
                 continue
-
+            
             sheet_meta_data = meta_data[sheet_name]
             sheet_record_identifier = sheet_meta_data['record_identifier']
             sheet_data_frame = report_wb.get_sheet(sheet_name)
-            sheet_columns = sheet_data_frame.columns.tolist()
-
+            # sheet_columns = sheet_data_frame.columns.tolist()
+            sheet_columns = list(sheet_data_frame.keys())
+            
             selected_properties = request_column_selection(f"Select columns for '{sheet_name}' (comma-separated) or leave black:", sheet_columns)
             if not selected_properties:
                 continue    # Skip sheet if not columns selected
@@ -115,7 +116,7 @@ def resolve_reports(db_manager: DatabaseManager):
             if sheet_record_identifier not in selected_properties:
                 selected_properties.insert(0, sheet_record_identifier)
 
-            for row in report_wb.get_sheet(sheet_name, cols=selected_properties, format=True).to_dict(orient='records'):
+            for row in report_wb.get_sheet(sheet_name, cols=selected_properties, format=True, orient='records'):
                 record_id = row[sheet_record_identifier]
                 db_manager.update_query(
                     sheet_meta_data['table'],

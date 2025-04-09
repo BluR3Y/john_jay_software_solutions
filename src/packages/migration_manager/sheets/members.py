@@ -32,7 +32,8 @@ def members_sheet_append(
     ft_manager = self.feedback_template_manager
     next_row = gt_manager.df[SHEET_NAME].shape[0] + 1
     grant_pln = grant_data['Project_Legacy_Number']
-    existing_data = ft_manager.find(SHEET_NAME, {"projectLegacyNumber": grant_pln}, return_one=True) or {}
+
+    existing_data = ft_manager.find(SHEET_NAME, {"projectLegacyNumber": grant_pln}, return_one=True, to_dict='records') or {}
     
     investigator_name = None
     investigator_role = None

@@ -37,11 +37,10 @@ def awards_sheet_append(
     grant_id = grant_data['Grant_ID']
     grant_pln = grant_data['Project_Legacy_Number']
     
-    existing_data = ft_manager.find(SHEET_NAME, {"projectLegacyNumber": grant_pln}, return_one=True) or {}
-    # proposal_sheet_entry = gt_manager.find("Proposal - Template", {"proposalLegacyNumber": grant_id}, return_one=True) or {}
-    proposal_sheet_entry_ref = gt_manager.find("Proposal - Template", { "proposalLegacyNumber": grant_id }, return_one=True, as_ref=True)
-    proposal_sheet_entry = proposal_sheet_entry_ref.replace([pd.NaT, np.nan], None).to_dict() if not proposal_sheet_entry_ref.empty else {}
-    
+    existing_data = ft_manager.find(SHEET_NAME, {"projectLegacyNumber": grant_pln}, return_one=True, to_dict='records') or {}
+    proposal_sheet_entry_ref = gt_manager.find("Proposal - Template", { "proposalLegacyNumber": grant_id }, return_one=True)
+    proposal_sheet_entry = gt_manager.formatDF(proposal_sheet_entry_ref).to_dict() if not proposal_sheet_entry_ref.empty else {}
+
     grant_status = grant_data['Status']
     grant_oar = proposal_sheet_entry.get('status')
     if not grant_oar:
@@ -200,28 +199,21 @@ def awards_sheet_append(
             grant_num_budget_periods = existing_num_budget_periods
             gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 49, 'warning', "Number of periods was determined using feedback file.")
     
-    grant_rate_cost_type = None
-    if grant_data['RIndir%DC']:
-        num_direct = float(grant_data['RIndir%DC'])
-        if num_direct:
-            grant_rate_cost_type = "Total Direct Costs (TDC)"
-        else:
-            existing_rate_cost_type = existing_data.get('Indirect Rate Cost Type')
-            if existing_rate_cost_type:
-                grant_rate_cost_type = existing_rate_cost_type
-                gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 36, "warning", "Cost Type was determined using feedback file.")
-        
-    if grant_data['RIndir%Per']:
-        num_wages = float(grant_data['RIndir%Per'])
-        if num_wages:
-            grant_rate_cost_type = "Salary and Wages (SW)"
-        else:
-            existing_rate_cost_type = existing_data.get('Indirect Rate Cost Type')
-            if existing_rate_cost_type:
-                grant_rate_cost_type = existing_rate_cost_type
-                gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 36, 'warning', "Cost Type was determined using feedback file.")
+    grant_rate_cost_type = proposal_sheet_entry.get('Indirect Rate Cost Type')
+    if not grant_rate_cost_type:
+        existing_rate_cost_type = existing_data.get('Indirect Rate Cost Type')
+        if existing_rate_cost_type:
+            grant_rate_cost_type = existing_rate_cost_type
+            gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 36, 'warning', "Cost Type was determined using feedback file")
     
-    grant_idc_rate = round((float(grant_data['RIndir%DC']) if grant_rate_cost_type == "Total Direct Costs (TDC)" else (float(grant_data['RIndir%Per']) if grant_rate_cost_type == "Salary and Wages (SW)" else 0)) * 100, 1)
+    grant_idc_rate = proposal_sheet_entry.get('IDC Rate Less OnCampus Rate')
+    if not grant_idc_rate:
+        if grant_rate_cost_type:
+            grant_idc_rate = round((float(grant_data['RIndir%DC']) if grant_rate_cost_type == "Total Direct Costs (TDC)" else (float(grant_data['RIndir%Per']) if grant_rate_cost_type == "Salary and Wages (SW)" else 0)) * 100, 1)
+        elif existing_data.get('IDC Rate'):
+            grant_idc_rate = existing_data.get('IDC Rate')
+            gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 37, 'warning', "IDC Rate was determined using feedback file")
+
     grant_idc_cost_type_explain = grant_data['Indirect_Deviation']
     if not grant_idc_cost_type_explain:
         existing_cost_explain = existing_data.get('IDC Cost Type Explain')

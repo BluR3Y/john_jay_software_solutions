@@ -34,17 +34,35 @@ class WorkbookManager:
         # Initialize an instance of the Comment Manager
         self.property_manager = PropertyManager(read_file_path, self.df.keys())
 
-    def get_sheet(self, sheet_name: str, cols: list[str] = None, format = False):
+    def formatDF(self, df: Union[pd.DataFrame, pd.Series]) -> Union[pd.DataFrame, pd.Series]:
+        """
+        Replace NaT and NaN with None, and convert datetime columns or values to Python datetime objects.
+        Works for both Series and DataFrame inputs.
+        """
+        df = df.replace({pd.NaT: None, np.nan: None})
+
+        if isinstance(df, pd.Series):
+            # Convert datetime Series to Python datetimes
+            if pd.api.types.is_datetime64_any_dtype(df):
+                df = df.apply(lambda x: x.to_pydatetime() if pd.notnull(x) else None)
+            return df
+        
+        for col in df.select_dtypes(include=["datetime64[ns]"]):
+            df[col] = df[col].apply(lambda x: x.to_pydatetime() if pd.notnull(x) else None)
+        return df
+
+    def get_sheet(self, sheet_name: str, cols: list[str] = None, format = False, orient:str = None):
+        if sheet_name not in self.df:
+            return None
+        
         cols = cols or []
         sheet_df = self.df[sheet_name][cols] if cols else self.df[sheet_name]
         sheet_df = sheet_df.copy()
 
         if format:
-            sheet_df = sheet_df.replace({pd.NaT: None, np.nan: None})
-            for col in sheet_df.select_dtypes(include=["datetime64[ns]"]):
-                sheet_df[col] = sheet_df[col].apply(lambda x: x.to_pydatetime() if pd.notnull(x) else None)
-        return sheet_df
-    #     return sheet_df.to_dict(orient='records')
+            sheet_df = self.formatDF(sheet_df)
+        
+        return sheet_df.to_dict(orient) if orient else sheet_df.to_dict()
 
     def create_sheet(self, sheet_name: str, sheet_columns: list):
         if sheet_name in self.df.keys():
@@ -78,7 +96,7 @@ class WorkbookManager:
         matching_indices = sheet_df.index[sheet_df.apply(lambda row: row.equals(obj), axis=1)]
         return matching_indices.tolist()
 
-    def update_cell(self, process: str, sheet: str, row: Union[int, pd.Series], col: Union[int, str], new_val):
+    def update_cell(self, process: str, sheet: str, row: Union[int, pd.Series], col: Union[int, str], new_val) -> pd.Series:
         """Update a specific cell in a given sheet and log the change."""
 
         if sheet not in self.df:
@@ -136,8 +154,19 @@ class WorkbookManager:
                 return False
         return True
     
-    def find(self, sheet_name: str, conditions: dict, return_one: bool = False, as_ref: bool = False):
-        """Retreive rows from the given sheet matching conditions."""
+    def find(self, sheet_name: str, conditions: dict, return_one: bool = False, to_dict: str = None):
+        """
+        Retrieve rows from a specified sheet in the workbook that match the given column-value conditions.
+
+        Args:
+            sheet_name (str): Name of the sheet to query.
+            conditions (dict): Dictionary of {column: value} to filter the DataFrame.
+            return_one (bool, optional): If True, return only the first matching row. Defaults to False.
+            to_dict (str, optional): If provided, converts result to dictionary using the specified orientation (e.g., 'records').
+
+        Returns:
+            pd.DataFrame, dict, or None: Filtered result(s), format depending on `return_one` and `to_dict`.
+        """
         
         if sheet_name not in self.df:
             raise ValueError(f"The sheet '{sheet_name}' was not found in the workbook.")
@@ -159,11 +188,17 @@ class WorkbookManager:
         if filtered_rows.empty:
             return None
         
-        # Replace NaN and NaT with None
-        # filtered_rows = filtered_rows.replace([pd.NaT, np.nan], None)     #Major Issue with series_indices
+        formatted = self.formatDF(filtered_rows)
         
-        # return filtered_rows.iloc[0].to_dict() if return_one else filtered_rows.to_dict(orient="records")
-        return (filtered_rows.iloc[0] if as_ref else filtered_rows.iloc[0].replace([pd.NaT, np.nan], None).to_dict()) if return_one else (filtered_rows if as_ref else filtered_rows.replace([pd.NaT, np.nan], None).to_dict(orient="records"))
+        if to_dict:
+            formatted = formatted.to_dict(orient=to_dict)
+        
+        if return_one:
+            return formatted[0] if isinstance(formatted, list) else formatted.iloc[0]
+        
+        return formatted
+
+        # return (filtered_rows.iloc[0] if as_ref else filtered_rows.iloc[0].replace([pd.NaT, np.nan], None).to_dict()) if return_one else (filtered_rows if as_ref else filtered_rows.replace([pd.NaT, np.nan], None).to_dict(orient="records"))
     
     def save_changes(self, write_file_path: str, index=False):
         """

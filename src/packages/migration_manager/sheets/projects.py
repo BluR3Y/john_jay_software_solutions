@@ -37,9 +37,8 @@ def projects_sheet_append(self: "MigrationManager", grant_data: dict):
     grant_pln = grant_data['Project_Legacy_Number']
     if not grant_pln:
         gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 0, "error", "Grant is missing Project Legacy Number")
+    existing_data = ft_manager.find(SHEET_NAME, {"projectLegacyNumber": grant_pln}, return_one=True, to_dict="records") or {}
 
-    existing_data = ft_manager.find(SHEET_NAME, {"projectLegacyNumber": grant_pln}, return_one=True) or {}
-    
     grant_title = grant_data['Project_Title']
     if not grant_title:
         gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 1, "error", "Grant is missing Project Title in database.")        

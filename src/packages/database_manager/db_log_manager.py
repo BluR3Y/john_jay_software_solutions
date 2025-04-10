@@ -10,6 +10,12 @@ class DatabaseLogManager(LogManager):
         
         # Call the parent class constructor
         super().__init__(log_file_path)
+
+    def get_runtime_dates(self):
+        return super().get_runtime_dates()
+    
+    def get_runtime_logs(self, date):
+        return super().get_runtime_logs(date)
         
     # def append_log(self, process: str, table: str, row_identifier: str, rows: dict, updates: dict):
     #     logs = dict()

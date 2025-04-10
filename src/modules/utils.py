@@ -3,16 +3,6 @@ from bs4 import BeautifulSoup
 import rapidfuzz
 import re
 
-# def request_file_path(requestStr: str, validTypes: list[str]):
-#     path = input(requestStr + ': ')
-#     if os.path.isfile(path):
-#         fileType = os.path.splitext(path)[1]
-#         if fileType in validTypes:
-#             return path
-#         else:
-#             raise Exception(f"The provided file has the extension {fileType} which is not a valid type for this request")
-#     else:
-#         raise Exception("The file does not exist at the provided path")
 def request_file_path(requestStr: str, validTypes: list[str]):
     if not validTypes:
         raise ValueError("No file extensions were provided.")
@@ -29,58 +19,70 @@ def request_file_path(requestStr: str, validTypes: list[str]):
         raise ValueError(f"The provided file has the extension {file_type} which is not a valid type for this request.")
     
     return selected_path
-    
-# def find_closest_match(input: str, string_list: list[str], threshold:int = 80, case_sensitive: bool = True):
-#     if not isinstance(input, str):
-#         raise ValueError("The input must be a string.")
-    
-#     if not isinstance(string_list, list) or not all(isinstance(s, str) for s in string_list):
-#         raise ValueError("string_list must be a list of strings.")
-    
-#     # Use rapidfuzz.process to calculate similarity scores for all strings
-#     matches = rapidfuzz.process.extract(input if case_sensitive else input.lower(), string_list if case_sensitive else [item.lower() for item in string_list], scorer=rapidfuzz.fuzz.ratio, score_cutoff=threshold)
-    
-#     if not matches:
-#         return None
-    
-#     # Extract the best match
-#     best_match, best_score, best_index = max(matches, key=lambda x: x[1])
-#     return string_list[best_index]
 
-def request_user_selection(requestStr: str, validSelections: list[str]) -> str:
+# def request_user_selection(requestStr: str, validSelections: list[str]) -> str:
+#     selection_str = ""
+#     for index, selection in enumerate(validSelections):
+#         selection_str += f"\t{index}) - {selection}\n"
+#     user_input = input(f"{requestStr}\n{selection_str}")
+#     if user_input:
+#         if user_input.isdigit():
+#             numeric_selection = int(user_input)
+#             if numeric_selection < len(validSelections):
+#                 return validSelections[numeric_selection]
+#             else:
+#                 raise Exception(f"{numeric_selection} is not a valid numeric selection.")
+#         else:
+#             if user_input in validSelections:
+#                 return user_input
+#             else:
+#                 raise Exception(f"{user_input} is not a valid selection.")
+#     else:
+#         raise Exception("Did not make a selection. Is required to continue.")
+
+def single_select_input(requestStr: str, selections: list[str]) -> str:
+    if not len(selections):
+        raise ValueError("Selections list can't be empty")
+    elif len(selections) == 1:
+        return selections[1]
+    
     selection_str = ""
-    for index, selection in enumerate(validSelections):
-        selection_str += f"\t{index}) - {selection}\n"
+    for index, item in enumerate(selections):
+        selection_str += f"\t{index}) - {item}\n"
     user_input = input(f"{requestStr}\n{selection_str}")
-    if user_input:
-        if user_input.isdigit():
-            numeric_selection = int(user_input)
-            if numeric_selection < len(validSelections):
-                return validSelections[numeric_selection]
-            else:
-                raise Exception(f"{numeric_selection} is not a valid numeric selection.")
-        else:
-            if user_input in validSelections:
-                return user_input
-            else:
-                raise Exception(f"{user_input} is not a valid selection.")
-    else:
+
+    if not user_input:
         raise Exception("Did not make a selection. Is required to continue.")
     
-def request_column_selection(requestStr: str, valid_columns: list[str]) -> list[str]:
-    input_str = " | ".join(valid_columns) + f"\n{requestStr} "
+    if user_input.isdigit():
+        numeric_selection = int(user_input)
+        if numeric_selection >= len(selections):
+            raise ValueError(f"{numeric_selection} is not a valid numeric selection.")
+        return selections[numeric_selection]
+    else:
+        if user_input not in selection_str:
+            raise ValueError(f"{user_input} is not a valid selection.")
+        return user_input
+
+def multi_select_input(requestStr: str, selections: list[str]) -> list[str]:
+    if not len(selections):
+        raise ValueError("Columns list can't be empty")
+    elif len(selections) == 1:
+        return selections
+    
+    input_str = " | ".join(selections) + f"\n{requestStr} "
     user_input = input(input_str)
     selected_properties = []
-    
+
     if not user_input:
         return selected_properties
-    # selected_properties = [col.strip() for col in user_input.split(',')] if user_input else []
-
+    elif user_input == "all":
+        return selections
+    
     for prop in user_input.split(','):
         formatted_prop = prop.strip()
-        if formatted_prop not in valid_columns:
+        if formatted_prop not in selections:
             raise ValueError(f"The column '{formatted_prop}' does not exist in the table.")
-        
         selected_properties.append(formatted_prop)
     return selected_properties
 
@@ -154,3 +156,15 @@ def get_valid_filename() -> str:
         if file_name and not any(char in file_name for char in r'\/:*?"<>|'):
             return file_name
         print("Invalid file name, try again.\n")
+
+def request_user_confirmation(requestStr: str) -> bool:
+    if not len(requestStr):
+        raise ValueError("requestStr can't be empty.")
+    
+    user_input = input(requestStr).capitalize()
+    if not user_input:
+        return False
+    elif user_input not in ["Yes",'Y','N',"No"]:
+        raise ValueError("Invalid input for confirmation")
+    
+    return user_input[0] == "Y"

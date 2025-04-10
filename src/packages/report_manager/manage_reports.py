@@ -2,7 +2,7 @@ import os
 import numpy as np
 import pandas as pd
 
-from modules.utils import request_user_selection, request_file_path, request_column_selection
+from modules.utils import request_file_path, multi_select_input, single_select_input
 from . import ReportGenerator
 from packages.database_manager import DatabaseManager
 from packages.workbook_manager import WorkbookManager
@@ -16,11 +16,11 @@ def generate_reports(db_manager: DatabaseManager):
         while True:
             try:
                 if report_generator.get_num_reports():
-                    selected_action = request_user_selection("Enter a next step:", ["Generate another report", "Save and Exit"])
+                    selected_action = single_select_input("Enter a next step:", ["Generate another report", "Save and Exit"])
                     if selected_action == "Save and Exit":
                         break
                     
-                selected_table = request_user_selection("Enter the name of the table whose records will be used to populate the report:", db_tables)
+                selected_table = single_select_input("Enter the name of the table whose records will be used to populate the report:", db_tables)
                 table_columns = db_manager.get_table_columns(selected_table)
                 record_identifier = list(table_columns.keys())[0]
                 
@@ -40,7 +40,7 @@ def generate_reports(db_manager: DatabaseManager):
                 print(f"Search returned {len(record_ids)} records.")
                 
                 if record_ids:
-                    selected_properties = request_column_selection(f"Input the columns in the '{selected_table}' table that will be used to populate the report.", table_columns)
+                    selected_properties = multi_select_input(f"Input the columns in the '{selected_table}' table that will be used to populate the report.", table_columns)
                     if not selected_properties:
                         raise ValueError("Failed to provide table columns.")
                     if record_identifier not in selected_properties:
@@ -103,7 +103,7 @@ def resolve_reports(db_manager: DatabaseManager):
             # sheet_columns = sheet_data_frame.columns.tolist()
             sheet_columns = list(sheet_data_frame.keys())
             
-            selected_properties = request_column_selection(f"Select columns for '{sheet_name}' (comma-separated) or leave black:", sheet_columns)
+            selected_properties = multi_select_input(f"Select columns for '{sheet_name}' (comma-separated) or leave black:", sheet_columns)
             if not selected_properties:
                 continue    # Skip sheet if not columns selected
 
@@ -143,7 +143,7 @@ def manage_reports(db_path: str):
     with DatabaseManager(db_path, PROCESS_NAME) as db_manager:
         print(f"Current Process: {PROCESS_NAME}")
         while True:
-            user_selection = request_user_selection("Select a Report Manager Action:", ["Generate Reports", "Resolve Reports", "Exit Process"])
+            user_selection = single_select_input("Select a Report Manager Action:", ["Generate Reports", "Resolve Reports", "Exit Process"])
 
             if user_selection == "Generate Reports":
                 generate_reports(db_manager)

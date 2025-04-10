@@ -18,8 +18,10 @@ class DatabaseManager:
         self.process = process
         self.connection = None
         self.cursor = None
+        
         log_file_dir = os.path.dirname(db_path)
-        self.log_manager = DatabaseLogManager(os.path.join(log_file_dir, "database_logs.json"))
+        file_name = os.path.basename(db_path).split('.')[0]
+        self.log_manager = DatabaseLogManager(os.path.join(log_file_dir, f"{file_name}_db_logs.json"))
         
     # Only envoked when using "with"(context manager)
     def __enter__(self):
@@ -135,7 +137,8 @@ class DatabaseManager:
                 query_vals = [values['new_value'] for values in changing_fields.values()]
 
                 self.cursor.execute(query_str, [*query_vals, row_id])
-                self.log_manager.append_runtime_log(self.process, {row_id: changing_fields})
+                # self.log_manager.append_runtime_log(self.process, {row_id: changing_fields})
+                self.log_manager.append_runtime_log(self.process, {table:{row_id: changing_fields}})
             self.connection.commit()
         except ValueError as err:
             if self.connection:

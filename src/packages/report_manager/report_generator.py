@@ -3,7 +3,7 @@ import pandas as pd
 import openpyxl
 
 from packages.workbook_manager import WorkbookManager
-from modules.utils import request_user_selection, get_valid_filename
+from modules.utils import single_select_input, get_valid_filename
 
 class ReportGenerator:
     process_name = "Report Generator"
@@ -29,7 +29,7 @@ class ReportGenerator:
         }
         
         if os.path.exists(os.path.join(save_path["dir_path"], f"{save_path['file_name']}.xlsx")):
-            user_action = request_user_selection(f"A report currently exists with the name '{save_path['file_name']}'. Choose an action to take: ", ["Choose new file name", "Append to existing file", "Overwrite file"])
+            user_action = single_select_input(f"A report currently exists with the name '{save_path['file_name']}'. Choose an action to take: ", ["Choose new file name", "Append to existing file", "Overwrite file"])
             if user_action == "Choose new file name":
                 save_path['file_name'] = get_valid_filename()
             elif user_action == "Append to existing file":

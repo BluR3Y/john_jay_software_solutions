@@ -8,18 +8,19 @@ import pandas as pd
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
 from dotenv import load_dotenv
-from modules.utils import request_user_selection
+from modules.utils import single_select_input
 from packages.report_manager import manage_reports
 
-from packages.database_manager import DatabaseManager
 from packages.migration_manager import manage_migration
+from packages.database_manager import manage_database
 
 # Run the program
 if __name__ == "__main__":
     user_actions = {
         "Fix Template": None,
         "Manage Reports": manage_reports,
-        "Generate Template": manage_migration
+        "Generate Template": manage_migration,
+        "Manage Database": manage_database
     }
     
     # Initialize the argument parser
@@ -56,7 +57,7 @@ if __name__ == "__main__":
         process_script(db_path)
     else:
         while True:
-            user_selection = request_user_selection("Select an action:", [*user_actions.keys(), "Exit Program"])
+            user_selection = single_select_input("Select an action:", [*user_actions.keys(), "Exit Program"])
             if user_selection == "Exit Program":
                 break
             

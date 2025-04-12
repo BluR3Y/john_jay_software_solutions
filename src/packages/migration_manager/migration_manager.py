@@ -55,6 +55,10 @@ class MigrationManager:
             self.ORG_CENTERS = json.load(f)
         with open(config_folder_path / 'john_jay_external_orgs.json') as f:
             self.ORGANIZATIONS = json.load(f)
+        self.ALL_ORGS = {
+            **self.ORGANIZATIONS['existing_external_orgs'],
+            **self.ORGANIZATIONS['non_existing_external_orgs']
+        }
 
         # Retrieve Instrument/Activity Types
         with open(config_folder_path / 'associated_data.json', 'r') as f:

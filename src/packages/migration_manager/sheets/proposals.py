@@ -1,5 +1,5 @@
 from typing import TYPE_CHECKING
-from modules.utils import find_closest_match, extract_titles
+from modules.utils import find_closest_match, extract_titles, reverse_dict_search
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 
@@ -49,29 +49,26 @@ def determine_instrument_type(instance, type):
     closest_valid_type = find_closest_match(type_title, valid_types, case_sensitive=False)
     return closest_valid_type
     
-def determine_sponsor(instance, sponsor):    
-    all_orgs = {
-        **instance.ORGANIZATIONS['existing_external_orgs'],
-        **instance.ORGANIZATIONS['non_existing_external_orgs']
-    }
+def determine_sponsor(instance, sponsor) -> tuple[str,str]:    
+    all_orgs = instance.ALL_ORGS
     inverse_orgs = {props.get('Alt Name'): name for name, props in all_orgs.items() if props.get('Alt Name')}
     org_primary_names = list(all_orgs.keys())
     org_alt_names = list(inverse_orgs.keys())
     
     # First, check if the sponsor is an exact match in primary or alternate orgs
     if sponsor in org_primary_names:
-        return all_orgs[sponsor]["Primary Code"]
+        return sponsor, all_orgs[sponsor]["Primary Code"]
     
     closest_valid_sponsor = find_closest_match(sponsor, org_primary_names, case_sensitive=False)
     if closest_valid_sponsor:
-        return all_orgs[closest_valid_sponsor]["Primary Code"]
+        return closest_valid_sponsor, all_orgs[closest_valid_sponsor]["Primary Code"]
     
     if sponsor in org_alt_names:
-        return all_orgs[inverse_orgs[sponsor]]["Primary Code"]
+        return sponsor, all_orgs[inverse_orgs[sponsor]]["Primary Code"]
     
     closest_valid_sponsor = find_closest_match(sponsor, org_alt_names, case_sensitive=False)
     if closest_valid_sponsor:
-        return all_orgs[inverse_orgs[closest_valid_sponsor]]["Primary Code"]
+        return closest_valid_sponsor, all_orgs[inverse_orgs[closest_valid_sponsor]]["Primary Code"]
     
     # Extract titles and attempt title-based matching
     titles = extract_titles(sponsor)
@@ -187,35 +184,37 @@ def proposals_sheet_append(
     else:
         gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 5, 'error', "Grant is missing Instrument_Type in database.")
     
-    grant_sponsor = None
+    grant_sponsor_name = None
+    grant_sponsor_code = None
     if grant_data['Sponsor_1']:
         try:
-            determined_sponsor = determine_sponsor(self, grant_data['Sponsor_1'])
-            if not determined_sponsor:
+            determined_sponsor_name, determined_sponsor_code = determine_sponsor(self, grant_data['Sponsor_1'])
+            if not determined_sponsor_code:
                 raise ValueError(f"Grant has invalid Sponsor_1 in database: {grant_data['Sponsor_1']}")
-            grant_sponsor = determined_sponsor
+            grant_sponsor_name = determined_sponsor_name
+            grant_sponsor_code = determined_sponsor_code
         except Exception as err:
             gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 6, 'error', err)
     else:
         gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 6, 'warning', "Grant does not have a Sponsor_1 in database.")
-    if not grant_sponsor:
+    if not grant_sponsor_code:
         existing_sponsor = existing_data.get('Sponsor')
         if existing_sponsor:
-            grant_sponsor = existing_sponsor
+            grant_sponsor_code = existing_sponsor
             gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 6, "notice", "Sponsor was retrieved from template file")
         elif (grant_data['Sponsor_1']):
-            grant_sponsor = grant_data['Sponsor_1']
+            grant_sponsor_code = grant_data['Sponsor_1']
             gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 6, "warning", "Sponsor does not exist in external orgs sheet.")
     
     if not grant_instrument_type:
         str_id = str(grant_data['RF_Account'])
         if str_id.startswith('6'):
             grant_instrument_type = "PSC CUNY"
-        elif grant_sponsor == 'CUNY':
+        elif grant_sponsor_code == 'CUNY':
             grant_instrument_type = 'CUNY Internal'
-        elif grant_sponsor.startswith('NYC') or grant_sponsor.startswith('NYS'):
+        elif grant_sponsor_code.startswith('NYC') or grant_sponsor_code.startswith('NYS'):
             grant_instrument_type = "NYC/NYS MOU - Interagency Agreement"
-        elif grant_sponsor == 'NSF' or grant_sponsor == 'JJCOAR':
+        elif grant_sponsor_code == 'NSF' or grant_sponsor_code == 'JJCOAR':
             grant_instrument_type = "Grant"
         else:
             existing_instrument_type = existing_data.get('Instrument Type')
@@ -230,22 +229,23 @@ def proposals_sheet_append(
         #     )
         #     print(f"Updated Instrument Type to '{grant_instrument_type}' for grant:{grant_id}")
 
-    grant_prime_sponsor = None
+    grant_prime_sponsor_name = None
+    grant_prime_sponsor_code = None
     if grant_data['Sponsor_2']:
         try:
-            determined_prime_sponsor = determine_sponsor(self, grant_data['Sponsor_2'])
-            if not determined_prime_sponsor:
+            determined_prime_sponsor_name, determined_prime_sponsor_code = determine_sponsor(self, grant_data['Sponsor_2'])
+            if not determined_prime_sponsor_code:
                 raise ValueError(f"Grant has invalid Sponsor_2 in database: {grant_data['Sponsor_2']}")
-            grant_prime_sponsor = determined_prime_sponsor
+            grant_prime_sponsor_code = determined_prime_sponsor_code
         except Exception as err:
             gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 7, 'error', err)
-    if not grant_prime_sponsor:
+    if not grant_prime_sponsor_code:
         existing_prime_sponsor = existing_data.get('Prime Sponsor')
         if existing_prime_sponsor:
-            grant_prime_sponsor = existing_prime_sponsor
+            grant_prime_sponsor_code = existing_prime_sponsor
             gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 7, "notice", "Sponsor was retrieved from template file")
         elif (grant_data['Sponsor_2']):
-            grant_prime_sponsor = grant_data['Sponsor_2']
+            grant_prime_sponsor_code = grant_data['Sponsor_2']
             
     grant_title = project_sheet_entry.get('title')
     grant_start_date = grant_data['Start_Date'] or grant_data['Start_Date_Req']
@@ -255,7 +255,7 @@ def proposals_sheet_append(
         if existing_start_date:
             grant_start_date = existing_start_date
             gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 9, "notice", "Start Date was retrieved from template file")
-        elif (("OAR" or " oar " in grant_title) or (grant_sponsor == "JJCOAR") and grant_data['Status_Date']):
+        elif (("OAR" or " oar " in grant_title) or (grant_sponsor_code == "JJCOAR") and grant_data['Status_Date']):
             grant_start_date = grant_data['Status_Date']
             # log
         # if (grant_start_date):
@@ -275,7 +275,7 @@ def proposals_sheet_append(
         if existing_end_date:
             grant_end_date = existing_end_date
             gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 10, "notice", "End Date was retrieved from template file")
-        elif (("OAR" or " oar " in grant_title) or (grant_sponsor == "JJCOAR") and grant_data['Status_Date']):
+        elif (("OAR" or " oar " in grant_title) or (grant_sponsor_code == "JJCOAR") and grant_data['Status_Date']):
             grant_end_date = grant_data['Status_Date']
         # if (grant_end_date):
         #     self.db_manager.update_query(
@@ -304,7 +304,7 @@ def proposals_sheet_append(
             gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 11, "notice", "Award Type was retrieved from template file")
         elif grant_instrument_type == 'PSC CUNY' or grant_instrument_type == 'CUNY Internal':
             grant_activity_type = 'Research on Campus'
-        elif grant_sponsor == 'JJCOAR' or grant_sponsor == 'NSF' or grant_sponsor == 'NEH':
+        elif grant_sponsor_code == 'JJCOAR' or grant_sponsor_code == 'NSF' or grant_sponsor_code == 'NEH':
             grant_activity_type = 'Research on Campus'
 
     grant_discipline = None
@@ -368,7 +368,7 @@ def proposals_sheet_append(
             gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 17, 'notice', "Rate Cost Type Explanation retrieved from template file.")
             
     grant_total_direct_cost = round(sum(map(lambda fund: fund['RIAmount'], rifunds_data)))
-    grant_sponsor_cost = round(sum(map(lambda fund: fund['RAmount'], total_data)))
+    grant_sponsor_code_cost = round(sum(map(lambda fund: fund['RAmount'], total_data)))
     
     grant_has_subrecipient = "Yes" if grant_data['Subrecipient_1'] else "No"
     grant_has_human_subjects = "Yes" if grant_data['Human Subjects'] else "No"
@@ -438,7 +438,10 @@ def proposals_sheet_append(
     #             "Grant_ID": grant_id
     #         }
     #     )
-            
+
+    Tester_1 = reverse_dict_search({"Primary Code": grant_sponsor_code},self.ALL_ORGS)
+    Tester_2 = reverse_dict_search({"Primary Code": grant_prime_sponsor_code},self.ALL_ORGS)
+    print(Tester_1,Tester_2)
     
     self.generated_template_manager.append_row(
         SHEET_NAME, {
@@ -448,8 +451,8 @@ def proposals_sheet_append(
             "OAR Status": grant_oar,
             "CUNY Campus": grant_primary_college,
             "Instrument Type": grant_instrument_type,
-            "Sponsor": grant_sponsor,
-            "Prime Sponsor": grant_prime_sponsor,
+            "Sponsor": grant_sponsor_code,
+            "Prime Sponsor": grant_prime_sponsor_code,
             "Title": grant_title,
             "Project Start Date": grant_start_date,
             "Project End Date": grant_end_date,
@@ -460,9 +463,9 @@ def proposals_sheet_append(
             "Indirect Rate Cost Type": grant_rate_cost_type,
             "IDC Rate": grant_idc_rate,
             "IDC Cost Type Explanation": grant_idc_cost_type_explain,
-            "Total Total Total Direct Cost (TDC) (TDC)s": round(grant_sponsor_cost - grant_total_direct_cost),
+            "Total Total Total Direct Cost (TDC) (TDC)s": round(grant_sponsor_code_cost - grant_total_direct_cost),
             "Total InTotal Total Direct Cost (TDC) (TDC)s": grant_total_direct_cost,
-            "Total Sponsor Costs": grant_sponsor_cost,
+            "Total Sponsor Costs": grant_sponsor_code_cost,
             "IDC Rate Less OnCampus Rate": grant_idc_rate_less_on_campus_rate,
             "Reassigned Time YN": reassigned_time_yn,
             "Reassigned Time Details": reassigned_time_details,
@@ -477,6 +480,8 @@ def proposals_sheet_append(
             "Submission Date": grant_submit_date,
             "Admin Unit Name": grant_admin_unit_name,
             "Admin Unit Code": grant_admin_unit_code,
-            "John Jay Centers": grant_admin_unit_center
+            "John Jay Centers": grant_admin_unit_center,
+            "Tester_1": Tester_1,
+            "Tester 2": Tester_2
         }
     )

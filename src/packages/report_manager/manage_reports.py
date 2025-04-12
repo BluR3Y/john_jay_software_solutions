@@ -24,20 +24,29 @@ def generate_reports(db_manager: DatabaseManager):
                 table_columns = db_manager.get_table_columns(selected_table)
                 record_identifier = list(table_columns.keys())[0]
                 
-                selected_search_conditions = input("WHERE: ")
-                if not selected_search_conditions:
-                    raise ValueError("Failed to provide query search conditions")
-                
-                formatted_search_conditions = db_manager.parse_sql_condition(selected_search_conditions)
-                print(f"Developer Info: {formatted_search_conditions}")
-                
-                search_result = db_manager.select_query(
-                    selected_table,
-                    [record_identifier],
-                    selected_search_conditions
-                )
-                record_ids = [item[record_identifier] for item in search_result]
-                print(f"Search returned {len(record_ids)} records.")
+                record_ids = None
+                # From file or query
+                source_conditions = single_select_input("Select source for search conditions:", ["Conditions Query","Identifier File"])
+                if source_conditions == "Conditions Query":
+                    search_query = input("WHERE: ")
+                    if not search_query:
+                        raise ValueError("Failed to provide search query")
+                    
+                    formatted_query = db_manager.parse_sql_condition(search_query)
+                    print(f"Developer Info: {formatted_query}")
+
+                    search_result = db_manager.select_query(
+                        selected_table,
+                        [record_identifier],
+                        formatted_query
+                    )
+                    record_ids = [item[record_identifier] for item in search_result]
+                else:
+                    conditions_path = request_file_path("Input the path of the text file with record ids:", [".txt"])
+                    with open(conditions_path, 'r') as conditions_file:
+                        ids = conditions_file.read().split(',')
+                    record_ids = ids
+                print(f"Search returned {len(record_ids)} records")
                 
                 if record_ids:
                     selected_properties = multi_select_input(f"Input the columns in the '{selected_table}' table that will be used to populate the report.", table_columns)
@@ -69,8 +78,8 @@ def generate_reports(db_manager: DatabaseManager):
                     selected_report_name = input("What would you like to name this report: ")
                     if not selected_report_name:
                         raise ValueError("Failed to provide a report name.")
-                    
-                    report_generator.append_report(selected_report_name, selected_table, record_identifier, formatted_search_conditions, report_data)
+                    query_condition = search_query if source_conditions == "Conditions Query" else {record_identifier:{"operator":"IN","value":record_ids}}
+                    report_generator.append_report(selected_report_name, selected_table, record_identifier,query_condition, report_data)
             except ValueError as err:
                 print(f"Validation Error: {err}")
             except Exception as err:

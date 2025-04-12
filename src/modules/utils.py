@@ -168,3 +168,11 @@ def request_user_confirmation(requestStr: str) -> bool:
         raise ValueError("Invalid input for confirmation")
     
     return user_input[0] == "Y"
+
+def reverse_dict_search(condition: dict, items: dict):
+    for key, props in items.items():
+        for search_key, search_prop in condition.items():
+            if props.get(search_key) != search_prop:
+                break
+        else:
+            return key

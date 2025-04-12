@@ -4,6 +4,7 @@ import warnings
 import pandas as pd
 # from packages.workbook_manager.workbook_manager import WorkbookManager
 # from packages.workbook_manager.series_ref import SeriesRef
+from packages.attachment_manager.index import AttachmentManager
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
@@ -41,6 +42,8 @@ if __name__ == "__main__":
     # parser.add_argument('--process', '-p', action="append", help='Add process to call.')
     # parser.add_argument('--dev', action='store_true', help="Run process in developer mode.")
     
+    aws_manager = AttachmentManager()
+
     # Parse the arguments
     args = parser.parse_args()
     

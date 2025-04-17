@@ -3,7 +3,8 @@ import os
 import datetime
 from typing import Union
 
-from . import DatabaseLogManager, destruct_query_conditions, parse_sql_condition
+from . import destruct_query_conditions, parse_sql_condition
+from packages.log_manager import LogManager
 
 class DatabaseManager:
     def __init__(self, db_path: str, process: str):
@@ -21,7 +22,7 @@ class DatabaseManager:
         
         log_file_dir = os.path.dirname(db_path)
         file_name = os.path.basename(db_path).split('.')[0]
-        self.log_manager = DatabaseLogManager(os.path.join(log_file_dir, f"{file_name}_db_logs.json"))
+        self.log_manager = LogManager(os.path.join(log_file_dir, f"{file_name}_db_logs.json"))
         
     # Only envoked when using "with"(context manager)
     def __enter__(self):
@@ -137,7 +138,6 @@ class DatabaseManager:
                 query_vals = [values['new_value'] for values in changing_fields.values()]
 
                 self.cursor.execute(query_str, [*query_vals, row_id])
-                # self.log_manager.append_runtime_log(self.process, {row_id: changing_fields})
                 self.log_manager.append_runtime_log(self.process, {table:{row_id: changing_fields}})
             self.connection.commit()
         except ValueError as err:

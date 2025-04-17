@@ -5,11 +5,12 @@ from pathlib import Path
 from datetime import datetime
 from packages.workbook_manager import WorkbookManager
 from packages.database_manager import DatabaseManager
+from packages.file_manager import FileManager
 from . import projects_sheet_append, proposals_sheet_append, members_sheet_append, awards_sheet_append, attachments_sheet_append, retrieve_pi_info
 
 class MigrationManager:
     
-    def __init__(self, db_manager: DatabaseManager, read_file_path: str, save_path: str = None):
+    def __init__(self, db_manager: DatabaseManager, read_file_path: str):
         if not read_file_path:
             raise ValueError("A file path was not provided to the Workbook.")
         if not os.path.exists(read_file_path):
@@ -20,11 +21,14 @@ class MigrationManager:
         
         # Initialize an instance of the WorkbookManager class for the generated data
         self.generated_template_manager = WorkbookManager()
+
+        # Initialize an instance of the FileManager class for grant attachment files
+        self.attachment_manager = FileManager(os.getenv("SAVE_PATH"), os.getenv("ATTACHMENT_PATH"))
         
-        self.save_path = save_path
         self.db_manager = db_manager
     
     def __enter__(self):
+        self.attachment_manager.__enter__()
         self.retrieve_configs()
         self.retrieve_pi_info()
         self.retrieve_Disciplines()
@@ -34,9 +38,8 @@ class MigrationManager:
     def __exit__(self, exc_type, exc_value, traceback):
         current_time = datetime.now()
         formatted_time = current_time.strftime('%d_%m_%Y')
-        self.generated_template_manager.save_changes(os.path.join(self.save_path, f"generated_data_{formatted_time}.xlsx"))
-    
-
+        self.generated_template_manager.save_changes(os.path.join(os.getenv("SAVE_PATH"), f"generated_data_{formatted_time}.xlsx"))
+        self.attachment_manager.__exit__(exc_type, exc_value, traceback)
         
     def retrieve_configs(self):
         # Determine the path of the current module

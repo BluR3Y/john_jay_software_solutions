@@ -7,7 +7,6 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 from dotenv import load_dotenv
 from modules.utils import single_select_input
 from packages.report_manager import manage_reports
-from packages.file_manager import FileManager
 
 from packages.migration_manager import manage_migration
 from packages.database_manager import manage_database

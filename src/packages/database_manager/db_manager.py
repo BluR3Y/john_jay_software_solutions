@@ -22,7 +22,7 @@ class DatabaseManager:
         
         log_file_dir = os.path.dirname(db_path)
         file_name = os.path.basename(db_path).split('.')[0]
-        self.log_manager = LogManager(os.path.join(log_file_dir, f"{file_name}_db_logs.json"))
+        self.log_manager = LogManager(os.path.join(log_file_dir, f"{file_name}_db_logs.json")).__enter__()
         
     # Only envoked when using "with"(context manager)
     def __enter__(self):
@@ -33,7 +33,14 @@ class DatabaseManager:
     # Only envoked when using "with"(context manager)
     def __exit__(self, exc_type, exc_value, traceback):
         """Close the database connection when exiting the context."""
-        self.terminate_db_connection()
+        if self.connection:
+            try:
+                self.cursor.close()
+                self.connection.close()
+            except pyodbc.Error as err:
+                raise ConnectionError(f"An error occured while closing the database: {err}")
+        # Save logger changes
+        self.log_manager.__exit__(exc_type, exc_value, traceback)
         
     def init_db_connection(self):
         """Initialize the database connection."""
@@ -47,16 +54,16 @@ class DatabaseManager:
         except pyodbc.Error as err:
             raise ConnectionError(f"An error occured while connecting to database: {err}")
         
-    def terminate_db_connection(self):
-        """Terminate the database connection."""
-        if self.connection:
-            try:
-                self.cursor.close()
-                self.connection.close()
-            except pyodbc.Error as err:
-                raise ConnectionError(f"An error occured while closing the database: {err}")
-        # Save logger changes
-        self.log_manager.save_logs()
+    # def terminate_db_connection(self):
+    #     """Terminate the database connection."""
+    #     if self.connection:
+    #         try:
+    #             self.cursor.close()
+    #             self.connection.close()
+    #         except pyodbc.Error as err:
+    #             raise ConnectionError(f"An error occured while closing the database: {err}")
+    #     # Save logger changes
+    #     self.log_manager.__exit__()
         
     def get_db_tables(self):
         tables = []
@@ -128,22 +135,55 @@ class DatabaseManager:
                 raise ValueError("Could not find records that satisfied given parameters.")
             
             for row in affecting_rows:
-                changing_fields = {key:{"prev_value": row[key], "new_value": val} for key, val in cols.items() if (key in row and row[key] != val)}
-                if not changing_fields:
+                # changing_fields = {key:val for key, val in cols.items() if (key in row and row[key] != val)}
+                changing_properties = [key for key in cols.keys() if (key in row and row[key] != cols[key])]
+                if not len(changing_properties):
                     continue
 
                 row_id = row[table_row_identifier]
-                formatted_cols = ', '.join([f"{col} = ?" for col in changing_fields.keys()])
+                formatted_cols = ', '.join([f"{col} = ?" for col in changing_properties])
                 query_str = f"UPDATE {table} SET {formatted_cols} WHERE {table_row_identifier} = ?"
-                query_vals = [values['new_value'] for values in changing_fields.values()]
+                # query_vals = list(changing_fields.values())
+                query_vals = [cols[field] for field in changing_properties]
 
                 self.cursor.execute(query_str, [*query_vals, row_id])
-                self.log_manager.append_runtime_log(self.process, {table:{row_id: changing_fields}})
+                self.log_manager.append_runtime_log(self.process, "update", table, row_id, {prop: row[prop] for prop in changing_properties})
             self.connection.commit()
         except ValueError as err:
             if self.connection:
                 self.connection.rollback()
                 raise err
+
+
+    def delete_query(self, table: str, conditions: dict = None):
+        try:
+            if table not in self.get_db_tables():
+                raise ValueError(f"The table '{table}' does not exist in the database.")
+            if not conditions:
+                raise ValueError("No search conditions provided for deletion.")
+            
+            table_columns = self.get_table_columns(table)
+            record_identifier = list(table_columns.keys())[0]
+
+            affecting_rows = self.select_query(table=table, conditions=conditions)
+            if not affecting_rows:
+                raise ValueError(f"No records found in '{table}' matching conditions: {conditions}")
+            
+            for row in affecting_rows:
+                record_id = row[record_identifier]
+                properties = {k: v for k, v in row.items() if k != record_identifier}
+
+                query_str = f"DELETE FROM {table} WHERE {record_identifier} = ?"
+                self.cursor.execute(query_str, [record_id])
+                self.log_manager.append_runtime_log(self.process, "delete", table, record_id, properties)
+            self.connection.commit()
+        except Exception as err:
+            if self.connection:
+                try:
+                    self.connection.rollback()
+                except Exception as rollback_err:
+                    print("Rollback failed:", rollback_err)
+            raise err
                 
    # ** Caution: Deprecated
     def execute_query_legacy(self, query, *args):

@@ -23,7 +23,7 @@ class MigrationManager:
         self.generated_template_manager = WorkbookManager()
 
         # Initialize an instance of the FileManager class for grant attachment files
-        self.attachment_manager = FileManager(os.getenv("SAVE_PATH"), os.getenv("ATTACHMENT_PATH"))
+        self.attachment_manager = FileManager(os.getenv("SAVE_PATH"), os.getenv("ATTACHMENT_PATH")).__enter__()
         
         self.db_manager = db_manager
     

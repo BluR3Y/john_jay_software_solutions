@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 from modules.utils import find_closest_match, extract_titles, reverse_dict_search
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
@@ -49,7 +49,7 @@ def determine_instrument_type(instance, type):
     closest_valid_type = find_closest_match(type_title, valid_types, case_sensitive=False)
     return closest_valid_type
     
-def determine_sponsor(instance, sponsor) -> tuple[str,str]:    
+def determine_sponsor(instance, sponsor):    
     all_orgs = instance.ALL_ORGS
     inverse_orgs = {props.get('Alt Name'): name for name, props in all_orgs.items() if props.get('Alt Name')}
     org_primary_names = list(all_orgs.keys())
@@ -75,18 +75,18 @@ def determine_sponsor(instance, sponsor) -> tuple[str,str]:
 
     for title in titles:
         if title in org_primary_names:
-            return all_orgs[title]["Primary Code"]
+            return title, all_orgs[title]["Primary Code"]
         
         closest_valid_sponsor = find_closest_match(title, org_primary_names, case_sensitive=False)
         if closest_valid_sponsor:
-            return all_orgs[closest_valid_sponsor]["Primary Code"]
+            return closest_valid_sponsor, all_orgs[closest_valid_sponsor]["Primary Code"]
         
         if title in org_alt_names:
-            return all_orgs[inverse_orgs[title]]["Primary Code"]
+            return title, all_orgs[inverse_orgs[title]]["Primary Code"]
         
         closest_valid_sponsor = find_closest_match(title, org_alt_names, case_sensitive=False)
         if closest_valid_sponsor:
-            return all_orgs[inverse_orgs[closest_valid_sponsor]]["Primary Code"]
+            return closest_valid_sponsor, all_orgs[inverse_orgs[closest_valid_sponsor]]["Primary Code"]
 
 def determine_activity_type(instance, type, on_site):
     activity_types = instance.ACTIVITY_TYPES
@@ -188,11 +188,10 @@ def proposals_sheet_append(
     grant_sponsor_code = None
     if grant_data['Sponsor_1']:
         try:
-            determined_sponsor_name, determined_sponsor_code = determine_sponsor(self, grant_data['Sponsor_1'])
-            if not determined_sponsor_code:
+            determined_sponsor = determine_sponsor(self, grant_data['Sponsor_1'])
+            if not determined_sponsor:
                 raise ValueError(f"Grant has invalid Sponsor_1 in database: {grant_data['Sponsor_1']}")
-            grant_sponsor_name = determined_sponsor_name
-            grant_sponsor_code = determined_sponsor_code
+            grant_sponsor_name, grant_sponsor_code = determined_sponsor
         except Exception as err:
             gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 6, 'error', err)
     else:
@@ -233,10 +232,14 @@ def proposals_sheet_append(
     grant_prime_sponsor_code = None
     if grant_data['Sponsor_2']:
         try:
-            determined_prime_sponsor_name, determined_prime_sponsor_code = determine_sponsor(self, grant_data['Sponsor_2'])
-            if not determined_prime_sponsor_code:
+            # determined_prime_sponsor_name, determined_prime_sponsor_code = determine_sponsor(self, grant_data['Sponsor_2'])
+            # if not determined_prime_sponsor_code:
+            #     raise ValueError(f"Grant has invalid Sponsor_2 in database: {grant_data['Sponsor_2']}")
+            # grant_prime_sponsor_code = determined_prime_sponsor_code
+            determined_prime_sponsor = determine_sponsor(self, grant_data['Sponsor_2'])
+            if not determined_prime_sponsor:
                 raise ValueError(f"Grant has invalid Sponsor_2 in database: {grant_data['Sponsor_2']}")
-            grant_prime_sponsor_code = determined_prime_sponsor_code
+            grant_prime_sponsor_name, grant_prime_sponsor_code = determined_prime_sponsor
         except Exception as err:
             gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 7, 'error', err)
     if not grant_prime_sponsor_code:
@@ -438,10 +441,6 @@ def proposals_sheet_append(
     #             "Grant_ID": grant_id
     #         }
     #     )
-
-    Tester_1 = reverse_dict_search({"Primary Code": grant_sponsor_code},self.ALL_ORGS)
-    Tester_2 = reverse_dict_search({"Primary Code": grant_prime_sponsor_code},self.ALL_ORGS)
-    print(Tester_1,Tester_2)
     
     self.generated_template_manager.append_row(
         SHEET_NAME, {
@@ -480,8 +479,6 @@ def proposals_sheet_append(
             "Submission Date": grant_submit_date,
             "Admin Unit Name": grant_admin_unit_name,
             "Admin Unit Code": grant_admin_unit_code,
-            "John Jay Centers": grant_admin_unit_center,
-            "Tester_1": Tester_1,
-            "Tester 2": Tester_2
+            "John Jay Centers": grant_admin_unit_center
         }
     )

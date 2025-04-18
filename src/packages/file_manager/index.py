@@ -44,6 +44,7 @@ class FileManager:
             FileManager: Returns the instance of the FileManager.
         """
         if self.save_dir.exists():
+            print(self.save_dir)
             self._delete_directory(self.save_dir)
 
         # Ensure save path exists

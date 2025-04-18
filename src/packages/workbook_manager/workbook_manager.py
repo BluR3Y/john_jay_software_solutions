@@ -28,7 +28,7 @@ class WorkbookManager:
             
             file_path_obj = pathlib.Path(read_file_path)
             log_file_path = os.path.join(file_path_obj.parent, f"{file_path_obj.stem}_workbook_logs.json")
-            self.log_manager = LogManager(log_file_path)
+            self.log_manager = LogManager(log_file_path).__enter__()
         elif create_sheets:
             self.df = {sheet_name: pd.DataFrame(sheet_rows) for sheet_name, sheet_rows in create_sheets.items()}
         
@@ -137,7 +137,8 @@ class WorkbookManager:
 
         # Log the change if logging is enabled
         if self.log_manager:
-            self.log_manager.append_runtime_log(process, {sheet:{row_index:{col_name:{"prev_value": cell_prev_value,"new_value": new_val}}}})
+            # self.log_manager.append_runtime_log(process, {sheet:{row_index:{col_name:{"prev_value": cell_prev_value,"new_value": new_val}}}})
+            self.log_manager.append_runtime_log(process, "update", sheet, row_index, {col_name: cell_prev_value})
 
         return row  # Return the updated row     
         
@@ -225,7 +226,7 @@ class WorkbookManager:
                     
             # Save LogManager changes
             if self.log_manager:
-                self.log_manager.save_logs()
+                self.log_manager.__exit__(None, None, None)
                 
             # Save Workbook Properties
             self.property_manager.apply_changes(write_file_path)

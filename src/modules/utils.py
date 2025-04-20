@@ -20,26 +20,6 @@ def request_file_path(requestStr: str, validTypes: list[str]):
     
     return selected_path
 
-# def request_user_selection(requestStr: str, validSelections: list[str]) -> str:
-#     selection_str = ""
-#     for index, selection in enumerate(validSelections):
-#         selection_str += f"\t{index}) - {selection}\n"
-#     user_input = input(f"{requestStr}\n{selection_str}")
-#     if user_input:
-#         if user_input.isdigit():
-#             numeric_selection = int(user_input)
-#             if numeric_selection < len(validSelections):
-#                 return validSelections[numeric_selection]
-#             else:
-#                 raise Exception(f"{numeric_selection} is not a valid numeric selection.")
-#         else:
-#             if user_input in validSelections:
-#                 return user_input
-#             else:
-#                 raise Exception(f"{user_input} is not a valid selection.")
-#     else:
-#         raise Exception("Did not make a selection. Is required to continue.")
-
 def single_select_input(requestStr: str, selections: list[str]) -> str:
     if not len(selections):
         raise ValueError("Selections list can't be empty")

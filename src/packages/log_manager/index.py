@@ -92,7 +92,7 @@ class LogManager:
     def _load_logs(file_path):
         """Load existing logs from json file."""
         if not os.path.exists(file_path):
-            return
+            return []
         
         try:
             with open(file_path, 'r', encoding='utf-8') as json_file:

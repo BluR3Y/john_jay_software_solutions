@@ -63,7 +63,7 @@ def awards_sheet_append(
             grant_instrument_type = existing_instrument
             gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 7, 'warning', "Instrument Type was determined using feedback file.")
             
-            proposal_sheet_entry_ref = gt_manager.update_cell("Feedback Generator", "Proposal - Template", proposal_sheet_entry_ref, "Instrument Type", existing_instrument)
+            proposal_sheet_entry_ref = gt_manager.update_cell("Feedback Generator", "Proposal - Template", proposal_sheet_entry_ref, {"Instrument Type": existing_instrument})
             # Add comment in proposal record regarding found instrument
             
             
@@ -112,9 +112,9 @@ def awards_sheet_append(
             
     if award_notice_date and grant_sponsor_code.lower() == "jjcoar":
         if not proposal_sheet_entry.get('Project Start Date'):
-            proposal_sheet_entry_ref = gt_manager.update_cell("Feedback Generator", "Proposal - Template", proposal_sheet_entry_ref, "Project Start Date", award_notice_date)
+            proposal_sheet_entry_ref = gt_manager.update_cell("Feedback Generator", "Proposal - Template", proposal_sheet_entry_ref, {"Project Start Date":award_notice_date})
         if not proposal_sheet_entry.get('Project End Date'):
-            proposal_sheet_entry_ref = gt_manager.update_cell("Feedback Generator", "Proposal - Template", proposal_sheet_entry_ref, "Project End Date", award_notice_date)
+            proposal_sheet_entry_ref = gt_manager.update_cell("Feedback Generator", "Proposal - Template", proposal_sheet_entry_ref, {"Project End Date":award_notice_date})
         
             
     project_start_date = proposal_sheet_entry.get('Project Start Date')
@@ -146,7 +146,7 @@ def awards_sheet_append(
             gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 20, 'warning', "Activity Type was determined using feedback file.")
             
     if grant_activity_type and not proposal_sheet_entry.get('Activity Type'):
-        proposal_sheet_entry_ref = gt_manager.update_cell("Feedback Generator", "Proposal - Template", proposal_sheet_entry_ref, "Activity Type", grant_activity_type)
+        proposal_sheet_entry_ref = gt_manager.update_cell("Feedback Generator", "Proposal - Template", proposal_sheet_entry_ref, {"Activity Type":grant_activity_type})
             
     grant_discipline = proposal_sheet_entry.get('Discipline')
     if not grant_discipline:

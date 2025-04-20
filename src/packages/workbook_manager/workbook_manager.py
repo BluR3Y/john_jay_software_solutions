@@ -4,18 +4,19 @@ import openpyxl
 import pathlib
 import warnings
 import numpy as np
+from openpyxl import load_workbook
 
 from typing import Union
 
 from . import PropertyManager
 from ..log_manager import LogManager
 
-class WorkbookManager:
-    read_file_path = None
-    log_manager = None
-    df = {}
-    
-    def __init__(self, read_file_path: str = None, create_sheets: dict = None):
+class WorkbookManager:    
+    def __init__(self, read_file_path: str = None, create_sheets: dict = None, write_file_path: str = None):
+        if not write_file_path:
+            warn_msg = "meaning that file will be overwritten with changes." if read_file_path else "meaning workbook content won't be saved."
+            warnings.warn(f"Write file path was not provided, {warn_msg}")
+
         if read_file_path:
             if not os.path.exists(read_file_path):
                 raise ValueError(f"The WorkbookManager was provided an invalid file path: {read_file_path}")
@@ -25,17 +26,87 @@ class WorkbookManager:
             
             # Read the contents of the workbook
             self.df = pd.read_excel(read_file_path, sheet_name=None)
-            
-            file_path_obj = pathlib.Path(read_file_path)
-            log_file_path = os.path.join(file_path_obj.parent, f"{file_path_obj.stem}_workbook_logs.json")
-            self.log_manager = LogManager(log_file_path).__enter__()
         elif create_sheets:
             self.df = {sheet_name: pd.DataFrame(sheet_rows) for sheet_name, sheet_rows in create_sheets.items()}
+        else:
+            raise ValueError(f"Failed to pass workbook file path or sheet properties to WorkbookManager.")
+        self.write_file_path = write_file_path
         
-        # Initialize an instance of the Comment Manager
-        self.property_manager = PropertyManager(read_file_path, self.df.keys())
+    def __enter__(self):
+        if self.read_file_path:
+            file_path_obj = pathlib.Path(self.read_file_path)
+            log_file_path = os.path.join(file_path_obj.parent, f"{file_path_obj.stem}_workbook_logs.json")
+            self.log_manager = LogManager(log_file_path).__enter__()
 
-    def formatDF(self, df: Union[pd.DataFrame, pd.Series]) -> Union[pd.DataFrame, pd.Series]:
+        # Initialize an instance of the Comment Manager
+        self.property_manager = PropertyManager(self.read_file_path, self.df.keys())
+
+        return self
+    
+    def __exit__(self, exc_type, exc_value, traceback):
+        self._save_changes()
+        if self.log_manager and self.write_file_path is None:
+            self.log_manager.__exit__(exc_type, exc_value, traceback)
+
+    # def _save_changes(self):
+    #     if self.read_file_path:
+    #         if not self.log_manager.get_runtime_logs(self.log_manager.runtime_date_time):
+    #             print("Workbook is empty. Now exiting Workbook Manager.")
+    #             return
+            
+    #         wb = load_workbook(self.read_file_path)
+    #         for sheet_name, df_sheet in self.df.items():
+    #             if sheet_name not in wb.sheetnames:
+    #                 wb.create_sheet(sheet_name)
+    #             sheet = wb[sheet_name]
+    #             for r_idx, row in df_sheet.iterrows():
+    #                 for c_idx, val in enumerate(row):
+    #                     sheet.cell(row=r_idx + 2, column=c_idx + 1, value=val)
+    #         wb.save(self.write_file_path or self.read_file_path)
+    #     elif self.write_file_path:
+    #         if all([sheet_content.empty for sheet_content in self.df.values()]):
+    #             print("Workbook is empty. Now exiting Workbook Manager.")
+    #             return
+            
+    #         with pd.ExcelWriter(self.write_file_path, engine='openpyxl', mode='w') as writer:
+    #             for sheet_name, df_sheet in self.df.items():
+    #                 df_sheet.to_excel(writer, sheet_name=sheet_name)
+    #     else:
+    #         return
+    #     # Save Workbook Properties
+    #     self.property_manager.apply_changes(self.write_file_path or self.read_file_path)
+
+    def _save_changes(self):
+        write_path = self.write_file_path or self.read_file_path
+        if not write_path:
+            print("Workbook Manager is missing path to save file")
+            return
+        
+        if self.read_file_path and not self.log_manager.get_runtime_logs(self.log_manager.runtime_date_time):
+            print("Workbook is empty. Now exiting Workbook Manager.")
+            return
+        
+        if self.write_file_path and all([sheet_content.empty for sheet_content in self.df.values()]):
+            print("Workbook is empty. Now exiting Workbook Manager.")
+            return
+
+        try:
+            # Use ExcelWriter to write multiple sheets back into the Excel file
+            with pd.ExcelWriter(write_path, engine='openpyxl', mode='w') as writer:
+                for sheet_name, df_sheet in self.df.items():
+                    df_sheet.to_excel(writer, sheet_name=sheet_name)
+                    
+            # Save LogManager changes
+            if self.log_manager:
+                self.log_manager.__exit__(None, None, None)
+                
+            # Save Workbook Properties
+            self.property_manager.apply_changes(write_path)
+        except Exception as err:
+            raise Exception(f"Error occured while attempting to save Workbook data: {err}")            
+
+    @staticmethod
+    def formatDF(df: Union[pd.DataFrame, pd.Series]) -> Union[pd.DataFrame, pd.Series]:
         """
         Replace NaT and NaN with None, and convert datetime columns or values to Python datetime objects.
         Works for both Series and DataFrame inputs.
@@ -97,50 +168,44 @@ class WorkbookManager:
         matching_indices = sheet_df.index[sheet_df.apply(lambda row: row.equals(obj), axis=1)]
         return matching_indices.tolist()
 
-    def update_cell(self, process: str, sheet: str, row: Union[int, pd.Series], col: Union[int, str], new_val) -> pd.Series:
-        """Update a specific cell in a given sheet and log the change."""
-
+    def update_cell(self, process: str, sheet: str, row: Union[int, pd.Series], properties: dict) -> pd.Series:
         if sheet not in self.df:
-            raise ValueError(f"The sheet '{sheet}' does not exist in the workbook.")
-
+            raise ValueError(f"Sheet '{sheet}' does not exist")
         sheet_df = self.df[sheet]
 
-        # Determine row index
+        row_index = None
         if isinstance(row, pd.Series):
-            row_indices = self.series_indices(sheet, row)
-            if not row_indices:
-                raise ValueError("No matching row found.")
-            if len(row_indices) > 1:
-                raise ValueError("Multiple matching rows found. Please refine your search criteria.")
-            row_index = row_indices[0]
-        else:
-            if not (0 <= row < sheet_df.shape[0]):  
-                raise ValueError("Invalid row index.")
+            matches = self.series_indices(sheet, row)
+            if len(matches) != 1:
+                raise ValueError("Series did not uniquely match a single row.")
+            row_index = matches[0]
+        elif isinstance(row, int):
+            if not (0 < row < sheet_df.shape[0]):
+                raise ValueError("Row index out of bounds.")
             row_index = row
-
-        # Determine column name
-        if isinstance(col, int):
-            if not (0 <= col < len(sheet_df.columns)):
-                raise ValueError("Invalid column index.")
-            col_name = sheet_df.columns[col]
         else:
-            if col not in sheet_df.columns:
-                raise ValueError("Column not found in sheet.")
-            col_name = col
+            raise TypeError("Row must be an int or pandas Series.")
+        
+        current = sheet_df.iloc[row_index]
+        changing = {
+            key: val for key, val in properties.items()
+            if key in current.index and current[key] != val
+        }
 
-        # Retrieve previous value and update the DataFrame
-        cell_prev_value = sheet_df.at[row_index, col_name]
-        sheet_df.at[row_index, col_name] = new_val  # Directly update the DataFrame
+        unknown_keys = set(properties.keys()) - set(current.index)
+        if unknown_keys:
+            warnings.warn(f"Ignored unknown column(s): {unknown_keys}")
 
-        # Reassign 'row' to reflect changes
-        row = sheet_df.iloc[row_index]
+        if not changing:
+            return current
+        
+        for key, val in changing.items():
+            self.df[sheet].at[row_index, key] = val
 
-        # Log the change if logging is enabled
         if self.log_manager:
-            # self.log_manager.append_runtime_log(process, {sheet:{row_index:{col_name:{"prev_value": cell_prev_value,"new_value": new_val}}}})
-            self.log_manager.append_runtime_log(process, "update", sheet, row_index, {col_name: cell_prev_value})
+            self.log_manager.append_runtime_log(process, "update", sheet, row_index, changing)
 
-        return row  # Return the updated row     
+        return self.df[sheet].iloc[row_index]
         
     def append_row(self, sheet: str, props: dict):
         # Create a new DataFrame
@@ -149,10 +214,7 @@ class WorkbookManager:
         self.df[sheet] = pd.concat([self.df[sheet], new_row], ignore_index=True)
         
     def row_follows_condition(self, row, conditions: dict) -> bool:
-        for identifier, value in conditions.items():
-            if row[identifier] != value:
-                return False
-        return True
+        return all(row.get(k) == v for k, v in conditions.items())
     
     def find(self, sheet_name: str, conditions: dict, return_one: bool = False, to_dict: str = None):
         """
@@ -186,49 +248,61 @@ class WorkbookManager:
         filtered_rows = sheet_data_frame[mask]
         
         if filtered_rows.empty:
-            return None
+            return filtered_rows
         
         formatted = self.formatDF(filtered_rows)
         
         if to_dict:
-            formatted = formatted.to_dict(orient=to_dict)
-        
-        if return_one:
-            return formatted[0] if isinstance(formatted, list) else formatted.iloc[0]
-        
-        return formatted
+            results = formatted.to_dict(orient=to_dict)
+            return results[0] if return_one else results
+        return formatted.iloc[0] if return_one else formatted
 
-        # return (filtered_rows.iloc[0] if as_ref else filtered_rows.iloc[0].replace([pd.NaT, np.nan], None).to_dict()) if return_one else (filtered_rows if as_ref else filtered_rows.replace([pd.NaT, np.nan], None).to_dict(orient="records"))
-    
-    def save_changes(self, write_file_path: str, index=False):
-        """
-        Saves the data stored in the pandas dataframes by converting each dataframe into an excel sheet in the same workbook.
-        Additionally, function also sets the 'sheet_state' property to that of the sheet in the workbook that was imported.
-        
-        # Parameters:
-        - write_file_path: file path where the migration data will be stored.
-        - index: Will determine if the index column from the DataFrame will persist in the stored excel sheet.
-        """
-                
-        if write_file_path == self.read_file_path:
-            warnings.warn(f"The save path is the same as the read path, meaning that file will be overwritten with changes.")
-        
-        # populated_sheets = {sheet_name: sheet_content for sheet_name, sheet_content in self.df.items() if not sheet_content.empty}
-        is_empty = all([sheet_content.empty for sheet_content in self.df.values()])
-        if is_empty:
-            print("Workbook is empty. Now exiting Workbook Manager.")
-        
-        try:
-            # Use ExcelWriter to write multiple sheets back into the Excel file
-            with pd.ExcelWriter(write_file_path, engine='openpyxl', mode='w') as writer:
-                for sheet_name, df_sheet in self.df.items():
-                    df_sheet.to_excel(writer, sheet_name=sheet_name, index=index)
-                    
-            # Save LogManager changes
-            if self.log_manager:
-                self.log_manager.__exit__(None, None, None)
-                
-            # Save Workbook Properties
-            self.property_manager.apply_changes(write_file_path)
-        except Exception as err:
-            raise Exception(f"Error occured while attempting to save Workbook data: {err}")
+    @staticmethod
+    def values_equal(a, b):
+        if pd.isnull(a) and pd.isnull(b):
+            return True
+        if isinstance(a, (float, int)) and isinstance(b, str):
+            try:
+                return a == float(b)
+            except ValueError:
+                return False
+        if isinstance(a, str) and isinstance(b, (float, int)):
+            try:
+                return float(a) == b
+            except ValueError:
+                return False
+        if isinstance(a, pd.Timestamp):
+            try:
+                b_dt = pd.to_datetime(b)
+                return a == b_dt
+            except Exception:
+                return False
+        if isinstance(b, pd.Timestamp):
+            try:
+                a_dt = pd.to_datetime(a)
+                return b == a_dt
+            except Exception:
+                return False
+        return a == b
+
+    @staticmethod
+    def find_closest_row(base: dict, df: pd.DataFrame, threshold: float = 0.75) -> Union[pd.Series, None]:
+        if df.empty:
+            return None
+
+        def num_matches(row: pd.Series) -> int:
+            return sum(base.get(key) == row.get(key) for key in base)
+
+        match_counts = {idx: num_matches(row) for idx, row in df.iterrows()}
+
+        if not match_counts:
+            return None
+
+        best_idx = max(match_counts, key=match_counts.get)
+        max_matches = match_counts[best_idx]
+        total_possible = len(base)
+
+        if total_possible == 0 or (max_matches / total_possible) < threshold:
+            return None
+
+        return df.loc[best_idx]

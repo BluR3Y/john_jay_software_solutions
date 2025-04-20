@@ -48,10 +48,47 @@ def revert_changes(db_manager: DatabaseManager):
         print(f"An unexpected error occured: {err}")
 
 # Legacy
+# def apply_latest_changes(db_manager: DatabaseManager):
+#     latest_logs_path = request_file_path("Input file path of logs that will be applied to the database: ", [".json"])
+#     latest_logs_obj = LogManager(latest_logs_path).__enter__()
+
+#     def format_log(log):
+#         formatted = {}
+#         for key, props in log.items():
+#             if isinstance(props, dict):
+#                 formatted[key] = format_log(props)
+#             elif key == "new_value":
+#                 return props
+#         return formatted
+
+#     merged_logs = {}
+#     for log_timestamp in latest_logs_obj.get_runtime_dates():
+#         for logs in latest_logs_obj.get_runtime_logs(log_timestamp).values():
+#             latest_logs_obj._merge_dicts(merged_logs, format_log(logs))
+
+#     errors = []
+#     for table in merged_logs:
+#         table_cols = db_manager.get_table_columns(table)
+#         table_identifier = list(table_cols.keys())[0]
+#         for record_identifier, record_props in merged_logs[table].items():
+#             try:
+#                 db_manager.update_query(table, record_props, {
+#                     table_identifier: {
+#                         "operator": "=",
+#                         "value": record_identifier
+#                     }
+#                 })
+#             except Exception as err:
+#                 errors.append(f"An error occured while updating record '{record_identifier}': {err}")
+#     if errors:
+#         print(f"Errors occured while applying latest changes: {errors}")
+# Dont use
 def apply_latest_changes(db_manager: DatabaseManager):
     latest_logs_path = request_file_path("Input file path of logs that will be applied to the database: ", [".json"])
-    latest_logs_obj = LogManager(latest_logs_path).__enter__()
-
+    logs = {}
+    with open(latest_logs_path, 'r', encoding='utf-8') as log_file:
+        logs = json.load(log_file)
+    
     def format_log(log):
         formatted = {}
         for key, props in log.items():
@@ -60,11 +97,11 @@ def apply_latest_changes(db_manager: DatabaseManager):
             elif key == "new_value":
                 return props
         return formatted
-
+    
     merged_logs = {}
-    for log_timestamp in latest_logs_obj.get_runtime_dates():
-        for logs in latest_logs_obj.get_runtime_logs(log_timestamp).values():
-            latest_logs_obj._merge_dicts(merged_logs, format_log(logs))
+    for log_timestamp in logs.keys():
+        for lgs in logs[log_timestamp].values():
+            db_manager.log_manager._merge_dicts(merged_logs, format_log(lgs))
 
     errors = []
     for table in merged_logs:
@@ -72,12 +109,7 @@ def apply_latest_changes(db_manager: DatabaseManager):
         table_identifier = list(table_cols.keys())[0]
         for record_identifier, record_props in merged_logs[table].items():
             try:
-                db_manager.update_query(table, record_props, {
-                    table_identifier: {
-                        "operator": "=",
-                        "value": record_identifier
-                    }
-                })
+                print(record_props)
             except Exception as err:
                 errors.append(f"An error occured while updating record '{record_identifier}': {err}")
     if errors:

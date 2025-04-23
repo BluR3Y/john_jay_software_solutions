@@ -21,7 +21,6 @@ def parse_sql_condition(condition_str: str) -> dict:
 
 # --- Logical Operator Parsing ---
 def find_top_level_operator(condition_str: str) -> Union[str, None]:
-    operators = ['AND', 'OR']
     level = 0
     pattern = re.compile(r'\b(AND|OR)\b', re.IGNORECASE)
 

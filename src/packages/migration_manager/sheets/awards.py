@@ -37,7 +37,12 @@ def awards_sheet_append(
     grant_id = grant_data['Grant_ID']
     grant_pln = grant_data['Project_Legacy_Number']
     
-    existing_data = ft_manager.find(SHEET_NAME, {"projectLegacyNumber": grant_pln}, return_one=True, to_dict='records') or {}
+    # existing_data = ft_manager.find(SHEET_NAME, {"projectLegacyNumber": grant_pln}, return_one=True, to_dict='records') or {}
+    # proposal_sheet_entry_ref = gt_manager.find("Proposal - Template", { "proposalLegacyNumber": grant_id }, return_one=True)
+    # proposal_sheet_entry = gt_manager.formatDF(proposal_sheet_entry_ref).to_dict() if not proposal_sheet_entry_ref.empty else {}
+    existing_data_ref = ft_manager.find(SHEET_NAME, {"projectLegacyNumber": grant_pln}, return_one=True)
+    existing_data = existing_data_ref.to_dict() if existing_data_ref is not None else {}
+
     proposal_sheet_entry_ref = gt_manager.find("Proposal - Template", { "proposalLegacyNumber": grant_id }, return_one=True)
     proposal_sheet_entry = gt_manager.formatDF(proposal_sheet_entry_ref).to_dict() if not proposal_sheet_entry_ref.empty else {}
 
@@ -297,7 +302,9 @@ def awards_sheet_append(
             grant_irb_approval_date = existing_irb_approval_date
             gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 50, 'warning', "IRB Approval Date was determined using feedback file.")
     
-    self.generated_template_manager.append_row(SHEET_NAME, {
+    self.generated_template_manager.append_row(
+        self.process_name,
+        SHEET_NAME, {
         "projectLegacyNumber": grant_pln,
         "proposalLegacyNumber": grant_id,
         "awardLegacyNumber": f"{grant_id}-award",

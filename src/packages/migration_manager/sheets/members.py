@@ -33,7 +33,9 @@ def members_sheet_append(
     next_row = gt_manager.df[SHEET_NAME].shape[0] + 1
     grant_pln = grant_data['Project_Legacy_Number']
 
-    existing_data = ft_manager.find(SHEET_NAME, {"projectLegacyNumber": grant_pln}, return_one=True, to_dict='records') or {}
+    # existing_data = ft_manager.find(SHEET_NAME, {"projectLegacyNumber": grant_pln}, return_one=True, to_dict='records') or {}
+    existing_data_ref = ft_manager.find(SHEET_NAME, {"projectLegacyNumber": grant_pln}, return_one=True)
+    existing_data = existing_data_ref.to_dict() if existing_data_ref is not None else {}
     
     investigator_name = None
     investigator_role = None
@@ -79,7 +81,9 @@ def members_sheet_append(
             investigator_email = f"{f_name} {l_name}"
 
     # Last Here: Fixing Members
-    self.generated_template_manager.append_row(SHEET_NAME, {
+    self.generated_template_manager.append_row(
+        self.process_name,
+        SHEET_NAME, {
         "projectLegacyNumber": grant_pln,
         "form": "proposal",
         "legacyNumber": grant_data['Grant_ID'],
@@ -88,7 +92,9 @@ def members_sheet_append(
         "association 1": investigator_association
     })
     if grant_data['Status'] == "Funded":
-        self.generated_template_manager.append_row(SHEET_NAME, {
+        self.generated_template_manager.append_row(
+            self.process_name,
+            SHEET_NAME, {
             "projectLegacyNumber": grant_pln,
             "form": "award",
             "legacyNumber": (str(grant_data['Grant_ID']) + "-award"),

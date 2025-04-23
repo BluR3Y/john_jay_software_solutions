@@ -90,7 +90,7 @@ def resolve_reports(db_manager: DatabaseManager):
         file_path = request_file_path("Enter the file path of the Excel file:", [".xlsx"])
 
         # Create a workbook for the Excel file
-        report_wb = WorkbookManager(file_path)
+        report_wb = WorkbookManager(file_path).__enter__()
 
         # Validate metadata presence
         report_meta = report_wb.get_sheet("report_meta_data", orient='records')
@@ -148,8 +148,8 @@ def resolve_reports(db_manager: DatabaseManager):
         print(f"An unexpected error occurred: {err}")
         
 
-def manage_reports(db_path: str):
-    with DatabaseManager(db_path, PROCESS_NAME) as db_manager:
+def manage_reports():
+    with DatabaseManager(os.getenv("ACCESS_DB_PATH"), PROCESS_NAME) as db_manager:
         print(f"Current Process: {PROCESS_NAME}")
         while True:
             user_selection = single_select_input("Select a Report Manager Action:", ["Generate Reports", "Resolve Reports", "Exit Process"])

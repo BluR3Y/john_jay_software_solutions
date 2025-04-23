@@ -13,9 +13,9 @@ class ReportGenerator:
         self.file_name = "generated_report"
         
     def __enter__(self):
-        self.report_workbook = WorkbookManager()
+        self.report_workbook = WorkbookManager().__enter__()
         self.report_workbook.create_sheet("report_meta_data", ["sheet_name", "table", "record_identifier"])
-        
+
         return self
     
     def __exit__(self, exc_type, exc_value, traceback):
@@ -41,7 +41,7 @@ class ReportGenerator:
                     
                     existing_workbook.create_sheet(sheet_name, sheet_content.to_dict(orient='records'))
                     sheet_meta_data = self.report_workbook.find("report_meta_data", {"sheet_name": sheet_name}, return_one=True, to_dict='records')
-                    existing_workbook.append_row("report_meta_data", {
+                    existing_workbook.append_row(self.process_name, "report_meta_data", {
                         "sheet_name": sheet_name,
                         "table": sheet_meta_data.get('table'),
                         "record_identifier": sheet_meta_data.get('record_identifier')
@@ -49,14 +49,14 @@ class ReportGenerator:
                 self.report_workbook = existing_workbook
 
         try:
-            self.report_workbook.save_changes(os.path.join(save_path["dir_path"], f"{save_path['file_name']}.xlsx"))
+            self.report_workbook._save_data(os.path.join(save_path["dir_path"], f"{save_path['file_name']}.xlsx"))
             print("Report successfully generated.")
         except Exception as err:
             print(f"Error occured while saving report: {err}")
     
     def append_report(self, report_name: str, table: str, record_identifier: str, search_query: dict, report_data: list[dict]):
         self.report_workbook.create_sheet(report_name, report_data)
-        self.report_workbook.append_row("report_meta_data", {
+        self.report_workbook.append_row(self.process_name, "report_meta_data", {
             "sheet_name": report_name,
             "table": table,
             "record_identifier": record_identifier,

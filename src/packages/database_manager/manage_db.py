@@ -3,9 +3,9 @@ from pprint import pprint
 import os
 import json
 from packages.log_manager import LogManager
+from packages.log_manager import manage_logs
 from modules.utils import (
     request_file_path,
-    multi_select_input,
     single_select_input,
     request_user_confirmation
 )
@@ -16,10 +16,7 @@ def view_logs(db_manager: DatabaseManager):
     log_manager = db_manager.log_manager
     selected_date = single_select_input("Select date logs:", list(log_manager.get_runtime_dates()))
     date_logs = log_manager.get_runtime_logs(selected_date)
-    # log_processes = list(date_logs.keys())
-
-    # selected_process = multi_select_input("Select processes from logs:", log_processes)
-    # logs = {process:date_logs[process] for process in selected_process}
+    
     pprint(date_logs)
 
 def revert_changes(db_manager: DatabaseManager):
@@ -47,42 +44,6 @@ def revert_changes(db_manager: DatabaseManager):
     except Exception as err:
         print(f"An unexpected error occured: {err}")
 
-# Legacy
-# def apply_latest_changes(db_manager: DatabaseManager):
-#     latest_logs_path = request_file_path("Input file path of logs that will be applied to the database: ", [".json"])
-#     latest_logs_obj = LogManager(latest_logs_path).__enter__()
-
-#     def format_log(log):
-#         formatted = {}
-#         for key, props in log.items():
-#             if isinstance(props, dict):
-#                 formatted[key] = format_log(props)
-#             elif key == "new_value":
-#                 return props
-#         return formatted
-
-#     merged_logs = {}
-#     for log_timestamp in latest_logs_obj.get_runtime_dates():
-#         for logs in latest_logs_obj.get_runtime_logs(log_timestamp).values():
-#             latest_logs_obj._merge_dicts(merged_logs, format_log(logs))
-
-#     errors = []
-#     for table in merged_logs:
-#         table_cols = db_manager.get_table_columns(table)
-#         table_identifier = list(table_cols.keys())[0]
-#         for record_identifier, record_props in merged_logs[table].items():
-#             try:
-#                 db_manager.update_query(table, record_props, {
-#                     table_identifier: {
-#                         "operator": "=",
-#                         "value": record_identifier
-#                     }
-#                 })
-#             except Exception as err:
-#                 errors.append(f"An error occured while updating record '{record_identifier}': {err}")
-#     if errors:
-#         print(f"Errors occured while applying latest changes: {errors}")
-# Dont use
 def apply_latest_changes(db_manager: DatabaseManager):
     latest_logs_path = request_file_path("Input file path of logs that will be applied to the database: ", [".json"])
     logs = {}
@@ -152,8 +113,8 @@ def delete_table_records(db_manager: DatabaseManager):
             }
         })
 
-def manage_database(db_path: str):
-    with DatabaseManager(db_path, PROCESS_NAME) as db_manager:
+def manage_database():
+    with DatabaseManager(os.getenv("ACCESS_DB_PATH"), PROCESS_NAME) as db_manager:
         print(f"Current Process: {PROCESS_NAME}")
         while True:
             user_selection = single_select_input("Select a Database Manager Action:",[
@@ -166,7 +127,7 @@ def manage_database(db_path: str):
 
             match user_selection:
                 case "View changes":
-                    view_logs(db_manager)
+                    manage_logs(db_manager.log_manager)
                 case "Revert changes":
                     revert_changes(db_manager)
                 case "Apply latest changes":

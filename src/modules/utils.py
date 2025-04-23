@@ -24,7 +24,7 @@ def single_select_input(requestStr: str, selections: list[str]) -> str:
     if not len(selections):
         raise ValueError("Selections list can't be empty")
     elif len(selections) == 1:
-        return selections[1]
+        return selections[0]
     
     selection_str = ""
     for index, item in enumerate(selections):

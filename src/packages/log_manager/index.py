@@ -1,7 +1,6 @@
 import json
 import datetime
 import os
-from typing import Literal
 
 class LogManager:
     operations = ["create", "update", "delete"]
@@ -21,7 +20,6 @@ class LogManager:
 
     def __enter__(self):
         self.logs = self._load_logs(self.file_path) or []
-        # retriev**
         self.runtime_date_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         return self
     
@@ -65,7 +63,7 @@ class LogManager:
         Appends a new log or updates an existing one if a match is found.
 
         Args:
-            process: Name of the process being logged.
+            process: Name of the process being logged (Acts as a transaction in typical SQL fasion)
             operation: Type of operation ("create", "update", "delete").
             table: Affected database table.
             record_id: ID of the affected record.
@@ -107,7 +105,7 @@ class LogManager:
             if isinstance(value, dict) and isinstance(base.get(key), dict):
                 LogManager._merge_dicts(base[key], value)
             else:
-                base[key] = value    
+                base[key] = value
     
     @staticmethod
     def _convert_to_json_serializable(obj):

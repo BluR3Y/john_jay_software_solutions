@@ -6,27 +6,28 @@ from packages.migration_manager import MigrationManager
 from packages.workbook_manager import WorkbookManager
 from modules.utils import multi_select_input, single_select_input, request_file_path
 
-PROCESS_NAME = "Migration Manager"
-
 def generate_data(db_path: str):
-    with DatabaseManager(db_path, PROCESS_NAME) as db_manager:
+    with DatabaseManager(db_path, MigrationManager.process_name) as db_manager:
         with MigrationManager(db_manager, os.getenv('EXCEL_FILE_PATH')) as migration_manager:
-            # existing_grants = [int(gt) for gt in migration_manager.feedback_template_manager.df["Proposal - Template"]['proposalLegacyNumber'].tolist()]
-            existing_wb = WorkbookManager("C:/Users/reyhe/OneDrive/Documents/JJay/data_pull_2025_04_17/latest_generated_data_set_2_18_04_2025.xlsx")
-            existing_grants = [int(gt) for gt in existing_wb.df["Proposal - Template"]['proposalLegacyNumber'].tolist()]
+            existing_base = [int(gt) for gt in migration_manager.feedback_template_manager.df["Proposal - Template"]['proposalLegacyNumber'].tolist()]
+            wb_secondary = WorkbookManager("C:/Users/reyhe/OneDrive/Documents/JJay/data_pull_2025_04_17/Legacy Data Template John Jay College - Final UAT Draft 123024-with corrections-022625.xlsx").__enter__()
+            existing_secondary = [int(gt) for gt in wb_secondary.df["Proposal - Template"]['proposalLegacyNumber'].tolist()]
 
-            # query_grant_ids = db_manager.select_query(
-            #     table="grants",
-            #     cols=["Grant_ID"],
-            #     conditions={
-            #         "End_Date_Req": {
-            #             "operator": ">",
-            #             "value": "2016-12-31"
-            #         }
-            #     }
-            # )
-            # grant_ids = [grant['Grant_ID'] for grant in query_grant_ids if grant['Grant_ID'] not in existing_grants]
-            for grant_id in tqdm(existing_grants, "Processing grants", unit="grant"):
+
+            sum_existing = [*existing_base, *existing_secondary]
+
+            query_grant_ids = db_manager.select_query(
+                table="grants",
+                cols=["Grant_ID"],
+                conditions={
+                    "End_Date_Req": {
+                        "operator": ">",
+                        "value": "2016-12-31"
+                    }
+                }
+            )
+            grant_ids = [grant['Grant_ID'] for grant in query_grant_ids if grant['Grant_ID'] not in sum_existing]
+            for grant_id in tqdm(grant_ids, "Processing grants", unit="grant"):
                 
                 # Retrieve primary grant data
                 select_grant_query = db_manager.select_query(
@@ -154,66 +155,67 @@ def generate_data(db_path: str):
                     except Exception as err:
                         print(f"Error occured while appending to awards sheet: {err}")
                     
-                    # Append grant to "attachments" sheet
-                    try:
-                        migration_manager.attachments_sheet_append(select_grant_query)
-                    except Exception as err:
-                        print(f"Error occured while appending to attachments sheet: {err}")
+                #     # Append grant to "attachments" sheet
+                #     try:
+                #         migration_manager.attachments_sheet_append(select_grant_query)
+                #     except Exception as err:
+                #         print(f"Error occured while appending to attachments sheet: {err}")
 
-def merge_workbooks(base_path: str):
-    with WorkbookManager(
-        read_file_path=base_path,
-        # write_file_path=os.path.join(os.path.dirname(base_path), f"{os.path.basename(base_path).split('.')[0]}_merged_workbook.xlsx")
-    ) as base_wb:
-        updates_path = request_file_path("Enter the file path of the updated workbook: ", [".xlsx"])
-        updates_wb = WorkbookManager(updates_path).__enter__()
+# def merge_workbooks(base_path: str):
+#     with WorkbookManager(
+#         read_file_path=base_path,
+#         # write_file_path=os.path.join(os.path.dirname(base_path), f"{os.path.basename(base_path).split('.')[0]}_merged_workbook.xlsx")
+#     ) as base_wb:
+#         updates_path = request_file_path("Enter the file path of the updated workbook: ", [".xlsx"])
+#         updates_wb = WorkbookManager(updates_path).__enter__()
 
-        non_empty_props = lambda x: {key:val for key,val in x.items() if (val)}
+#         non_empty_props = lambda x: {key:val for key,val in x.items() if (val)}
 
-        selected_sheets = multi_select_input("Select which sheets to apply updates: ", list(updates_wb.df.keys()))
-        sheet_identifier = "projectLegacyNumber"
-        errors = []
-        for sheet in selected_sheets:
+#         selected_sheets = multi_select_input("Select which sheets to apply updates: ", list(updates_wb.df.keys()))
+#         sheet_identifier = "projectLegacyNumber"
+#         errors = []
+#         for sheet in selected_sheets:
 
-            for updated_row in updates_wb.get_sheet(sheet, format=True, orient='records'):
-                row_id = updated_row.get(sheet_identifier)
-                id_search_ref = base_wb.find(sheet, {sheet_identifier: row_id})
-                if id_search_ref is None or id_search_ref.empty:
-                    continue
+#             for updated_row in updates_wb.get_sheet(sheet, format=True, orient='records'):
+#                 row_id = updated_row.get(sheet_identifier)
+#                 id_search_ref = base_wb.find(sheet, {sheet_identifier: row_id})
+#                 if id_search_ref is None or id_search_ref.empty:
+#                     continue
 
-                closest_match = base_wb.find_closest_row(updated_row, id_search_ref, 0.65)
-                if closest_match is None or closest_match.empty:
-                    continue
-                match_dict = base_wb.formatDF(closest_match).to_dict()
-                try:
-                    base_wb.update_cell(
-                        PROCESS_NAME,
-                        sheet,
-                        closest_match,
-                        {
-                            key:prop for key,prop in non_empty_props(updated_row).items()
-                            if match_dict.get(key) != prop
-                        }
-                    )
-                except Exception as err:
-                    errors.append(f"Error occured while updating grant {row_id}: {err}")
-        if len(errors):
-            print('\n'.join(errors))
+#                 closest_match = base_wb.find_closest_row(updated_row, id_search_ref, 0.65)
+#                 if closest_match is None or closest_match.empty:
+#                     continue
+#                 match_dict = base_wb.formatDF(closest_match).to_dict()
+#                 try:
+#                     base_wb.update_cell(
+#                         PROCESS_NAME,
+#                         sheet,
+#                         closest_match,
+#                         {
+#                             key:prop for key,prop in non_empty_props(updated_row).items()
+#                             if match_dict.get(key) != prop
+#                         }
+#                     )
+#                 except Exception as err:
+#                     errors.append(f"Error occured while updating grant {row_id}: {err}")
+#         if len(errors):
+#             print('\n'.join(errors))
     
 
-def manage_migration(db_path: str):
-    print(f"Current Process:{PROCESS_NAME}")
-    while True:
-            user_selection = single_select_input("Select a Database Manager Action:",[
-                "Migrate Data",
-                "Merge Workbooks",
-                "Exit Process"
-            ])
+def manage_migration():
+    print(f"Current Process:{MigrationManager.process_name}")
+    generate_data(os.getenv("ACCESS_DB_PATH"))
+    # while True:
+    #         user_selection = single_select_input("Select a Database Manager Action:",[
+    #             "Migrate Data",
+    #             "Merge Workbooks",
+    #             "Exit Process"
+    #         ])
 
-            match user_selection:
-                case "Migrate Data":
-                    generate_data(db_path)
-                case "Merge Workbooks":
-                    merge_workbooks(os.getenv("EXCEL_FILE_PATH"))
-                case _:
-                    return
+    #         match user_selection:
+    #             case "Migrate Data":
+    #                 generate_data(os.getenv("ACCESS_DB_PATH"))
+    #             case "Merge Workbooks":
+    #                 merge_workbooks(os.getenv("EXCEL_FILE_PATH"))
+    #             case _:
+    #                 return

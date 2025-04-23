@@ -21,7 +21,9 @@ def attachments_sheet_append(self: "MigrationManager", grant_data: dict):
         to_dict='records'
     )
     if not grant_attachments:
-        gt_manager.append_row(SHEET_NAME, {
+        gt_manager.append_row(
+            self.process_name,
+            SHEET_NAME, {
             "projectLegacyNumber": grant_pln,
             "form": "Proposal",
             "legacyNumber": f"{grant_id}"

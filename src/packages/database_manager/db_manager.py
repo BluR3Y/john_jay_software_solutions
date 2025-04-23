@@ -30,16 +30,9 @@ class DatabaseManager:
         self.init_db_connection()
         return self
     
-    # Only envoked when using "with"(context manager)
     def __exit__(self, exc_type, exc_value, traceback):
-        """Close the database connection when exiting the context."""
-        if self.connection:
-            try:
-                self.cursor.close()
-                self.connection.close()
-            except pyodbc.Error as err:
-                raise ConnectionError(f"An error occured while closing the database: {err}")
-        # Save logger changes
+        """Handle exiting the context."""
+        self._terminate_db_connection()
         self.log_manager.__exit__(exc_type, exc_value, traceback)
         
     def init_db_connection(self):
@@ -53,17 +46,15 @@ class DatabaseManager:
             self.cursor = self.connection.cursor()
         except pyodbc.Error as err:
             raise ConnectionError(f"An error occured while connecting to database: {err}")
-        
-    # def terminate_db_connection(self):
-    #     """Terminate the database connection."""
-    #     if self.connection:
-    #         try:
-    #             self.cursor.close()
-    #             self.connection.close()
-    #         except pyodbc.Error as err:
-    #             raise ConnectionError(f"An error occured while closing the database: {err}")
-    #     # Save logger changes
-    #     self.log_manager.__exit__()
+
+    def _terminate_db_connection(self):
+        """Terminate the database connection."""
+        if self.connection:
+            try:
+                self.cursor.close()
+                self.connection.close()
+            except pyodbc.Error as err:
+                raise ConnectionError(f"An error occured while closing the database: {err}")
         
     def get_db_tables(self):
         tables = []
@@ -77,7 +68,6 @@ class DatabaseManager:
         try:
             query = f"SELECT * FROM {table} WHERE 1=0"
             self.cursor.execute(query)
-            # columns = [column[0] for column in self.cursor.description]
             return {column[0]:column[1] for column in self.cursor.description}
         except pyodbc.Error as err:
             print(f"An error occured while querying the database: {err}")
@@ -154,7 +144,6 @@ class DatabaseManager:
                 self.connection.rollback()
                 raise err
 
-
     def delete_query(self, table: str, conditions: dict = None):
         try:
             if table not in self.get_db_tables():
@@ -186,7 +175,7 @@ class DatabaseManager:
             raise err
                 
    # ** Caution: Deprecated
-    def execute_query_legacy(self, query, *args):
+    def execute_query(self, query, *args):
         """Execute a given SQL query."""
         try:
             self.cursor.execute(query, *args)

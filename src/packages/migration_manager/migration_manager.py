@@ -9,6 +9,7 @@ from packages.file_manager import FileManager
 from . import projects_sheet_append, proposals_sheet_append, members_sheet_append, awards_sheet_append, attachments_sheet_append, retrieve_pi_info
 
 class MigrationManager:
+    process_name = "Migration Manager"
     
     def __init__(self, db_manager: DatabaseManager, read_file_path: str):
         if not read_file_path:
@@ -17,10 +18,10 @@ class MigrationManager:
             raise ValueError(f"The Workbook Manager was provided an invalid file path: {read_file_path}")
         
         # Initialize an instance of the WorkbookManager class for the feedback file
-        self.feedback_template_manager = WorkbookManager(read_file_path=read_file_path)
+        self.feedback_template_manager = WorkbookManager(read_file_path=read_file_path).__enter__()
         
         # Initialize an instance of the WorkbookManager class for the generated data
-        self.generated_template_manager = WorkbookManager()
+        self.generated_template_manager = WorkbookManager().__enter__()
 
         # Initialize an instance of the FileManager class for grant attachment files
         self.attachment_manager = FileManager(os.getenv("SAVE_PATH"), os.getenv("ATTACHMENT_PATH")).__enter__()
@@ -38,7 +39,7 @@ class MigrationManager:
     def __exit__(self, exc_type, exc_value, traceback):
         current_time = datetime.now()
         formatted_time = current_time.strftime('%d_%m_%Y')
-        self.generated_template_manager.save_changes(os.path.join(os.getenv("SAVE_PATH"), f"generated_data_{formatted_time}.xlsx"))
+        self.generated_template_manager._save_data(os.path.join(os.getenv("SAVE_PATH"), f"generated_data_{formatted_time}.xlsx"))
         self.attachment_manager.__exit__(exc_type, exc_value, traceback)
         
     def retrieve_configs(self):

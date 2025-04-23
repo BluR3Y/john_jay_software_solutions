@@ -89,7 +89,7 @@ def determine_sponsor(instance, sponsor):
             return closest_valid_sponsor, all_orgs[inverse_orgs[closest_valid_sponsor]]["Primary Code"]
 
 def determine_activity_type(instance, type, on_site):
-    activity_types = instance.ACTIVITY_TYPES
+    activity_types = list(instance.ACTIVITY_TYPES)
     if type in activity_types:
         return type
 
@@ -100,7 +100,7 @@ def validate_grant_discipline(instance, discipline) -> dict:
     """Validate if a discipline is in the list of valid disciplines."""
 
     # Retrieve list of valid disciplines
-    valid_disciplines = instance.DISCIPLINES
+    valid_disciplines = list(instance.DISCIPLINES)
     
     if discipline in valid_disciplines:
         return {"valid": True}
@@ -150,8 +150,13 @@ def proposals_sheet_append(
     grant_id = grant_data['Grant_ID']
     grant_pln = grant_data['Project_Legacy_Number']
     
-    existing_data = ft_manager.find(SHEET_NAME, {"proposalLegacyNumber": grant_id}, return_one=True, to_dict='records') or {}
-    project_sheet_entry = gt_manager.find("Project - Template", {"projectLegacyNumber": grant_pln}, return_one=True, to_dict='records') or {}
+    # existing_data = ft_manager.find(SHEET_NAME, {"proposalLegacyNumber": grant_id}, return_one=True, to_dict='records') or {}
+    # project_sheet_entry = gt_manager.find("Project - Template", {"projectLegacyNumber": grant_pln}, return_one=True, to_dict='records') or {}
+    existing_data_ref = ft_manager.find(SHEET_NAME, {"proposalLegacyNumber": grant_id}, return_one=True)
+    existing_data = existing_data_ref.to_dict() if existing_data_ref is not None else {}
+    # project_sheet_entry = gt_manager.find("Project - Template", {"projectLegacyNumber": grant_pln}, return_one=True, to_dict='records') or {}
+    project_sheet_entry_ref = gt_manager.find("Project - Template", {"projectLegacyNumber": grant_pln}, return_one=True)
+    project_sheet_entry = project_sheet_entry_ref.to_dict() if project_sheet_entry_ref is not None else {}
 
     grant_status = grant_data['Status']
     if not grant_status:
@@ -443,6 +448,7 @@ def proposals_sheet_append(
     #     )
     
     self.generated_template_manager.append_row(
+        self.process_name,
         SHEET_NAME, {
             "projectLegacyNumber": grant_pln,
             "proposalLegacyNumber": grant_id,

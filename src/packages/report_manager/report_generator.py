@@ -2,7 +2,7 @@ import os
 import pandas as pd
 import openpyxl
 
-from packages.workbook_manager import WorkbookManager
+from packages.workbook_manager_legacy import WorkbookManager
 from modules.utils import single_select_input, get_valid_filename
 
 class ReportGenerator:

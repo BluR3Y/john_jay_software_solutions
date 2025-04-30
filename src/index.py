@@ -11,8 +11,8 @@ from modules.logger import config_logger
 from packages.report_manager import manage_reports
 from packages.migration_manager import manage_migration
 from packages.database_manager import manage_database
-from packages.workbook_manager import manage_workbook
-from packages.workbook_manager_beta.index import WorkbookManager
+from packages.workbook_manager_legacy import manage_workbook
+from packages.workbook_manager_beta.manage_workbook import manage_workbook as beta
 
 # Run the program
 if __name__ == "__main__":
@@ -21,7 +21,8 @@ if __name__ == "__main__":
         "Manage Reports": manage_reports,
         "Generate Template": manage_migration,
         "Manage Database": manage_database,
-        "Manage Workbook": manage_workbook
+        "Manage Workbook": manage_workbook,
+        "Beta": beta
     }
     
     # Initialize the argument parser
@@ -52,17 +53,6 @@ if __name__ == "__main__":
     load_dotenv(os.path.join(parent_dir, f"env/.env.{args.env}"))
 
     config_logger(os.getenv("SAVE_PATH"))
-
-    tester = WorkbookManager(os.getenv("EXCEL_FILE_PATH")).__enter__()
-    tester.sheets['Proposal - Template'].add_issue(3,3,"notice", "Test issue appended")
-    tester.sheets['Proposal - Template'].add_issue(3,3,"warning", "Test issue appended")
-    tester.sheets['Proposal - Template'].add_issue(5,5,"notice", "Test issue appended")
-    tester.sheets['Proposal - Template'].add_issue(6,6,"notice", "Test issue appended")
-    tester.sheets['Proposal - Template'].add_issue(6,6,"warning", "Test issue appended")
-    tester.sheets['Proposal - Template'].add_issue(6,6,"error", "Test issue appended")
-    tester.sheets['Proposal - Template'].add_issue(8,8,"error", "Test issue appended")
-    tester.sheets['Proposal - Template'].add_issue(8,8,"notice", "Test issue appended")
-    tester._save_data("C:/Users/reyhe/OneDrive/Desktop/test_beta.xlsx")
 
     selected_process = args.process
     if selected_process:

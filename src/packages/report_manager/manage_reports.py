@@ -5,7 +5,7 @@ import pandas as pd
 from modules.utils import request_file_path, multi_select_input, single_select_input
 from . import ReportGenerator
 from packages.database_manager import DatabaseManager
-from packages.workbook_manager import WorkbookManager
+from packages.workbook_manager_legacy import WorkbookManager
 
 PROCESS_NAME = "Report Manager"
 

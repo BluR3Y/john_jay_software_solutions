@@ -41,8 +41,14 @@ class SheetManager:
         }
     }
 
-    def __init__(self, sheet_data: Union[pd.DataFrame, list[str]]):
-        self.df = pd.DataFrame(columns=sheet_data) if isinstance(sheet_data, list) else sheet_data
+    def __init__(self, sheet_data: Union[pd.DataFrame, list]):
+        if isinstance(sheet_data, list):
+            populated_data = all(isinstance(item, dict) for item in sheet_data)
+            self.df = pd.DataFrame(sheet_data) if populated_data else pd.DataFrame(columns=sheet_data)
+        elif isinstance(sheet_data, pd.DataFrame):
+            self.df = sheet_data
+        else:
+            raise TypeError("Invalid sheet_data provided to SheetManager.")
         self.assigned_sheet_props = {}
         self.assigned_cell_props = {}
 
@@ -52,7 +58,7 @@ class SheetManager:
 
         for r_idx, row in self.df.iterrows():
             for c_idx, val in enumerate(row):
-                curr_cell = dest_sheet.cell(row=r_idx + 1, column=c_idx + 1)
+                curr_cell = dest_sheet.cell(row=r_idx + 2, column=c_idx + 1)    # modify row increment
 
                 if isinstance(curr_cell, cell.MergedCell):
                     continue
@@ -253,9 +259,6 @@ class SheetManager:
             end_color=min_priority['color'],
             fill_type='solid'
         )
-        
-
-        
     
     @staticmethod
     def format_df(df: Union[pd.DataFrame, pd.Series]) -> Union[pd.DataFrame, pd.Series]:
@@ -277,6 +280,11 @@ class SheetManager:
             df[col] = df[col].apply(lambda x: x.to_pydatetime() if pd.notnull(x) else None)
         return df
     
+    @staticmethod
+    def row_follows_condition(row, conditions: dict) -> bool:
+        """Return True if all condition key-value pairs match the row."""
+        return all(row.get(k) == v for k, v in conditions.items())
+
     @staticmethod
     def values_equal(a, b):
         """

@@ -1,6 +1,6 @@
 import os
 from packages.log_manager import manage_logs
-from packages.workbook_manager import WorkbookManager
+from packages.workbook_manager_legacy import WorkbookManager
 from modules.utils import (
     single_select_input,
     multi_select_input,

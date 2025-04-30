@@ -7,7 +7,7 @@ def config_logger(save_path):
     logger.setLevel(logging.DEBUG)  # Set the minimum level for this logger
 
     # Create a file handler and set its format
-    file_handler = logging.FileHandler(Path(save_path) / 'migration_script.log')
+    file_handler = logging.FileHandler(Path(save_path) / 'migration_script_logs.log')
     formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
     file_handler.setFormatter(formatter)
     logger.addHandler(file_handler)

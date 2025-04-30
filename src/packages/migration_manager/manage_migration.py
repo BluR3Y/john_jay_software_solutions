@@ -3,7 +3,7 @@ from tqdm import tqdm
 
 from packages.database_manager import DatabaseManager
 from packages.migration_manager import MigrationManager
-from packages.workbook_manager import WorkbookManager
+from packages.workbook_manager_legacy import WorkbookManager
 from modules.utils import multi_select_input, single_select_input, request_file_path
 
 def generate_data(db_path: str):

@@ -1,23 +1,25 @@
 import pandas as pd
-import numpy as np
 import logging
 from typing import Union, Literal
 from openpyxl import worksheet
 from openpyxl.comments import Comment
 from openpyxl.styles import PatternFill
+import numpy as np
 from openpyxl.cell import cell
 
+assignable_sheet_props = ["sheet_state","column_dimensions"]
+assignable_cell_props = ["comment","fill","border","font","hyperlink","value","alignment","number_format"]
 
 class SheetManager:
     # openpyxl sheet properties: Title, col/row height/width, lock row/col, tab color, hide/Unhide col/rows, lock cells, modify print settings, hide sheets, add header/footer, Set gridline visibility
-    assignable_sheet_props = ["sheet_state","column_dimensions"]
+    
     # Reference
     # assigned_sheet_props = {
     #     "sheet_state": "visible"
     # }
 
     # openpyxl cell properties: Value, Font, Fill (Background Color), Border, Alignment, Number Format, Comment, Hyperlink, Merge Cells, Unmerge Cells
-    assignable_cell_props = ["comment","fill","border","font","hyperlink","value","alignment","number_format"]
+    
     # Reference
     # assigned_cell_props = {
     #     (1,5): {
@@ -40,6 +42,10 @@ class SheetManager:
             "color": "bb2124"
         }
     }
+
+    def __iter__(self):
+        for index, row in self.df.iterrows():
+            yield row.to_dict()
 
     def __init__(self, sheet_data: Union[pd.DataFrame, list]):
         if isinstance(sheet_data, list):
@@ -193,17 +199,24 @@ class SheetManager:
         
         formatted = self.format_df(filtered_rows)
         
-        if to_dict:
-            results = formatted.to_dict(orient=to_dict)
-            return results[0] if return_one else results
+        # if to_dict:
+        #     results = formatted.to_dict(orient=to_dict)
+        #     return results[0] if return_one else results
         return formatted.iloc[0] if return_one else formatted
     
-    def add_issue(self, row: int, col: int, type: Literal["notice", "warning", "error"], message: str):
+    def add_issue(self, row: int, col: Union[int, str], type: Literal["notice", "warning", "error"], message: str):
         """Alter cell properties to indicate warning state."""
-        num_rows, num_cols = self.df.shape
-        if not (0 <= row < num_rows) or not (0 <= col < num_cols):
-            raise ValueError("Index is out of bounds.")
+        if isinstance(col, str):
+            sheet_cols = self.df.columns
+            col_index = next(index for index, value in enumerate(sheet_cols) if value == col)
+            if col_index is None:
+                raise ValueError(f"{col} is not a valid column name in the sheet.")
+            col = col_index
         
+        num_rows, num_cols = self.df.shape
+        if not (0 <= row <= num_rows) or not (0 <= col < num_cols):
+            raise ValueError("Index is out of bounds.")
+
         issue_props = self.issue_types[type]
         cell_key = (row, col)
         cell_props = self.assigned_cell_props.get(cell_key, {})
@@ -259,27 +272,16 @@ class SheetManager:
             end_color=min_priority['color'],
             fill_type='solid'
         )
-    
-    @staticmethod
-    def format_df(df: Union[pd.DataFrame, pd.Series]) -> Union[pd.DataFrame, pd.Series]:
-        """
-        Replace NaT and NaN with None, and convert datetime columns/values to native Python datetime.
 
-        Parameters:
-        - df: A pandas DataFrame or Series to format.
-        """
-        df = df.replace({pd.NaT: None, np.nan: None})
+    def get_df(self, cols: list[str] = [], format: bool = False) -> pd.DataFrame:
+        sheet_df = self.df[cols] if len(cols) else self.df
+        sheet_df = sheet_df.copy()
 
-        if isinstance(df, pd.Series):
-            # Convert datetime Series to Python datetimes
-            if pd.api.types.is_datetime64_any_dtype(df):
-                df = df.apply(lambda x: x.to_pydatetime() if pd.notnull(x) else None)
-            return df
+        if format:
+            sheet_df = self.format_df(sheet_df)
         
-        for col in df.select_dtypes(include=["datetime64[ns]"]):
-            df[col] = df[col].apply(lambda x: x.to_pydatetime() if pd.notnull(x) else None)
-        return df
-    
+        return sheet_df
+
     @staticmethod
     def row_follows_condition(row, conditions: dict) -> bool:
         """Return True if all condition key-value pairs match the row."""
@@ -342,7 +344,26 @@ class SheetManager:
         total_possible = len(base)
 
         if total_possible == 0 or (max_matches / total_possible) < threshold:
-            print(max_matches, total_possible, max_matches/total_possible)
             return None
 
         return df.loc[best_idx]
+    
+    @staticmethod
+    def format_df(df: Union[pd.DataFrame, pd.Series]) -> Union[pd.DataFrame, pd.Series]:
+        """
+        Replace NaT and NaN with None, and convert datetime columns/values to native Python datetime.
+
+        Parameters:
+        - df: A pandas DataFrame or Series to format.
+        """
+        df = df.replace({pd.NaT: None, np.nan: None})
+
+        if isinstance(df, pd.Series):
+            # Convert datetime Series to Python datetimes
+            if pd.api.types.is_datetime64_any_dtype(df):
+                df = df.apply(lambda x: x.to_pydatetime() if pd.notnull(x) else None)
+            return df
+        
+        for col in df.select_dtypes(include=["datetime64[ns]"]):
+            df[col] = df[col].apply(lambda x: x.to_pydatetime() if pd.notnull(x) else None)
+        return df

@@ -1,490 +1,299 @@
-from typing import TYPE_CHECKING, Optional
-from modules.utils import find_closest_match, extract_titles, reverse_dict_search
+import re
+
+from typing import TYPE_CHECKING
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 
+from modules.utils import find_closest_match
+
 if TYPE_CHECKING:
-    # Only imported for type checking
-    from packages.migration_manager import MigrationManager
+    from .. import MigrationManager
 
 SHEET_NAME = "Proposal - Template"
 
-ACTIVITY_FALLBACK_ASSOCIATIONS = {
-    'Research': 'Research on Campus',
-    'Conference': 'General and Administrative Purpose on Campus',
-    'Other': 'Other Institutional Activity',
-    'Training': 'Instruction on Campus',
-    'Course Development': 'Experimental Development Research on Campus Experimental',
-    'Equipment': 'Equipment on Campus',
-    'Other - Center Development': 'Other Sponsored Activity on Campus',
-    'Program Development': 'Experimental Development Research on Campus Experimental',
-    'Research/Training': 'Research Training on Campus',
-    'Student Support': 'Fellowship'
-}
+# def determine_oar_status(grant_data: dict) -> str:
+#     project_status = str(grant_data.get('Status')).capitalize()
 
-# def determine_instrument_type(instance, award_type):
-#     valid_types = instance.INSTRUMENT_TYPES
-#     type_letter = None
-#     type_title = None
-#     if ('-' in award_type):
-#         type_letter, type_title = award_type.split('-')
-#     else:
-#         type_title = award_type
-
-#     for type_name, association in valid_types.items():
-#         if type_letter in association.keys():
-#             return type_name
-#         closest_valid_type = find_closest_match(type_title, [str(item) for item in association.values()], case_sensitive=False)
-#         if closest_valid_type:
-#             return type_name
-def determine_instrument_type(instance, type):
-    valid_types = instance.INSTRUMENT_TYPES
-    type_letter = None
-    type_title = None
-    if ('-' in type):
-        type_letter, type_title = type.split('-')
-    else:
-        type_title = type
-
-    closest_valid_type = find_closest_match(type_title, valid_types, case_sensitive=False)
-    return closest_valid_type
-    
-def determine_sponsor(instance, sponsor):    
-    all_orgs = instance.ALL_ORGS
-    inverse_orgs = {props.get('Alt Name'): name for name, props in all_orgs.items() if props.get('Alt Name')}
-    org_primary_names = list(all_orgs.keys())
-    org_alt_names = list(inverse_orgs.keys())
-    
-    # First, check if the sponsor is an exact match in primary or alternate orgs
-    if sponsor in org_primary_names:
-        return sponsor, all_orgs[sponsor]["Primary Code"]
-    
-    closest_valid_sponsor = find_closest_match(sponsor, org_primary_names, case_sensitive=False)
-    if closest_valid_sponsor:
-        return closest_valid_sponsor, all_orgs[closest_valid_sponsor]["Primary Code"]
-    
-    if sponsor in org_alt_names:
-        return sponsor, all_orgs[inverse_orgs[sponsor]]["Primary Code"]
-    
-    closest_valid_sponsor = find_closest_match(sponsor, org_alt_names, case_sensitive=False)
-    if closest_valid_sponsor:
-        return closest_valid_sponsor, all_orgs[inverse_orgs[closest_valid_sponsor]]["Primary Code"]
-    
-    # Extract titles and attempt title-based matching
-    titles = extract_titles(sponsor)
-
-    for title in titles:
-        if title in org_primary_names:
-            return title, all_orgs[title]["Primary Code"]
+#     if project_status == "Funded":
+#         project_end_date = grant_data.get('End_Date_Req') or grant_data.get('End_Date') or grant_data.get('Date_Submitted')
+#         if not project_end_date:
+#             raise ValueError("Grant was not assigned an End Date in the database.")
         
-        closest_valid_sponsor = find_closest_match(title, org_primary_names, case_sensitive=False)
-        if closest_valid_sponsor:
-            return closest_valid_sponsor, all_orgs[closest_valid_sponsor]["Primary Code"]
+#         funded_threshold = datetime.strptime('2024-01-01', '%Y-%m-%d')
+#         return "Active" if project_end_date >= funded_threshold else "Closed"
+    
+#     if project_status == "Pending":
+#         project_start_date = grant_data.get('Start_Date_Req') or grant_data.get('Date_Submitted') or grant_data.get('Start_Date')
+#         if not project_start_date:
+#             raise ValueError("Grant was not assigned a Start Date in the database.")
         
-        if title in org_alt_names:
-            return title, all_orgs[inverse_orgs[title]]["Primary Code"]
-        
-        closest_valid_sponsor = find_closest_match(title, org_alt_names, case_sensitive=False)
-        if closest_valid_sponsor:
-            return closest_valid_sponsor, all_orgs[inverse_orgs[closest_valid_sponsor]]["Primary Code"]
+#         pending_threshold = datetime.strptime('2024-06-30', '%Y-%m-%d')
+#         return "Activate" if project_start_date >= pending_threshold else "Closed"
+    
+#     if project_status in ["Withdrawn", "Unsubmitted", "Rejected"]:
+#         return "Closed"
 
-def determine_activity_type(instance, type, on_site):
-    activity_types = list(instance.ACTIVITY_TYPES)
-    if type in activity_types:
-        return type
+# Funded, Pending, Rejected, Unsubmitted, Withdrawn
+def determine_status(grant_data: dict) -> str:
+    pass
+    
+def determine_instrument_type(instrument_types: list[str], target: str) -> tuple[str, float]:
+    type = re.sub(r"^[A-Z]\s*-\s*", "", target)
+    return find_closest_match(type, instrument_types)
 
-    closest_match = find_closest_match(f"{type} {'on' if on_site else 'off'} Campus", activity_types, case_sensitive=False)
-    return closest_match
+def determine_sponsor(sponsors: dict, target: str) -> tuple[str, str, float]:
+    closest_sponsor = find_closest_match(target, list(sponsors.keys()))
+    if closest_sponsor:
+        return (closest_sponsor[0], sponsors[closest_sponsor[0]], closest_sponsor[1])
+    
+def determine_activity_type(activity_types: list[str], target: str) -> str:
+    if target in activity_types:
+        return target
+    closest_match = find_closest_match(target, activity_types, case_sensitive=False)
+    if closest_match:
+        return closest_match[0]
 
-def validate_grant_discipline(instance, discipline) -> dict:
-    """Validate if a discipline is in the list of valid disciplines."""
-
-    # Retrieve list of valid disciplines
-    valid_disciplines = list(instance.DISCIPLINES)
-    
-    if discipline in valid_disciplines:
-        return {"valid": True}
-    
-    # Attempt to find a close match
-    closest_valid_discipline = find_closest_match(discipline, valid_disciplines)
-    
-    return {
-        "valid": False,
-        "suggestion": closest_valid_discipline
-    }
-
-def determine_grant_admin_unit(instance, grant):
-    org_units = instance.ORG_UNITS
-    org_centers = instance.ORG_CENTERS
-    project_primary_dept = grant['Primary_Dept']
-    
-    org_unit_keys = [str(item) for item in org_units.keys()]
-    if project_primary_dept in org_unit_keys:
-        return project_primary_dept, org_units[project_primary_dept]['Primary Code'], None
-    
-    closest_valid_dept = find_closest_match(project_primary_dept, org_unit_keys)
-    if closest_valid_dept:
-        return closest_valid_dept, org_units[closest_valid_dept]['Primary Code'], None
-    
-    org_center_keys = [str(item) for item in org_centers.keys()]
-    if project_primary_dept in org_center_keys:
-        project_center = org_centers[project_primary_dept]
-        return project_center['Admin Unit'], project_center['Admin Unit Code'], project_primary_dept
-    
-    closest_valid_center = find_closest_match(project_primary_dept, org_center_keys)
-    if closest_valid_center:
-        project_center = org_centers[closest_valid_center]
-        return project_center['Admin Unit'], project_center['Admin Unit Code'], closest_valid_center
-    return (None, None, None)
 
 def proposals_sheet_append(
     self: "MigrationManager",
-    grant_data,
-    total_data,
-    rifunds_data
-    ):
-    gt_manager = self.generated_template_manager
-    ft_manager = self.feedback_template_manager
-    next_row = gt_manager.df[SHEET_NAME].shape[0] + 1
-    
-    grant_id = grant_data['Grant_ID']
-    grant_pln = grant_data['Project_Legacy_Number']
-    
-    # existing_data = ft_manager.find(SHEET_NAME, {"proposalLegacyNumber": grant_id}, return_one=True, to_dict='records') or {}
-    # project_sheet_entry = gt_manager.find("Project - Template", {"projectLegacyNumber": grant_pln}, return_one=True, to_dict='records') or {}
-    existing_data_ref = ft_manager.find(SHEET_NAME, {"proposalLegacyNumber": grant_id}, return_one=True)
-    existing_data = existing_data_ref.to_dict() if existing_data_ref is not None else {}
-    # project_sheet_entry = gt_manager.find("Project - Template", {"projectLegacyNumber": grant_pln}, return_one=True, to_dict='records') or {}
-    project_sheet_entry_ref = gt_manager.find("Project - Template", {"projectLegacyNumber": grant_pln}, return_one=True)
-    project_sheet_entry = project_sheet_entry_ref.to_dict() if project_sheet_entry_ref is not None else {}
+    grant_data: dict,
+    total_data: list,
+    rifunds_data: list):
+    gen_proposal_sheet_manager = self.generated_wb_manager[SHEET_NAME]
+    ref_proposal_sheet_manager = self.reference_wb_manager[SHEET_NAME] if self.reference_wb_manager else None
 
-    grant_status = grant_data['Status']
-    if not grant_status:
-        gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 3, 'error', "Grant is missing Status in database.")
-        existing_status = existing_data.get('Status')
-        if existing_status:
-            grant_status = existing_status
-            gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 3, 'notice', "Status was determined using feedback file.")
-    
-    
-    grant_oar = project_sheet_entry.get('status')
+    next_row = gen_proposal_sheet_manager.df.shape[0]
 
-    grant_primary_college = grant_data['Prim_College']
-    if not grant_primary_college:
-        gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 4, 'error', "Grant is missing Primary College in database.")
-        existing_college = existing_data.get('CUNY Campus')
-        if existing_college:
-            grant_primary_college = existing_college
-            gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 4, 'notice', "Primary College was determined using feedback file.")
-        
-    grant_instrument_type = None
-    if grant_data['Instrument_Type']:
+    grant_id = grant_data.get('Grant_ID')
+    grant_pln = grant_data.get('Project_Legacy_Number')
+
+    existing_data_ref = ref_proposal_sheet_manager.find({"proposalLegacyNumber": grant_id}, return_one=True) if ref_proposal_sheet_manager else None
+    existing_data = existing_data_ref.to_dict() if (existing_data_ref is not None and not existing_data_ref.empty) else {}
+
+    # Status
+    grant_ref_status = existing_data.get('status')
+    grant_gen_status = None
+    grant_db_status = grant_data.get('Status')
+    if grant_db_status:
         try:
-            determined_instrument_type = determine_instrument_type(self, grant_data['Instrument_Type'])
+            determined_status = determine_status()
+            if not determined_status:
+                raise ValueError(f"Grant was assigned an invalid status in the database: {grant_db_status}")
+            grant_gen_status = determined_status
+        except Exception as err:
+            gen_proposal_sheet_manager.add_issue(next_row, "status", "error", err)
+    else:
+        gen_proposal_sheet_manager.add_issue(next_row, "status", "error", "Grant is missing Status in database.")
+    
+    grant_status, status_error = self.determine_best_match(grant_ref_status, grant_gen_status)
+    if status_error:
+        gen_proposal_sheet_manager.add_issue(next_row, "status", "warning", status_error)
+    
+    # CUNY Campus
+    grant_ref_campus = existing_data.get('CUNY Campus')
+    grant_db_campus = grant_data.get('Prim_College')
+    if not grant_db_campus:
+        gen_proposal_sheet_manager.add_issue(next_row, "CUNY Campus", "error", "Grant is missing Primary College in database.")
+
+    grant_campus, campus_error = self.determine_best_match(grant_ref_campus, grant_db_campus)
+    if campus_error:
+        gen_proposal_sheet_manager.add_issue(next_row, "CUNY Campus", "warning", campus_error)
+    
+    # Instrument Type
+    grant_ref_instrument_type = existing_data.get('Instrument Type')
+    grant_gen_instrument_type = None
+    grant_db_instrument_type = grant_data.get('Instrument_Type')
+    if grant_db_instrument_type:
+        try:
+            determined_instrument_type = determine_instrument_type(self.INSTRUMENT_TYPES, grant_db_instrument_type)
             if not determined_instrument_type:
-                raise ValueError(f"Grant has invalid Instrument_Type in database: {grant_data['Instrument_Type']}")
-            grant_instrument_type = determined_instrument_type
+                raise ValueError(f"Grant was assigned an invalid Instrument Type in the database: {grant_db_instrument_type}")
+            if determined_instrument_type[1] < 90:
+                gen_proposal_sheet_manager.add_issue(next_row, "Instrument Type", "warning", f"Failed to find exact match for Instrument Type '{grant_db_instrument_type}' but was similar to {determined_instrument_type[0]}")
+            grant_gen_instrument_type = determined_instrument_type[0]
         except Exception as err:
-            gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 5, 'error', err)
+            gen_proposal_sheet_manager.add_issue(next_row, "Instrument Type", "error", err)
     else:
-        gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 5, 'error', "Grant is missing Instrument_Type in database.")
+        gen_proposal_sheet_manager.add_issue(next_row, "Instrument Type", "error", "Grant is missing Instrument Type in database.")
+
+    grant_instrument_type, instrument_type_error = self.determine_best_match(grant_ref_instrument_type, grant_gen_instrument_type)
+    if instrument_type_error:
+        gen_proposal_sheet_manager.add_issue(next_row, "Instrument Type", "warning", instrument_type_error)
     
-    grant_sponsor_name = None
-    grant_sponsor_code = None
-    if grant_data['Sponsor_1']:
+    # Sponsor
+    grant_ref_sponsor_code = existing_data.get('Sponsor')
+    grant_gen_sponsor_name = grant_gen_sponsor_code = None
+    grant_db_sponsor = grant_data.get('Sponsor_1')
+    if grant_db_sponsor:
         try:
-            determined_sponsor = determine_sponsor(self, grant_data['Sponsor_1'])
+            determined_sponsor = determine_sponsor(self.EXTERNAL_ORGS, grant_db_sponsor)
             if not determined_sponsor:
-                raise ValueError(f"Grant has invalid Sponsor_1 in database: {grant_data['Sponsor_1']}")
-            grant_sponsor_name, grant_sponsor_code = determined_sponsor
+                raise ValueError(f"Grant was assigned an invalid Sponsor_1 in the database: {grant_db_sponsor}")
+            if determined_sponsor[2] < 90:
+                gen_proposal_sheet_manager.add_issue(next_row, "Sponsor", "warning", f"Failed to find exact match for Sponsor '{grant_db_sponsor}' but was similar to {determined_sponsor[0]}")
+            grant_gen_sponsor_name, grant_gen_sponsor_code, *_ = determined_sponsor
         except Exception as err:
-            gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 6, 'error', err)
+            grant_gen_sponsor_code = grant_db_sponsor
+            gen_proposal_sheet_manager.add_issue(next_row, "Sponsor", "error", err)
     else:
-        gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 6, 'warning', "Grant does not have a Sponsor_1 in database.")
-    if not grant_sponsor_code:
-        existing_sponsor = existing_data.get('Sponsor')
-        if existing_sponsor:
-            grant_sponsor_code = existing_sponsor
-            gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 6, "notice", "Sponsor was retrieved from template file")
-        elif (grant_data['Sponsor_1']):
-            grant_sponsor_code = grant_data['Sponsor_1']
-            gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 6, "warning", "Sponsor does not exist in external orgs sheet.")
-    
-    if not grant_instrument_type:
+        gen_proposal_sheet_manager.add_issue(next_row, "Sponsor", "error", "Grant is missing Sponsor_1 in database.")
+
+    grant_sponsor_code, sponsor_error = self.determine_best_match(grant_ref_sponsor_code, grant_gen_sponsor_code)
+    if sponsor_error:
+        gen_proposal_sheet_manager.add_issue(next_row, "Sponsor", "warning", sponsor_error)
+
+    # Instrument Type Fallback
+    if not grant_gen_instrument_type:
         str_id = str(grant_data['RF_Account'])
         if str_id.startswith('6'):
-            grant_instrument_type = "PSC CUNY"
+            grant_gen_instrument_type = "PSC CUNY"
         elif grant_sponsor_code == 'CUNY':
-            grant_instrument_type = 'CUNY Internal'
+            grant_gen_instrument_type = 'CUNY Internal'
         elif grant_sponsor_code.startswith('NYC') or grant_sponsor_code.startswith('NYS'):
-            grant_instrument_type = "NYC/NYS MOU - Interagency Agreement"
+            grant_gen_instrument_type = "NYC/NYS MOU - Interagency Agreement"
         elif grant_sponsor_code == 'NSF' or grant_sponsor_code == 'JJCOAR':
-            grant_instrument_type = "Grant"
-        else:
-            existing_instrument_type = existing_data.get('Instrument Type')
-            if existing_instrument_type:
-                grant_instrument_type = existing_instrument_type
-                gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 5, 'notice', "Instrument Type was determined using feedback file.")
-        # if (grant_instrument_type and not grant_data['Instrument_Type']):
-        #     self.db_manager.update_query(
-        #         "grants",
-        #         { "Instrument_Type": grant_instrument_type },
-        #         { "Grant_ID": { "operator": "=", "value": grant_id } }
-        #     )
-        #     print(f"Updated Instrument Type to '{grant_instrument_type}' for grant:{grant_id}")
+            grant_gen_instrument_type = "Grant"
+        grant_instrument_type, instrument_type_error = self.determine_best_match(grant_ref_instrument_type, grant_gen_instrument_type)
+        if instrument_type_error:
+            gen_proposal_sheet_manager.add_issue(next_row, "Instrument Type", "warning", instrument_type_error)
 
-    grant_prime_sponsor_name = None
-    grant_prime_sponsor_code = None
-    if grant_data['Sponsor_2']:
+    # Prime Sponsor
+    grant_ref_prime_sponsor_code = existing_data.get('Prime Sponsor')
+    grant_gen_prime_sponsor_name = grant_gen_prime_sponsor_code = None
+    grant_db_prime_sponsor = grant_data.get('Sponsor_2')
+    if grant_db_prime_sponsor:
         try:
-            # determined_prime_sponsor_name, determined_prime_sponsor_code = determine_sponsor(self, grant_data['Sponsor_2'])
-            # if not determined_prime_sponsor_code:
-            #     raise ValueError(f"Grant has invalid Sponsor_2 in database: {grant_data['Sponsor_2']}")
-            # grant_prime_sponsor_code = determined_prime_sponsor_code
-            determined_prime_sponsor = determine_sponsor(self, grant_data['Sponsor_2'])
+            determined_prime_sponsor = determine_sponsor(self.EXTERNAL_ORGS, grant_db_prime_sponsor)
             if not determined_prime_sponsor:
-                raise ValueError(f"Grant has invalid Sponsor_2 in database: {grant_data['Sponsor_2']}")
-            grant_prime_sponsor_name, grant_prime_sponsor_code = determined_prime_sponsor
+                raise ValueError(f"Grant has invalid Sponsor_2 in database: {grant_db_prime_sponsor}")
+            if determined_prime_sponsor[2] < 90:
+                gen_proposal_sheet_manager.add_issue(next_row, "Prime Sponsor", "warning", f"Failed to find exact match for Prime Sponsor '{grant_db_prime_sponsor}' but was similar to {determined_prime_sponsor[0]}")
+            grant_gen_prime_sponsor_name, grant_gen_prime_sponsor_code, *_ = determined_prime_sponsor
         except Exception as err:
-            gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 7, 'error', err)
-    if not grant_prime_sponsor_code:
-        existing_prime_sponsor = existing_data.get('Prime Sponsor')
-        if existing_prime_sponsor:
-            grant_prime_sponsor_code = existing_prime_sponsor
-            gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 7, "notice", "Sponsor was retrieved from template file")
-        elif (grant_data['Sponsor_2']):
-            grant_prime_sponsor_code = grant_data['Sponsor_2']
-            
-    grant_title = project_sheet_entry.get('title')
-    grant_start_date = grant_data['Start_Date'] or grant_data['Start_Date_Req']
-    if not grant_start_date:
-        gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 9, 'error', "Grant does not have a start date in database.")
-        existing_start_date = existing_data.get('Project Start Date')
-        if existing_start_date:
-            grant_start_date = existing_start_date
-            gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 9, "notice", "Start Date was retrieved from template file")
-        elif (("OAR" or " oar " in grant_title) or (grant_sponsor_code == "JJCOAR") and grant_data['Status_Date']):
-            grant_start_date = grant_data['Status_Date']
-            # log
-        # if (grant_start_date):
-        #     self.db_manager.update_query(
-        #         "grants",
-        #         { "Start_Date": grant_start_date },
-        #         { "Grant_ID": {
-        #             "operator": "=",
-        #             "value": grant_id
-        #         } }
-        #     )
+            grant_gen_prime_sponsor_code = grant_db_prime_sponsor
+            gen_proposal_sheet_manager.add_issue(next_row, "Prime Sponsor", "error", err)
     
-    grant_end_date = grant_data['End_Date'] or grant_data['End_Date_Req']
-    if not grant_end_date:
-        gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 10, 'error', "Grant does not have a end date in database.")
-        existing_end_date = existing_data.get('Project End Date')
-        if existing_end_date:
-            grant_end_date = existing_end_date
-            gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 10, "notice", "End Date was retrieved from template file")
-        elif (("OAR" or " oar " in grant_title) or (grant_sponsor_code == "JJCOAR") and grant_data['Status_Date']):
-            grant_end_date = grant_data['Status_Date']
-        # if (grant_end_date):
-        #     self.db_manager.update_query(
-        #         "grants",
-        #         { "End_Date": grant_start_date + relativedelta(years=1) },
-        #         { "Grant_ID": {
-        #             "operator": "=",
-        #             "value": grant_id
-        #         } }
-        #     )
-    
-    grant_activity_type = None
-    if grant_data['Award_Type']:
-        try:
-            determined_activity_type = determine_activity_type(self, grant_data['Award_Type'], grant_data['Purpose'] != None)
-            if not determined_activity_type:
-                raise ValueError(f"Grant has invalid Award_Type in database: {grant_data['Award_Type']}")
-            grant_activity_type = determined_activity_type
-        except Exception as err:
-            gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 11, 'error', err)
-    else:
-        gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 11, 'error', "Grant is missing Award_Type in database")
-    if not grant_activity_type:
-        if existing_data.get('Activity Type'):
-            grant_activity_type = existing_data.get('Activity Type')
-            gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 11, "notice", "Award Type was retrieved from template file")
-        elif grant_instrument_type == 'PSC CUNY' or grant_instrument_type == 'CUNY Internal':
-            grant_activity_type = 'Research on Campus'
-        elif grant_sponsor_code == 'JJCOAR' or grant_sponsor_code == 'NSF' or grant_sponsor_code == 'NEH':
-            grant_activity_type = 'Research on Campus'
+    grant_prime_sponsor, prime_sponsor_error = self.determine_best_match(grant_ref_prime_sponsor_code, grant_gen_prime_sponsor_code)
+    if prime_sponsor_error:
+        gen_proposal_sheet_manager.add_issue(next_row, "Prime Sponsor", "warning", prime_sponsor_error)
 
-    grant_discipline = None
-    if grant_data['Discipline']:
-        discipline_validation = validate_grant_discipline(self, grant_data['Discipline'])
-        if discipline_validation['valid']:
-            grant_discipline = grant_data['Discipline']
-        elif discipline_validation['suggestion']:
-            grant_discipline = discipline_validation['suggestion']
-            gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 12, 'notice', f"Grant discipline value '{grant_data['Discipline']}' is not valid but a similar one was found.")
-        else:
-            gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 12, 'error', f"Grant discipline value '{grant_data['Discipline']} is not valid'")
+    # Title
+    grant_ref_title = existing_data.get('Title')
+    grant_db_title = grant_data.get('Project_Title')
+    if not grant_db_title:
+        gen_proposal_sheet_manager.add_issue(next_row, "Title", "error", "Grant is missing Project_Title in database.")
+    grant_title, title_error = self.determine_best_match(grant_ref_title, grant_db_title)
+    if title_error:
+        gen_proposal_sheet_manager.add_issue(next_row, "Title", "warning", title_error)
+
+    # Start Date
+    grant_ref_start_date = existing_data.get('Project Start Date')
+    grant_gen_start_date = None
+    grant_db_start_date = grant_data.get('Start_Date') or grant_data.get('Start_Date_Req')
+    if not grant_db_start_date:
+        gen_proposal_sheet_manager.add_issue(next_row, "Project Start Date", "error", "Grant does not have a start date in database.")
+        if ("OAR" or " oar " in grant_title) or (grant_sponsor_code == "JJCOAR") and grant_data.get('Status_Date'):
+            grant_gen_start_date = grant_data['Status_Date']
     else:
-        gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 12, 'error', "Grant does not have a discipline in database.")
-        
-    if not grant_discipline and grant_data['Primary_Dept']:
-        alt_discipline_validation = validate_grant_discipline(self, grant_data['Primary_Dept'])
-        if alt_discipline_validation['valid']:
-            grant_discipline = grant_data['Primary_Dept']
-            gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 12, 'notice', "Discipline was determined using Primary Dept.")
-        elif alt_discipline_validation['suggestion']:
-            grant_discipline = alt_discipline_validation['suggestion']
-            gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 12, 'notice', "Primary Dept. assimilated a valid Discipline.")
-            
-    if not grant_discipline:
-        existing_discipline = existing_data.get('Discipline')
-        if existing_discipline:
-            grant_discipline = existing_discipline
-            gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 12, "notice", "Discipline was retrieved from template file")
+        grant_gen_start_date = grant_db_start_date
+
+    grant_start_date, start_date_error = self.determine_best_match(grant_ref_start_date, grant_gen_start_date)
+    if start_date_error:
+        gen_proposal_sheet_manager.add_issue(next_row, "Project Start Date", "warning", start_date_error)
     
-    grant_num_budget_periods = len(total_data)
-    grant_rate_cost_type = None
-    if grant_data['RIndir%DC']:
-        num_direct = float(grant_data['RIndir%DC'])
-        if num_direct:
-            grant_rate_cost_type = "Total Direct Costs (TDC)"
-    if grant_data['RIndir%Per']:
-        num_wages = float(grant_data['RIndir%Per'])
-        if num_wages:
-            grant_rate_cost_type = "Salary and Wages (SW)"
-    if not grant_rate_cost_type:
-        existing_rate_cost_type = existing_data.get('Indirect Rate Cost Type')
-        if existing_rate_cost_type:
-            if existing_rate_cost_type not in ['Total Direct Costs (TDC)','Salary and Wages (SW)']:
-                print('Invalid cost type')
-            grant_rate_cost_type = existing_rate_cost_type
-            gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 15, "notice", "Rate Cost Type was retrieved from template file.")
-            
-    grant_idc_rate = round((float(grant_data['RIndir%DC']) if grant_rate_cost_type == "Total Direct Costs (TDC)" else (float(grant_data['RIndir%Per']) if grant_rate_cost_type == "Salary and Wages (SW)" else 0)) * 100, 1)
-    if not grant_idc_rate:
-        existing_idc_rate = existing_data.get('IDC Rate')
-        if existing_idc_rate:
-            grant_idc_rate = existing_idc_rate
-            gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 16, "IDC Rate was determined from template file.")
-    
-    grant_idc_cost_type_explain = grant_data['Indirect_Deviation']
-    if not grant_idc_cost_type_explain:
-        existing_cost_type_explain = existing_data.get('IDC Cost Type Explanation')
-        if existing_cost_type_explain:
-            grant_idc_cost_type_explain = existing_cost_type_explain
-            gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 17, 'notice', "Rate Cost Type Explanation retrieved from template file.")
-            
-    grant_total_direct_cost = round(sum(map(lambda fund: fund['RIAmount'], rifunds_data)))
-    grant_sponsor_code_cost = round(sum(map(lambda fund: fund['RAmount'], total_data)))
-    
-    grant_has_subrecipient = "Yes" if grant_data['Subrecipient_1'] else "No"
-    grant_has_human_subjects = "Yes" if grant_data['Human Subjects'] else "No"
-    grant_has_animal_subjects = "Yes" if grant_data['Research Animals'] else "No"
-    grant_has_hazard_material = ("Yes" if grant_data['Biohazards'] else "None")
-    grant_has_export_control = "Yes" if grant_data['Export Control'] else "No"
-    grant_comments = grant_data['Comments']
-    
-    grant_has_irb_approval = ("Approved" if grant_data['IRB_Approval'] else None)
-    grant_irb_approval_date = (grant_data['IRB_Start'] if grant_has_irb_approval else None)
-    
-    grant_idc_rate_less_on_campus_rate = "No"
-    reassigned_time_yn = "No"
-    reassigned_time_details = None
-    
-    grant_submit_date = grant_data['Date_Submitted']
-    if not grant_submit_date:
-        self.generated_template_manager.property_manager.append_comment(SHEET_NAME, next_row, 32, 'error', "Grant is missing Date_Submitted in the database.")
-    
-    grant_admin_unit_name = None
-    grant_admin_unit_code = None
-    grant_admin_unit_center = None
-    if grant_data['Primary_Dept']:
+    # End Date
+    grant_ref_end_date = existing_data.get('Project End Date')
+    grant_gen_end_date = None
+    grant_db_end_date = grant_data.get('End_Date') or grant_data.get('End_Date_Req')
+    if not grant_db_end_date:
+        gen_proposal_sheet_manager.add_issue(next_row, "Project End Date", "error", "Grant does not have an end date in database.")
+        if (("OAR" or " oar " in grant_title) or (grant_sponsor_code == "JJCOAR") and grant_data.get('Status_Date')):
+            grant_gen_end_date = grant_data['Status_Date']
+    else:
+        grant_gen_end_date = grant_db_end_date + relativedelta(years=1)
+
+    grant_end_date, end_date_error = self.determine_best_match(grant_ref_end_date, grant_gen_end_date)
+    if end_date_error:
+        gen_proposal_sheet_manager.add_issue(next_row, "Project End Date", "warning", end_date_error)
+
+    # Missing: Proposal Type
+
+    # Activity Type
+    grant_ref_activity_type = existing_data.get('Activity Type')
+    grant_gen_activity_type = None
+    grant_db_activity_type = grant_data.get('Award_Type')
+    if grant_db_activity_type:
         try:
-            grant_admin_unit_name, grant_admin_unit_code, grant_admin_unit_center = determine_grant_admin_unit(self, grant_data)
-            if not grant_admin_unit_name and not grant_admin_unit_code and not grant_admin_unit_center:
-                raise ValueError(f"Grant has invalid Primary_Dept in database: {grant_data['Primary_Dept']}")
+            determined_activity_type = find_closest_match(grant_db_activity_type, self.ACTIVITY_TYPES)
+            if not determined_activity_type:
+                raise ValueError(f"Grant has invalid Award_Type in database: {grant_db_activity_type}")
+            if determined_activity_type[1] < 90:
+                gen_proposal_sheet_manager.add_issue(next_row, "Activity Type", "warning", f"Failed to find exact match for Award_Type '{grant_db_activity_type}' but is similar to '{determined_activity_type[0]}'")
+            grant_gen_activity_type = determined_activity_type[0]
         except Exception as err:
-            gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 34, 'error', err)
+            gen_proposal_sheet_manager.add_issue(next_row, "Activity Type", "error", err)
     else:
-        gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 34, 'error', "Grant is missing Primary_Dept in database.")
-            
-    if not grant_admin_unit_name:
-        existing_unit_name = existing_data.get('Admin Unit Name')
-        if existing_unit_name:
-            grant_admin_unit_name = existing_unit_name
-            gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 34, 'notice', f"Admin Unit Name was retrieved from feedback file.")
-    if not grant_admin_unit_code:
-        existing_unit_code = existing_data.get('Admin Unit Code')
-        if existing_unit_code:
-            grant_admin_unit_code = existing_unit_code
-            gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 35, 'notice', f"Admin Unit Code was retrieved from feedback file.")
-    if grant_admin_unit_name == "Grant & Research Admin" and not grant_admin_unit_center:
-        existing_unit_center = existing_data.get('John Jay Centers')
-        if existing_unit_center:
-            grant_admin_unit_center = existing_unit_center
-            gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 33, 'notice', f"Admin Unit Code was retrieved from feedback file.")
-            
-    # if (not grant_start_date and grant_data['Date_Submitted'] and (grant_sponsor == "JJCOAR" or "OAR" in grant_title)):
-    #     print(f"Marker: {grant_data['Status_Date']}")
-    #     self.db_manager.update_query(
-    #         "grants",
-    #         {
-    #             "Start_Date": grant_data['Status_Date']
-    #         },
-    #         {
-    #             "Grant_ID": grant_id
-    #         }
-    #     )
-    # if (not grant_end_date and grant_data['Status_Date'] and (grant_sponsor == "JJCOAR" or "OAR" or " oar " in grant_title)):
-    #     self.db_manager.update_query(
-    #         "grants",
-    #         {
-    #             "Start_Date": grant_data['Status_Date'] + relativedelta(years=1)
-    #         },
-    #         {
-    #             "Grant_ID": grant_id
-    #         }
-    #     )
+        gen_proposal_sheet_manager.add_issue(next_row, "Activity Type", "error", "Grant is missing Award_Type in database.")
+
+    grant_activity_type, activity_type_error = self.determine_best_match(grant_ref_activity_type, grant_gen_activity_type)
+    if activity_type_error:
+        gen_proposal_sheet_manager.add_issue(next_row, "Activity Type", "warning", activity_type_error)
     
-    self.generated_template_manager.append_row(
-        self.process_name,
-        SHEET_NAME, {
-            "projectLegacyNumber": grant_pln,
-            "proposalLegacyNumber": grant_id,
-            "status": grant_status,
-            "OAR Status": grant_oar,
-            "CUNY Campus": grant_primary_college,
-            "Instrument Type": grant_instrument_type,
-            "Sponsor": grant_sponsor_code,
-            "Prime Sponsor": grant_prime_sponsor_code,
-            "Title": grant_title,
-            "Project Start Date": grant_start_date,
-            "Project End Date": grant_end_date,
-            "Activity Type": grant_activity_type,
-            "Discipline": grant_discipline,
-            "Abstract": "",
-            "Number of Budget Periods": grant_num_budget_periods,
-            "Indirect Rate Cost Type": grant_rate_cost_type,
-            "IDC Rate": grant_idc_rate,
-            "IDC Cost Type Explanation": grant_idc_cost_type_explain,
-            "Total Total Total Direct Cost (TDC) (TDC)s": round(grant_sponsor_code_cost - grant_total_direct_cost),
-            "Total InTotal Total Direct Cost (TDC) (TDC)s": grant_total_direct_cost,
-            "Total Sponsor Costs": grant_sponsor_code_cost,
-            "IDC Rate Less OnCampus Rate": grant_idc_rate_less_on_campus_rate,
-            "Reassigned Time YN": reassigned_time_yn,
-            "Reassigned Time Details": reassigned_time_details,
-            "Subrecipient": grant_has_subrecipient,
-            "Human Subjects": grant_has_human_subjects,
-            "IRB Protocol Status": grant_has_irb_approval,
-            "IRB Approval Date": grant_irb_approval_date,
-            "Animal Subjects": grant_has_animal_subjects,
-            "Hazardous Materials": grant_has_hazard_material,
-            "Export Control": grant_has_export_control,
-            "Additional Comments": grant_comments,
-            "Submission Date": grant_submit_date,
-            "Admin Unit Name": grant_admin_unit_name,
-            "Admin Unit Code": grant_admin_unit_code,
-            "John Jay Centers": grant_admin_unit_center
-        }
-    )
+    # Discipline
+    grant_ref_discipline = existing_data.get('Discipline')
+    grant_gen_discipline = None
+    grant_db_discipline = grant_data.get('Discipline')
+    if grant_db_discipline:
+        determined_discipline = find_closest_match(grant_db_discipline, self.DISCIPLINES)
+        if not determined_discipline:
+            raise ValueError(f"Grant has invalid Discipline in database: {grant_db_discipline}")
+        if determined_discipline[1] < 90:
+            gen_proposal_sheet_manager.add_issue(next_row, "Discipline", "warning", f"Exact match for grant discipline '{grant_db_discipline}' was not found but is similar to '{determined_discipline[0]}'")
+        grant_gen_discipline = determined_discipline[0]
+    else:
+        gen_proposal_sheet_manager.add_issue(next_row, "Discipline", "error", "Grant is missing Discipline in database.")
+
+    grant_discipline, discipline_error = self.determine_best_match(grant_ref_discipline, grant_gen_discipline)
+    if discipline_error:
+        gen_proposal_sheet_manager.add_issue(next_row, "Discipline", "warning", discipline_error)
+    
+
+    gen_proposal_sheet_manager.append_row({
+        "projectLegacyNumber": grant_pln,
+        "proposalLegacyNumber": grant_id,
+        "status": grant_status,
+        "Proposal Legacy Number": grant_pln,
+        "CUNY Campus": grant_campus,
+        "Instrument Type": grant_instrument_type,
+        "Sponsor": grant_sponsor_code,
+        "Prime Sponsor": grant_prime_sponsor,
+        "Title": grant_title,
+        "Project Start Date": grant_start_date.date(),
+        "Project End Date": grant_end_date.date(),
+        "Proposal Type": "",
+        "Activity Type": grant_activity_type,
+        "Discipline": grant_discipline,
+        "Abstract": "",
+        "Number of Budget Periods": "",
+        "Indirect Rate Cost Type": "",
+        "IDC Rate": "",
+        "IDC Cost Type Explanation": "",
+        "Total Direct Costs": "",
+        "Total Indirect Costs": "",
+        "Total Sponsor Costs": "",
+        "IDC Rate Less OnCampus Rate": "",
+        "Reassigned Time YN": "",
+        "Reassigned Time Details": "",
+        "Subrecipient": "",
+        "Subrecipient Names": "",
+        "Human Subjects": "",
+        "IRB Protocol Status": "",
+        "IRB Approval Date": "",
+        "Animal Subjects": "",
+        "Hazardous Materials": "",
+        "Export Control": "",
+        "Additional Comments": "",
+        "Submission Date": "",
+        "John Jay Centers": "",
+        "Admin Unit": "",
+    })

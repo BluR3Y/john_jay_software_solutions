@@ -30,7 +30,7 @@ def retrieve_pi_info(self):
             empl_id = str(person[3])
         
         investigators[empl_id] = fill_blanks(investigators.get(empl_id, {}), {
-                "name": {
+            "name": {
                 "first": first_name,
                 "middle": middle_name,
                 "last": last_name,

@@ -3,15 +3,15 @@ import platform
 from pathlib import Path
 from modules.utils import find_closest_match
 
-class FileManager:
+class ContentManager:
     """
     Manages the copying of a directory structure from a source to a destination
 
-    The FileManager ensures that the destination directory is clean before copying and handles file paths relative to the source directory. It uses a context manager to handle setup and cleanup.
+    The ContentManager ensures that the destination directory is clean before copying and handles file paths relative to the source directory. It uses a context manager to handle setup and cleanup.
     """
     def __init__(self, save_path: str, source_dir: str):
         """
-        Initializes the FileManager.
+        Initializes the ContentManager.
 
         Args:
             save_path: The root path where the source directory will be copied to.
@@ -22,7 +22,7 @@ class FileManager:
             FileExistsError: If the source directory does not exist.
         """
         if not save_path or not source_dir:
-            raise ValueError("Empty paths were provided to FileManager")
+            raise ValueError("Empty paths were provided to ContentManager")
         
         self.source_dir = Path(source_dir)
         if not self.source_dir.exists():
@@ -41,7 +41,7 @@ class FileManager:
             OSError: If an error occurs while creating the save directory.
         
         Returns:
-            FileManager: Returns the instance of the FileManager.
+            ContentManager: Returns the instance of the ContentManager.
         """
         if self.save_dir.exists():
             print(self.save_dir)
@@ -109,10 +109,10 @@ class FileManager:
 
     def find_closest_file(self, file_path: str):
         """
-        Finds the closest matching relative path within the FileManager's source directory for the given file path.
+        Finds the closest matching relative path within the ContentManager's source directory for the given file path.
 
         Args:
-            file_path (str): The file path to find the closest match for, relative to the FileManager's source directory.
+            file_path (str): The file path to find the closest match for, relative to the ContentManager's source directory.
 
         Returns:
             Path: Relative Path object or None if no close match is found or the source directory doesn't exist.
@@ -126,7 +126,7 @@ class FileManager:
             # Get list of directories and files in the current base directory
             all_items = [f.name for f in base_dir_obj.iterdir()]
             
-            closest_item = find_closest_match(part, all_items)
+            closest_item = find_closest_match(part, all_items)[0]
             if not closest_item:
                 return None  # No close match found
 

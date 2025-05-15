@@ -1,25 +1,25 @@
+from pathlib import Path
 import os
-import numpy as np
-import pandas as pd
+from datetime import datetime
 
-from modules.utils import request_file_path, multi_select_input, single_select_input
-from . import ReportGenerator
 from packages.database_manager import DatabaseManager
-from packages.workbook_manager_legacy import WorkbookManager
+from packages.workbook_manager import WorkbookManager
+from modules.utils import request_file_path, multi_select_input, single_select_input
 
-PROCESS_NAME = "Report Manager"
 
 def generate_reports(db_manager: DatabaseManager):
-    with ReportGenerator(os.getenv('SAVE_PATH')) as report_generator:
+    with WorkbookManager(write_file_path=Path(os.getenv("SAVE_PATH")) / f"generated_report_{datetime.now().strftime("%Y_%m_%d")}.xlsx") as report_workbook:
+        report_meta = report_workbook.create_sheet("report_meta_data", ["sheet_name", "table", "record_identifier"])
+        report_meta.assigned_sheet_props["sheet_state"] = "hidden"
         # Retrieve all the tables in the database
         db_tables = db_manager.get_db_tables()
         while True:
             try:
-                if report_generator.get_num_reports():
-                    selected_action = single_select_input("Enter a next step:", ["Generate another report", "Save and Exit"])
+                if report_meta.df.shape[0]:
+                    selected_action = single_select_input("Enter a next step:", ["Generate another report.", "Save and Exit"])
                     if selected_action == "Save and Exit":
                         break
-                    
+                
                 selected_table = single_select_input("Enter the name of the table whose records will be used to populate the report:", db_tables)
                 table_columns = db_manager.get_table_columns(selected_table)
                 record_identifier = list(table_columns.keys())[0]
@@ -47,7 +47,7 @@ def generate_reports(db_manager: DatabaseManager):
                         ids = conditions_file.read().split(',')
                     record_ids = ids
                 print(f"Search returned {len(record_ids)} records")
-                
+
                 if record_ids:
                     selected_properties = multi_select_input(f"Input the columns in the '{selected_table}' table that will be used to populate the report.", table_columns)
                     if not selected_properties:
@@ -78,66 +78,60 @@ def generate_reports(db_manager: DatabaseManager):
                     selected_report_name = input("What would you like to name this report: ")
                     if not selected_report_name:
                         raise ValueError("Failed to provide a report name.")
+                    report_workbook[selected_report_name] = report_data
                     query_condition = search_query if source_conditions == "Conditions Query" else {record_identifier:{"operator":"IN","value":record_ids}}
-                    report_generator.append_report(selected_report_name, selected_table, record_identifier,query_condition, report_data)
+                    report_meta.append_row({
+                        "sheet_name": selected_report_name,
+                        "table": selected_table,
+                        "record_identifier": record_identifier,
+                        "search_query": query_condition
+                    })
             except ValueError as err:
                 print(f"Validation Error: {err}")
             except Exception as err:
                 print(f"An unexpected error occured: {err}")
+        selected_wb_name = input("Select a file name for the report(Optional): ")
+        if selected_wb_name:
+            report_workbook.set_write_path(Path(os.getenv("SAVE_PATH")) / f"{selected_wb_name}.xlsx")
 
 def resolve_reports(db_manager: DatabaseManager):
     try:
         file_path = request_file_path("Enter the file path of the Excel file:", [".xlsx"])
-
         # Create a workbook for the Excel file
         report_wb = WorkbookManager(file_path).__enter__()
 
         # Validate metadata presence
-        report_meta = report_wb.get_sheet("report_meta_data", orient='records')
+        report_meta = report_wb["report_meta_data"]
         if not report_meta:
             raise FileExistsError("Report is missing metadata")
-        meta_data = {record['sheet_name']: record for record in report_meta}
+        
+        for sheet_meta in report_meta:
+            record_identifier = sheet_meta.get('record_identifier')
+            sheet_name = sheet_meta.get('sheet_name')
+            sheet_manager = report_wb[sheet_name]
+            sheet_columns = list(sheet_manager.get_df().keys())
 
-        # Process each sheet except metadata
-        sheet_names = [s for s in report_wb.df.keys() if s != "report_meta_data"]
-
-        for sheet_name in sheet_names:
-            if sheet_name not in meta_data:
-                print(f"Skipped sheet '{sheet_name}' as metadata did not contain info regarding sheet.")
-                continue
-            
-            sheet_meta_data = meta_data[sheet_name]
-            sheet_record_identifier = sheet_meta_data['record_identifier']
-            sheet_data_frame = report_wb.get_sheet(sheet_name)
-            # sheet_columns = sheet_data_frame.columns.tolist()
-            sheet_columns = list(sheet_data_frame.keys())
-            
-            selected_properties = multi_select_input(f"Select columns for '{sheet_name}' (comma-separated) or leave black:", sheet_columns)
+            selected_properties = multi_select_input(f"Select columns for '{sheet_name}' (comma-separated) or leave blank:", sheet_columns)
             if not selected_properties:
-                continue    # Skip sheet if not columns selected
-
-           # Validate column existance
-            for prop in selected_properties:
-                if prop not in sheet_columns:
-                    raise ValueError(f"The column '{prop}' does not exist in the sheet '{sheet_name}'")
+                continue    # Skip sheet if no columns selected
 
             # Ensure record identifier is included
-            if sheet_record_identifier not in selected_properties:
-                selected_properties.insert(0, sheet_record_identifier)
-
-            for row in report_wb.get_sheet(sheet_name, cols=selected_properties, format=True, orient='records'):
-                record_id = row[sheet_record_identifier]
+            if record_identifier not in selected_properties:
+                selected_properties.insert(0, record_identifier)
+            
+            for row in report_wb[sheet_name].get_df(cols=selected_properties, format=True).to_dict(orient='records'):
+                record_id = row[record_identifier]
                 db_manager.update_query(
-                    sheet_meta_data['table'],
-                    {name:val for name, val in row.items() if name != sheet_record_identifier},
+                    sheet_meta['table'],
+                    {name:val for name, val in row.items() if name != record_identifier},
                     {
-                        sheet_record_identifier: {
+                        record_identifier: {
                             "operator": "=",
                             "value": record_id
                         }
                     }
                 )
-        print("Finished making changes to records in the database.")
+            print("Finished making changes to records in the database.")
     except FileNotFoundError as err:
         print(f"File Error: {err}")
     except KeyError as err:
@@ -145,18 +139,17 @@ def resolve_reports(db_manager: DatabaseManager):
     except ValueError as err:
         print(f"Value Error: {err}")
     except Exception as err:
-        print(f"An unexpected error occurred: {err}")
-        
+        print(f"An unexpected error occured: {err}")
 
 def manage_reports():
-    with DatabaseManager(os.getenv("ACCESS_DB_PATH"), PROCESS_NAME) as db_manager:
-        print(f"Current Process: {PROCESS_NAME}")
+    with DatabaseManager(os.getenv("ACCESS_DB_PATH"), "REPORT-MANAGER") as db_manager:
         while True:
             user_selection = single_select_input("Select a Report Manager Action:", ["Generate Reports", "Resolve Reports", "Exit Process"])
 
-            if user_selection == "Generate Reports":
-                generate_reports(db_manager)
-            elif user_selection == "Resolve Reports":
-                resolve_reports(db_manager)
-            else:
-                return
+            match user_selection:
+                case "Generate Reports":
+                    generate_reports(db_manager)
+                case "Resolve Reports":
+                    resolve_reports(db_manager)
+                case _:
+                    return

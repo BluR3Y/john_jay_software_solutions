@@ -2,9 +2,11 @@ from typing import TYPE_CHECKING
 from datetime import datetime
 
 if TYPE_CHECKING:
-    from .. import MigrationManager
+    # Only imported for type checking
+    from packages.migration_manager import MigrationManager
 
 SHEET_NAME = "Project - Template"
+SHEET_COLUMNS = ["projectLegacyNumber", "title", "status"]
 
 def determine_grant_status(grant_data: dict):
     project_status = str(grant_data['Status']).capitalize()
@@ -25,30 +27,28 @@ def determine_grant_status(grant_data: dict):
         return "Active" if project_start_date >= pending_threshold else "Closed"
     elif project_status in ["Withdrawn", "Unsubmitted", "Rejected"]:
         return "Closed"
+    
 
 def projects_sheet_append(self: "MigrationManager", grant_data: dict):
-    ref_wb_manager = self.reference_wb_manager
-    ref_projects_sheet = ref_wb_manager[SHEET_NAME]
-    gen_wb_manager = self.generated_wb_manager
-    gen_projects_sheet = gen_wb_manager[SHEET_NAME]
-
-    next_row = gen_projects_sheet.df.shape[0]
-
-    grant_pln = grant_data.get('Project_Legacy_Number')
+    gt_manager = self.generated_template_manager
+    ft_manager = self.feedback_template_manager
+    next_row = gt_manager.df[SHEET_NAME].shape[0] + 1
+    
+    grant_pln = grant_data['Project_Legacy_Number']
     if not grant_pln:
-        gen_projects_sheet.add_issue(next_row, "projectLegacyNumber", "error", "Grant is missing Project Legacy Number")
-    existing_data_ref = ref_projects_sheet.find({"projectLegacyNumber": grant_pln}, return_one=True)
+        gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 0, "error", "Grant is missing Project Legacy Number")
+    existing_data_ref = ft_manager.find(SHEET_NAME, {"projectLegacyNumber": grant_pln}, return_one=True)
     existing_data = existing_data_ref.to_dict() if existing_data_ref is not None else {}
 
-    grant_title = grant_data.get('Project_Title')
+    grant_title = grant_data['Project_Title']
     if not grant_title:
-        gen_projects_sheet.add_issue(next_row, "title", "error", "Grant is missing Project Title.")
+        gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 1, "error", "Grant is missing Project Title in database.")        
         existing_title = existing_data.get('title')
         if existing_title:
             grant_title = existing_title
-            gen_projects_sheet.add_issue(next_row, "status", "notice", "Title was determined using feedback file.")
-    
-    grant_status = grant_data.get('Status')
+            gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 1, "notice", "Title was determined using feedback file.")
+
+    grant_status = grant_data['Status']
     grant_oar = None
     if grant_status:
         try:
@@ -57,15 +57,18 @@ def projects_sheet_append(self: "MigrationManager", grant_data: dict):
                 raise ValueError(f"Grant was assigned an invalid status in the database: {grant_status}")
             grant_oar = determined_oar
         except Exception as err:
-            gen_projects_sheet.add_issue(next_row, "status", "error", err)
+            gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 2, 'error', err)
     if not grant_oar:
         existing_oar = existing_data.get('status')
         if existing_oar:
             grant_oar = existing_oar
-            gen_projects_sheet.add_issue(next_row, "status", "notice", "Status was determined using feedback file.")
+            gt_manager.property_manager.append_comment(SHEET_NAME, next_row, 2, 'notice', "Status was determined using feedback file.")
 
-    gen_projects_sheet.append_row({
-        "projectLegacyNumber": grant_pln,
-        "title": grant_title,
-        "status": grant_oar
-    })
+    gt_manager.append_row(
+        self.process_name,
+        SHEET_NAME, {
+            "projectLegacyNumber": grant_pln,
+            "title": grant_title,
+            "status": grant_oar
+        }
+    )

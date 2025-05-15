@@ -66,30 +66,91 @@ def multi_select_input(requestStr: str, selections: list[str]) -> list[str]:
         selected_properties.append(formatted_prop)
     return selected_properties
 
-def find_closest_match(input, string_list, threshold=90, case_sensitive=True):
-    if not isinstance(input, str):
-        raise ValueError("The input must be a string.")
+# def find_closest_match(
+#         input,
+#         string_list,
+#         threshold=85,
+#         case_sensitive=True
+#     ) -> tuple[str, int]:
+#     """
+#     Determines the closest similar string in a list of strings.
+
+#     Parameters:
+#         - input (str): The target string to compare against others.
+#         - string_list (list[str]): A list of strings to compare against target string.
+#         - threshold (int): Minimum similarity score.
+#         - case_sensitive (bool): Boolean dictating whether to check case(Upper/Lower).
     
+#     Returns:
+#         tuple[str, int]: (best_match, best_score)
+#     """
+#     if not isinstance(input, str):
+#         raise ValueError("The input must be a string.")
+    
+#     if not isinstance(string_list, list) or not all(isinstance(s, str) for s in string_list):
+#         raise ValueError("string_list must be a list of strings.")
+    
+#     formatted_items = string_list if case_sensitive else [item.lower() for item in string_list]
+#     formatted_input = input if case_sensitive else input.lower()
+
+#     # Use rapidfuzz.process to calculate similarity scores for all strings
+#     matches = rapidfuzz.process.extract(formatted_input, formatted_items, scorer=rapidfuzz.fuzz.ratio, score_cutoff=threshold)
+    
+#     if not matches:
+#         for index, item in enumerate(formatted_items):
+#             if item.startswith(formatted_input) or item.endswith(formatted_input):
+#                 matches = [(item, 90, index)]
+#                 break
+#     if not matches:
+#         return None
+    
+#     # Extract the best match
+#     best_match, best_score, best_index = max(matches, key=lambda x: x[1])
+#     return (string_list[best_index], best_score)
+
+def find_closest_match(
+        target: str,
+        string_list: list[str],
+        threshold: int = 85,
+        case_sensitive: bool = True
+) -> tuple[str, int]:
+    """
+    Determines the closest similar string in a list of strings.
+
+    Parameters:
+        - target (str): The string to match.
+        - string_list (list[str]): List of candidate strings.
+        - threshold (int): Minimum similarity score.
+        - case_sensitive (bool): Whether comparison is case-sensitive.
+
+    Returns:
+        tuple[str, int]: (best_match, score) if match found, else None.
+    """
+    if not isinstance(target, str):
+        raise ValueError("Target must be a string.")
     if not isinstance(string_list, list) or not all(isinstance(s, str) for s in string_list):
         raise ValueError("string_list must be a list of strings.")
     
-    formatted_items = string_list if case_sensitive else [item.lower() for item in string_list]
-    formatted_input = input if case_sensitive else input.lower()
+    formatted_input = target if case_sensitive else target.lower()
+    formatted_list = string_list if case_sensitive else [s.lower() for s in string_list]
 
     # Use rapidfuzz.process to calculate similarity scores for all strings
-    matches = rapidfuzz.process.extract(formatted_input, formatted_items, scorer=rapidfuzz.fuzz.ratio, score_cutoff=threshold)
-    
+    matches = rapidfuzz.process.extract(
+        formatted_input,
+        formatted_list,
+        scorer=rapidfuzz.fuzz.ratio,
+        score_cutoff=threshold
+    )
+
     if not matches:
-        for index, item in enumerate(formatted_items):
+        for index, item in enumerate(formatted_list):
             if item.startswith(formatted_input) or item.endswith(formatted_input):
-                matches = [(item, 90, index)]
-                break
-    if not matches:
+                return (string_list[index], 90) # heuristic fallback
         return None
     
     # Extract the best match
-    best_match, best_score, best_index = max(matches, key=lambda x: x[1])
-    return string_list[best_index]
+    best_match, score, index = max(matches, key=lambda x: x[1])
+    return (string_list[index], score)
 
 def extract_titles(input_string):
     """

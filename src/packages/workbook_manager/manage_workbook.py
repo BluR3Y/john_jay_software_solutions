@@ -1,7 +1,8 @@
 import os
 import json
 import logging
-from packages.workbook_manager_beta import WorkbookManager, SheetManager
+# from packages.workbook_manager_beta import WorkbookManager, SheetManager
+from packages.workbook_manager import WorkbookManager, SheetManager
 # from content.proposal_data_set import proposal_data_set_config
 from modules.utils import (
     single_select_input,

@@ -8,21 +8,23 @@ from dotenv import load_dotenv
 from modules.utils import single_select_input
 from modules.logger import config_logger
 
-from packages.report_manager import manage_reports
-from packages.migration_manager import manage_migration
-from packages.database_manager import manage_database
-from packages.workbook_manager_legacy import manage_workbook
-from packages.workbook_manager_beta.manage_workbook import manage_workbook as beta
+# from packages.report_manager import manage_reports
+# from packages.migration_manager import manage_migration
+# from packages.database_manager import manage_database
+# from packages.workbook_manager_legacy import manage_workbook
+# from packages.workbook_manager_beta.manage_workbook import manage_workbook as beta
+
+from scripts.manage_database import manage_database
+from scripts.manage_reports import manage_reports
+from scripts.manage_migration import manage_migration
 
 # Run the program
 if __name__ == "__main__":
     user_actions = {
-        "Fix Template": None,
         "Manage Reports": manage_reports,
-        "Generate Template": manage_migration,
         "Manage Database": manage_database,
-        "Manage Workbook": manage_workbook,
-        "Beta": beta
+        "Manage Migration": manage_migration,
+        "Manage Workbook": None
     }
     
     # Initialize the argument parser

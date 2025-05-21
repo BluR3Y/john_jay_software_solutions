@@ -6,13 +6,14 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 
 from dotenv import load_dotenv
 from modules.utils import single_select_input
-from modules.logger import config_logger
+from modules.logger import logger
 
 # from packages.report_manager import manage_reports
 # from packages.migration_manager import manage_migration
 # from packages.database_manager import manage_database
 # from packages.workbook_manager_legacy import manage_workbook
 # from packages.workbook_manager_beta.manage_workbook import manage_workbook as beta
+from packages.workbook_manager import WorkbookManager
 
 from scripts.manage_database import manage_database
 from scripts.manage_reports import manage_reports
@@ -54,17 +55,27 @@ if __name__ == "__main__":
     parent_dir = os.path.dirname(file_dir)
     load_dotenv(os.path.join(parent_dir, f"env/.env.{args.env}"))
 
-    config_logger(os.getenv("SAVE_PATH"))
+    logger.config_logger(os.getenv("SAVE_PATH"), "debug")
+
+    tester_one = WorkbookManager("C:/Users/reyhe/OneDrive/Documents/JJay/data_pull_2025_05_19/generated_data_accumulator_iter_1.xlsx").__enter__()
+    tester_two = WorkbookManager("C:/Users/reyhe/OneDrive/Documents/JJay/data_pull_2025_05_19/generated_data_20_05_2025_iter_2.xlsx").__enter__()
+    
+    proposal_one = tester_one["Proposal - Template"]
+    proposal_two = tester_two["Proposal - Template"]
+    print(proposal_one.find_differences(proposal_two, ["proposalLegacyNumber"]))
 
     selected_process = args.process
-    if selected_process:
-        process_script = user_actions[selected_process]
-        process_script()
-    else:
-        while True:
-            user_selection = single_select_input("Select an action:", [*user_actions.keys(), "Exit Program"])
-            if user_selection == "Exit Program":
-                break
-            
-            action_fn = user_actions[user_selection]
-            action_fn()
+    try:
+        if selected_process:
+            process_script = user_actions[selected_process]
+            process_script()
+        else:
+            while True:
+                user_selection = single_select_input("Select an action:", [*user_actions.keys(), "Exit Program"])
+                if user_selection == "Exit Program":
+                    break
+                
+                action_fn = user_actions[user_selection]
+                action_fn()
+    except Exception as err:
+        logger.get_logger().exception(err)

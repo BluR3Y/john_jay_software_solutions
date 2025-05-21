@@ -4,6 +4,7 @@ from typing import Union, Literal
 from openpyxl import worksheet
 from openpyxl.comments import Comment
 from openpyxl.styles import PatternFill
+from openpyxl.utils import get_column_letter
 import numpy as np
 from openpyxl.cell import cell
 
@@ -47,6 +48,11 @@ class SheetManager:
         for index, row in self.df.iterrows():
             yield row.to_dict()
 
+    def __getitem__(self, key) -> Union[pd.Series, pd.DataFrame]:
+        if not isinstance(key, int) and not isinstance(key, list):
+            raise ValueError("Invalid key type")
+        return self.format_df(self.df.iloc[key])
+
     def __init__(self, sheet_data: Union[pd.DataFrame, list]):
         if isinstance(sheet_data, list):
             populated_data = all(isinstance(item, dict) for item in sheet_data)
@@ -59,12 +65,20 @@ class SheetManager:
         self.assigned_cell_props = {}
 
     def _append_data(self, dest_sheet: worksheet):
+        # Apply assigned sheet properties
         for attr_name, attr_val in self.assigned_sheet_props.items():
             setattr(dest_sheet, attr_name, attr_val)
 
+        # Identify empty columns (i.e., all values are NaN or None)
+        empty_columns = set()
+        for c_idx in range(self.df.shape[1]):
+            if self.df.iloc[:, c_idx].isnull().all():
+                empty_columns.add(c_idx)
+
+        # Populate the sheet
         for r_idx, row in self.df.iterrows():
             for c_idx, val in enumerate(row):
-                curr_cell = dest_sheet.cell(row=r_idx + 2, column=c_idx + 1)    # modify row increment
+                curr_cell = dest_sheet.cell(row=r_idx + 2, column=c_idx + 1)
 
                 if isinstance(curr_cell, cell.MergedCell):
                     continue
@@ -75,20 +89,48 @@ class SheetManager:
                 if cell_attrs:
                     for attr_name, attr_val in cell_attrs.items():
                         setattr(curr_cell, attr_name, attr_val)
-
-    def series_indices(self, obj: pd.Series) -> list[int]:
-        """
-        Find row indices where the Series exactly matches a row in the sheet.
-        """
-        if not isinstance(obj, pd.Series):
-            raise TypeError("obj must be a pandas Series")
         
-        # Ensure obj has the same columns as the DataFrame for valid comparison
-        if not all(col in self.df.columns for col in obj.index):
+        # Hide columns with no values
+        for c_idx in empty_columns:
+            col_letter = get_column_letter(c_idx + 1)
+            dest_sheet.column_dimensions[col_letter].hidden = True
+
+    def series_indices(self, obj: Union[pd.Series, dict], treat_nan_equal: bool = False) -> list[int]:
+        """
+        Find row indices in the sheet where the given Series or dict exactly matches.
+
+        Parameters:
+            obj (Union[pd.Series, dict]): Object to match against rows.
+            treat_nan_equal (bool): If True, treat NaNs as equal in comparisons.
+
+        Returns:
+            list[int]: Indices of rows that exactly match the given object.
+        """
+        # Normalize input to Series
+        if isinstance(obj, pd.Series):
+            obj_series = obj
+        elif isinstance(obj, dict):
+            obj_series = pd.Series(obj)
+        else:
+            raise TypeError("Object must be either a pandas Series or a dictionary.")
+        
+        # Validate column alignment
+        if not all(col in self.df.columns for col in obj_series.index):
             raise ValueError("Series contains columns that do not exist in the sheet.")
         
-        matching_indices = self.df.index[self.df.apply(lambda row: row.equals(obj), axis=1)]
-        return matching_indices.tolist()
+        if self.df.empty:
+            return []
+
+        # Handle NaN-safe comparison if specified
+        df_cmp = self.df[obj_series.index]
+        obj_cmp = obj_series.values
+        if treat_nan_equal:
+            df_cmp = df_cmp.fillna("<<NA>>")
+            obj_cmp = obj_series.fillna("<<NA>>").values
+
+        # Find matching rows
+        matching_mask = (df_cmp == obj_cmp).all(axis=1)
+        return self.df.index[matching_mask].tolist()
     
     def update_cell(self, row: Union[int, pd.Series], properties: dict) -> pd.Series:
         """
@@ -101,7 +143,7 @@ class SheetManager:
         # Determine the row index
         row_index = None
         if isinstance(row, pd.Series):
-            matches = self.series_indices(self.df, row)
+            matches = self.series_indices(row)
             if len(matches) != 1:
                 raise ValueError("Series did not uniquely match a single row.")
             row_index = matches[0]
@@ -155,7 +197,7 @@ class SheetManager:
         # Determine the row index
         row_index = None
         if isinstance(row, pd.Series):
-            matches = self.series_indices(self.df, row)
+            matches = self.series_indices(row)
             if len(matches) != 1:
                 raise ValueError("Series did not uniquely match a single row.")
             row_index = matches[0]
@@ -173,7 +215,7 @@ class SheetManager:
         self.df = self.df.drop(index=row_index).reset_index(drop=True)
         return row_data
     
-    def find(self, conditions: dict, return_one: bool = False, to_dict: str = None):
+    def find(self, conditions: dict, return_one: bool = False, clean_copy=False):
         """
         Retrieve rows matching specific conditions in a sheet.
 
@@ -199,9 +241,10 @@ class SheetManager:
         
         formatted = self.format_df(filtered_rows)
         
-        # if to_dict:
-        #     results = formatted.to_dict(orient=to_dict)
-        #     return results[0] if return_one else results
+        if clean_copy:
+            result = formatted.copy()
+            return result.reset_index(drop=True)
+
         return formatted.iloc[0] if return_one else formatted
     
     def add_issue(self, row: int, col: Union[int, str], type: Literal["notice", "warning", "error"], message: str):
@@ -282,6 +325,120 @@ class SheetManager:
         
         return sheet_df
 
+    def find_differences(self, target: "SheetManager", identifier_cols: list[str]) -> dict:
+        """
+        Compares rows between the current sheet and a target sheet using identifier columns.
+        Returns a dictionary where keys are row indices from self.df, and values are either:
+            - A dict of differing field values from the target (excluding identifier columns)
+            - None, if no matching row was found in the target
+
+        Notes:
+            - Rows with multiple source matches are processed using closest-match logic.
+            - Target matches are consumed greedily to avoid reuse in fuzzy matching.
+            - NaN values are considered equal.
+        """
+        
+        # Validate identifier columns
+        if not identifier_cols:
+            raise ValueError("Failed to provide identifier_cols")
+        
+        shared_cols = list(set(self.df.columns) & set(target.df.columns))
+        if not shared_cols:
+            raise KeyError("Sheets don't share any similar columns.")
+
+        if not all(col in shared_cols for col in identifier_cols):
+            raise ValueError("Invalid identifier columns.")
+
+        source_df = self.get_df(format=True)
+
+        # Extract unique identifier tuples
+        unique_identifiers = {
+            tuple(row[col] for col in identifier_cols)
+            for _, row in source_df[identifier_cols].iterrows()
+        }
+
+        # Helper: NaN-safe value diffing
+        def get_changes(base: dict, ref: dict) -> dict:
+            def differs(a, b):
+                if pd.isna(a) and pd.isna(b):
+                    return False
+                return a != b
+
+            return {
+                key: val for key, val in ref.items()
+                if key not in identifier_cols and differs(base.get(key), val)
+            }
+
+        differences = {}
+
+        for identifier in unique_identifiers:
+            # Build dict for row lookup
+            record_identifier = {col: identifier[i] for i, col in enumerate(identifier_cols)}
+            
+            source_matches_ref = self.find(record_identifier)
+            target_matches_ref = target.find(record_identifier, clean_copy=True)
+
+            # Create dict list of source matches
+            source_matches = source_matches_ref.to_dict(orient='records')
+            # Map local index to original DataFrame index
+            source_mapping = {
+                local_idx: global_idx
+                for local_idx, (global_idx, _) in enumerate(source_matches_ref.iterrows())
+            }
+
+            if len(source_matches_ref) > 1:
+                # If no target match at all, mark all source rows as unmatched
+                if target_matches_ref is None or target_matches_ref.empty:
+                    for global_idx in source_mapping.values():
+                        differences[global_idx] = None
+                    continue
+
+                # Sort source rows by count of non-null fields (most complete first)
+                sorted_local_indices = sorted(
+                    range(len(source_matches)),
+                    key=lambda idx: sum(val is not None for val in source_matches[idx].values()),
+                    reverse=True
+                )
+
+                for local_idx in sorted_local_indices:
+                    source_row = source_matches[local_idx]
+                    global_idx = source_mapping[local_idx]
+
+                    if not target_matches_ref.empty:
+                        closest_idx = self.find_closest_row(source_row, target_matches_ref, threshold=0.15)
+                        target_row = target_matches_ref.iloc[closest_idx].to_dict()
+
+                        changes = get_changes(source_row, target_row)
+                        if changes:
+                            differences[global_idx] = changes
+
+                        # Remove the used target match to prevent reuse
+                        target_matches_ref.drop(index=target_matches_ref.index[closest_idx], inplace=True)
+                    else:
+                        differences[global_idx] = None
+
+            else:
+                # Single source match
+                source_row = source_matches[0]
+                global_idx = source_mapping[0]
+
+                if target_matches_ref is None or target_matches_ref.empty:
+                    differences[global_idx] = None
+                elif len(target_matches_ref) > 1:
+                    closest_idx = self.find_closest_row(source_row, target_matches_ref, threshold=0.15)
+                    target_row = target_matches_ref.iloc[closest_idx].to_dict()
+                    changes = get_changes(source_row, target_row)
+                    if changes:
+                        differences[global_idx] = changes
+                else:
+                    # Single target match
+                    target_row = target_matches_ref.iloc[0].to_dict()
+                    changes = get_changes(source_row, target_row)
+                    if changes:
+                        differences[global_idx] = changes
+
+        return differences
+
     @staticmethod
     def row_follows_condition(row, conditions: dict) -> bool:
         """Return True if all condition key-value pairs match the row."""
@@ -319,7 +476,7 @@ class SheetManager:
         return a == b
 
     @staticmethod
-    def find_closest_row(base: dict, df: pd.DataFrame, threshold: float = 0.75) -> Union[pd.Series, None]:
+    def find_closest_row(base: dict, df: pd.DataFrame, threshold: float = 0.75) -> Union[int, None]:
         """
         Return the row in the DataFrame that most closely matches the given base dictionary.
 
@@ -346,7 +503,8 @@ class SheetManager:
         if total_possible == 0 or (max_matches / total_possible) < threshold:
             return None
 
-        return df.loc[best_idx]
+        # return df.loc[best_idx]
+        return best_idx
     
     @staticmethod
     def format_df(df: Union[pd.DataFrame, pd.Series]) -> Union[pd.DataFrame, pd.Series]:

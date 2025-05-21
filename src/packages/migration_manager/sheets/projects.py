@@ -1,71 +1,25 @@
 from typing import TYPE_CHECKING
-from datetime import datetime
 
 if TYPE_CHECKING:
     from .. import MigrationManager
 
 SHEET_NAME = "Project - Template"
 
-def determine_grant_status(grant_data: dict):
-    project_status = str(grant_data['Status']).capitalize()
-    
-    if project_status == "Funded":
-        project_end_date = grant_data['End_Date_Req'] or grant_data['End_Date'] or grant_data['Date_Submitted']
-        if not project_end_date:
-            raise ValueError("Grant was not assigned an End Date in the database. Which is required to determine its status.")
-            
-        funded_threshold = datetime.strptime('2024-01-01', '%Y-%m-%d')
-        return "Active" if project_end_date >= funded_threshold else "Closed"
-    elif project_status == "Pending":
-        project_start_date = grant_data['Start_Date_Req'] or grant_data['Date_Submitted'] or grant_data['Start_Date']
-        if not project_start_date:
-            raise ValueError("Grant was not assigned a Start Date in the database. Which is required to determine its status.")
-        
-        pending_threshold =  datetime.strptime('2024-06-30', '%Y-%m-%d')
-        return "Active" if project_start_date >= pending_threshold else "Closed"
-    elif project_status in ["Withdrawn", "Unsubmitted", "Rejected"]:
-        return "Closed"
-
 def projects_sheet_append(self: "MigrationManager", grant_data: dict):
-    ref_wb_manager = self.reference_wb_manager
-    ref_projects_sheet = ref_wb_manager[SHEET_NAME]
-    gen_wb_manager = self.generated_wb_manager
-    gen_projects_sheet = gen_wb_manager[SHEET_NAME]
-
-    next_row = gen_projects_sheet.df.shape[0]
-
+    gen_projects_sheet_manager = self.generated_wb_manager[SHEET_NAME]
+    gen_proposals_sheet_manager = self.generated_wb_manager["Proposal - Template"]
     grant_pln = grant_data.get('Project_Legacy_Number')
-    if not grant_pln:
-        gen_projects_sheet.add_issue(next_row, "projectLegacyNumber", "error", "Grant is missing Project Legacy Number")
-    existing_data_ref = ref_projects_sheet.find({"projectLegacyNumber": grant_pln}, return_one=True)
-    existing_data = existing_data_ref.to_dict() if existing_data_ref is not None else {}
 
-    grant_title = grant_data.get('Project_Title')
-    if not grant_title:
-        gen_projects_sheet.add_issue(next_row, "title", "error", "Grant is missing Project Title.")
-        existing_title = existing_data.get('title')
-        if existing_title:
-            grant_title = existing_title
-            gen_projects_sheet.add_issue(next_row, "status", "notice", "Title was determined using feedback file.")
+    proposals_data_ref = gen_proposals_sheet_manager.find({"projectLegacyNumber": grant_pln}, return_one=True)
+    proposals_data = proposals_data_ref.to_dict() if proposals_data_ref is not None else {}
     
-    grant_status = grant_data.get('Status')
-    grant_oar = None
-    if grant_status:
-        try:
-            determined_oar = determine_grant_status(grant_data)
-            if not determined_oar:
-                raise ValueError(f"Grant was assigned an invalid status in the database: {grant_status}")
-            grant_oar = determined_oar
-        except Exception as err:
-            gen_projects_sheet.add_issue(next_row, "status", "error", err)
-    if not grant_oar:
-        existing_oar = existing_data.get('status')
-        if existing_oar:
-            grant_oar = existing_oar
-            gen_projects_sheet.add_issue(next_row, "status", "notice", "Status was determined using feedback file.")
+    grant_title = proposals_data.get('Title')
+    grant_status = proposals_data.get('status')
+    if grant_status in ["Funded", "In Development"]:
+        grant_status = "Active"
 
-    gen_projects_sheet.append_row({
+    gen_projects_sheet_manager.append_row({
         "projectLegacyNumber": grant_pln,
         "title": grant_title,
-        "status": grant_oar
+        "status": grant_status
     })

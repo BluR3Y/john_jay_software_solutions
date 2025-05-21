@@ -8,13 +8,16 @@
         "projectLegacyNumber",
         "proposalLegacyNumber",
         "status",
+        "OAR Status",
         "S2S reference id",
         "Proposal Legacy Number",
         "CUNY Campus",
         "Sponsor Deadline",
         "Instrument Type",
         "Sponsor",
+        "Sponsor Name",
         "Prime Sponsor",
+        "Prime Sponsor Name",
         "Program Officer Contact Info",
         "Sponsor App No",
         "Sponsor Guidelines Options",
@@ -156,7 +159,8 @@
         "Additional Comments",
         "Submission Date",
         "John Jay Centers",
-        "Admin Unit"
+        "Admin Unit",
+        "Admin Unit Name"
     ],
     "Award - Template": [
         "projectLegacyNumber",

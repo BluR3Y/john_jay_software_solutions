@@ -1,1 +1,35 @@
-1010729,1011122,1011270,1011281,1011284,1011547,1011719,1011723,1011760,1011782,1011939,1011947,1012103,1012223,1012348,1012442,1012611,1012726,1012673,1013026,1013051,1012691,1013085,1006942,1006883,1006829,1006690,1006372,1006017,1005989,1005449,1005981,1005958,1005758,1005662,1005585,1005203,1005023,1013376,1013438,1013627,1013819
+projectLegacyNumber	
+proposalLegacyNumber	
+OAR Status	
+status	
+Instrument Type	
+Sponsor	
+Prime Sponsor	
+Title	
+Project Start Date	
+Project End Date	
+Activity Type	
+Discipline	
+Abstract	
+Number of Budget Periods	
+Indirect Rate Cost Type	
+IDC Rate	
+IDC Cost Type Explanation	
+Total Total Total Direct Cost (TDC) (TDC)s	
+Total InTotal Total Direct Cost (TDC) (TDC)s	
+Total Sponsor Costs	
+IDC Rate Less OnCampus Rate	
+Reassigned Time YN	
+Reassigned Time Details	
+Subrecipient	
+Human Subjects	
+IRB Protocol Status	
+IRB Approval Date	
+Animal Subjects	
+Hazardous Materials	
+Export Control	
+Additional Comments	
+Submission Date	
+John Jay Centers	
+Admin Unit Name	
+Admin Unit Code

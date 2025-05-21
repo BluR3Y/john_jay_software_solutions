@@ -12,6 +12,7 @@ from packages.content_manager import ContentManager
 from .sheets.projects import projects_sheet_append
 from .sheets.members import members_sheet_append
 from .sheets.proposals import proposals_sheet_append
+from .sheets.awards import awards_sheet_append
 
 class MigrationManager:
     config_dir_path = Path(__file__).resolve().parent / 'configs'
@@ -37,7 +38,8 @@ class MigrationManager:
         self._retrieve_wb_config()
         self._retrieve_internal_orgs()
         self._retrieve_external_orgs()
-        self._retrieve_people()
+        self._retrieve_centers()
+        # self._retrieve_people()
         self._retrieve_associations()
         return self
 
@@ -88,17 +90,12 @@ class MigrationManager:
             self.INTERNAL_ORGS = json.load(f)
 
     def _retrieve_external_orgs(self):
-        external_orgs = {}
-        external_orgs_sheet_manager = self.reference_wb_manager["Data - External Orgs"]
-
-        for index, row in external_orgs_sheet_manager.get_df(format=True).iterrows():
-            key, value = row
-
-            # Normalize and clean name data
-            name = re.sub("-(PP|FF)$", "", key).strip()
-            code = value.strip() if value else None
-            external_orgs[name] = code
-        self.EXTERNAL_ORGS = external_orgs
+        with open(self.config_dir_path / 'john_jay_external_orgs.json', 'r', encoding='utf-8') as f:
+            self.EXTERNAL_ORGS = json.load(f)
+    
+    def _retrieve_centers(self):
+        with open(self.config_dir_path / 'john_jay_centers.json', 'r', encoding='utf-8') as f:
+            self.CENTERS = json.load(f)
 
     def _retrieve_associations(self):
         with open(self.config_dir_path / 'john_jay_associations.json', 'r', encoding='utf-8') as f:
@@ -116,8 +113,8 @@ class MigrationManager:
             return (ref_sol, "Status was determined using reference workbook.")
         elif gen_sol:
             return (gen_sol, None)
-        return (None, None)
 
 MigrationManager.projects_sheet_append = projects_sheet_append
 MigrationManager.members_sheet_append = members_sheet_append
 MigrationManager.proposals_sheet_append = proposals_sheet_append
+MigrationManager.awards_sheet_append = awards_sheet_append

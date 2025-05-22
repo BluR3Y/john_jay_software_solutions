@@ -54,10 +54,10 @@ def determine_status(grant_data: dict) -> str:
     
 def determine_instrument_type(instrument_types: list[str], target: str) -> tuple[str, float]:
     type = re.sub(r"^[A-Z]\s*-\s*", "", target)
-    return find_closest_match(type, instrument_types)
+    return find_closest_match(type, instrument_types, case_sensitive=False)
 
 def determine_sponsor(sponsors: dict, target: str) -> tuple[str, str, float]:
-    closest_sponsor = find_closest_match(target, list(sponsors.keys()))
+    closest_sponsor = find_closest_match(target, list(sponsors.keys()), case_sensitive=False)
     if closest_sponsor:
         return (closest_sponsor[0], sponsors[closest_sponsor[0]].get('Primary Code'), closest_sponsor[1])
     
@@ -294,7 +294,7 @@ def proposals_sheet_append(
     grant_db_activity_type = grant_data.get('Award_Type')
     if grant_db_activity_type:
         try:
-            determined_activity_type = find_closest_match(grant_db_activity_type, self.ACTIVITY_TYPES)
+            determined_activity_type = find_closest_match(grant_db_activity_type, self.ACTIVITY_TYPES, case_sensitive=False)
             if not determined_activity_type:
                 raise ValueError(f"Grant has invalid Award_Type in database: {grant_db_activity_type}")
             if determined_activity_type[1] < 90:
@@ -316,7 +316,7 @@ def proposals_sheet_append(
     grant_gen_discipline = grant_discipline = None
     grant_db_discipline = grant_data.get('Discipline')
     if grant_db_discipline:
-        determined_discipline = find_closest_match(grant_db_discipline, self.DISCIPLINES)
+        determined_discipline = find_closest_match(grant_db_discipline, self.DISCIPLINES, case_sensitive=False)
         if not determined_discipline:
             raise ValueError(f"Grant has invalid Discipline in database: {grant_db_discipline}")
         if determined_discipline[1] < 90:
@@ -328,7 +328,7 @@ def proposals_sheet_append(
     # Fallback: Discipline
     grant_db_primary_dept = grant_data.get('Primary_Dept')
     if not grant_gen_discipline and grant_db_primary_dept:
-        determined_discipline = find_closest_match(grant_db_primary_dept, self.DISCIPLINES)
+        determined_discipline = find_closest_match(grant_db_primary_dept, self.DISCIPLINES, case_sensitive=False)
         if determined_discipline:
             gen_proposal_sheet_manager.add_issue(next_row, "Discipline", "warning", "Discipline was determined using Primary Dept.")
             grant_gen_discipline = determined_discipline[0]
@@ -362,14 +362,14 @@ def proposals_sheet_append(
                 grant_gen_indir_cost_type = "Total Direct Costs (TDC)"
             elif indir_per_num > indir_dc_num:
                 grant_gen_indir_cost_type = "Salary and Wages (SW)"
-            else:
-                raise ValueError(f"Grant was assigned: RIndir%DC - {grant_db_indir_dc} and RIndir%Per - {grant_db_indir_per}")
+            # else:
+            #     raise ValueError(f"Grant was assigned: RIndir%DC - {grant_db_indir_dc} and RIndir%Per - {grant_db_indir_per}")
         elif grant_db_indir_dc is not None:
             grant_gen_indir_cost_type = "Total Direct Costs (TDC)"
         elif grant_db_indir_per is not None:
             grant_gen_indir_cost_type = "Salary and Wages (SW)"
-        else:
-            raise ValueError("Grant is missing Indirect Percentage in database.")
+        # else:
+        #     raise ValueError("Grant is missing Indirect Percentage in database.")
     except Exception as err:
         gen_proposal_sheet_manager.add_issue(next_row, "Indirect Rate Cost Type", "error", err)
 
@@ -482,13 +482,15 @@ def proposals_sheet_append(
     grant_yearly_indirect_cost = determine_yearly_indirect_cost(rifunds_data)
     grant_yearly_direct_cost = determine_yearly_direct_cost(grant_yearly_total_cost, grant_yearly_indirect_cost)
     
+    # IF any grant period year duplicate, disregard anual budgeting
+    # Last Here
 
     gen_proposal_sheet_manager.append_row({
         "projectLegacyNumber": grant_pln,
         "proposalLegacyNumber": grant_id,
         "status": grant_status,
         "OAR Status": grant_db_status,      # For Staff Use
-        "Proposal Legacy Number": grant_pln,
+        "Proposal Legacy Number": None,
         "CUNY Campus": grant_campus,
         "Instrument Type": grant_instrument_type,
         "Sponsor": grant_sponsor_code,
@@ -527,7 +529,7 @@ def proposals_sheet_append(
         "Animal Subjects": grant_yn_animal_subjects,
         "Hazardous Materials": grant_yn_hazard_material,
         "Export Control": grant_yn_export_control,
-        "Additional Comments": grant_comments,
+        "Additional Comments": f"{grant_comments} | {grant_db_status}",
         "Submission Date": grant_submit_date.date(),
         "John Jay Centers": grant_admin_unit_center,
         "Admin Unit": grant_admin_unit_code,

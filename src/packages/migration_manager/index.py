@@ -39,7 +39,7 @@ class MigrationManager:
         self._retrieve_internal_orgs()
         self._retrieve_external_orgs()
         self._retrieve_centers()
-        # self._retrieve_people()
+        self._retrieve_people()
         self._retrieve_associations()
         return self
 
@@ -54,36 +54,48 @@ class MigrationManager:
             for sheet_name, sheet_columns in gen_sheets.items():
                 self.generated_wb_manager.create_sheet(sheet_name, sheet_columns)
 
+    # def _retrieve_people(self):
+    #     people = {}
+    #     people_sheet_manager = self.reference_wb_manager["Data - People"]
+
+    #     for index, row in people_sheet_manager.get_df(format=True).iterrows():
+    #         if index == 0:
+    #             continue
+
+    #         f_name, m_name, l_name, emp_id, username = row
+
+    #         # Normalize and clean name data
+    #         first_name = f_name.strip().capitalize() if f_name else None
+    #         middle_name = m_name.strip().capitalize() if m_name and len(m_name) else None
+    #         last_name = re.sub(r"\s*\(\d{8}\)$", "", l_name).strip().capitalize()
+    #         email = str(username).strip() if username else None
+
+    #         # Retrieve existing or create new
+    #         person = people.get(emp_id, {
+    #             "name": {"first": None, "middle": None, "last": None},
+    #             "empl_id": emp_id,
+    #             "email": None
+    #         })
+            
+    #         # Fill in missing details
+    #         person["name"]["first"] = person["name"]["first"] or first_name
+    #         person["name"]["middle"] = person["name"]["middle"] or middle_name
+    #         person["name"]["last"] = person["name"]["last"] or last_name
+    #         person["empl_id"] = person["empl_id"] or emp_id
+    #         person["email"] = person["email"] or email
+            
+    #         # Save back to the dictionary
+    #         people[emp_id] = person
+
+    #     self.PEOPLE = people
     def _retrieve_people(self):
-        people = {}
-        people_sheet_manager = self.reference_wb_manager["Data - People"]
+        with open(self.config_dir_path / 'john_jay_investigators.json', 'r', encoding='utf-8') as f:
+            self.INVESTIGATORS = json.load(f)
 
-        for index, row in people_sheet_manager.get_df(format=True).iterrows():
-            f_name, m_name, l_name, emp_id, username = row
+        def format_name(first: str, middle: str, last: str) -> str:
+            return f"{last}, {f"{first} {middle}" if middle else first}"
 
-            # Normalize and clean name data
-            first_name = f_name.strip().capitalize() if f_name else None
-            middle_name = m_name.strip().capitalize() if m_name and len(m_name) else None
-            last_name = re.sub(r"\s*\(\d{8}\)$", "", l_name).strip().capitalize()
-            email = str(username).strip() if username else None
-
-            # Retrieve existing or create new
-            person = people.get(emp_id, {
-                "name": {"first": None, "middle": None, "last": None},
-                "empl_id": emp_id,
-                "email": None
-            })
-            
-            # Fill in missing details
-            person["name"]["first"] = person["name"]["first"] or first_name
-            person["name"]["middle"] = person["name"]["middle"] or middle_name
-            person["name"]["last"] = person["name"]["last"] or last_name
-            person["empl_id"] = person["empl_id"] or emp_id
-            person["email"] = person["email"] or email
-            
-            # Save back to the dictionary
-            people[emp_id] = person
-        self.PEOPLE = people
+        self.FORMAT_INVESTIGATORS = {format_name(*person.get('name').values()): empl for empl, person in self.INVESTIGATORS.items()}
 
     def _retrieve_internal_orgs(self):
         with open(self.config_dir_path / 'john_jay_org_units.json', 'r', encoding='utf-8') as f:

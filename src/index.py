@@ -13,7 +13,6 @@ from modules.logger import logger
 # from packages.database_manager import manage_database
 # from packages.workbook_manager_legacy import manage_workbook
 # from packages.workbook_manager_beta.manage_workbook import manage_workbook as beta
-from packages.workbook_manager import WorkbookManager
 
 from scripts.manage_database import manage_database
 from scripts.manage_reports import manage_reports
@@ -56,13 +55,6 @@ if __name__ == "__main__":
     load_dotenv(os.path.join(parent_dir, f"env/.env.{args.env}"))
 
     logger.config_logger(os.getenv("SAVE_PATH"), "debug")
-
-    tester_one = WorkbookManager("C:/Users/reyhe/OneDrive/Documents/JJay/data_pull_2025_05_19/generated_data_accumulator_iter_1.xlsx").__enter__()
-    tester_two = WorkbookManager("C:/Users/reyhe/OneDrive/Documents/JJay/data_pull_2025_05_19/generated_data_20_05_2025_iter_2.xlsx").__enter__()
-    
-    proposal_one = tester_one["Proposal - Template"]
-    proposal_two = tester_two["Proposal - Template"]
-    print(proposal_one.find_differences(proposal_two, ["proposalLegacyNumber"]))
 
     selected_process = args.process
     try:

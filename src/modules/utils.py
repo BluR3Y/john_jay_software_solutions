@@ -1,5 +1,4 @@
 import os
-from bs4 import BeautifulSoup
 import rapidfuzz
 import re
 
@@ -11,14 +10,16 @@ def request_file_path(requestStr: str, validTypes: list[str]):
     if not selected_path:
         raise ValueError("Failed to provide file path.")
     
-    if not os.path.isfile(selected_path):
-        raise FileExistsError(f"The file does not exist at the provided path: {selected_path}")
+    formatted_path = selected_path.strip('"')
     
-    file_type = os.path.splitext(selected_path)[1]
+    if not os.path.isfile(formatted_path):
+        raise FileExistsError(f"The file does not exist at the provided path: {formatted_path}")
+    
+    file_type = os.path.splitext(formatted_path)[1]
     if file_type not in validTypes:
         raise ValueError(f"The provided file has the extension {file_type} which is not a valid type for this request.")
     
-    return selected_path
+    return formatted_path
 
 def single_select_input(requestStr: str, selections: list[str]) -> str:
     if not len(selections):
@@ -50,7 +51,7 @@ def multi_select_input(requestStr: str, selections: list[str]) -> list[str]:
     elif len(selections) == 1:
         return selections
     
-    input_str = " | ".join(selections) + f"\n{requestStr} "
+    input_str = " | ".join(selections) + f"\n{requestStr} (comma-separated) or leave blank: "
     user_input = input(input_str)
     selected_properties = []
 

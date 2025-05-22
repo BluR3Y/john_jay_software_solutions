@@ -33,6 +33,8 @@ class WorkbookManager:
     def __getitem__(self, key) -> SheetManager:
         return self.sheets.get(key)
     
+    def __delitem__(self, key): self.delete_sheet(key)
+    
     def __setitem__(self, sheet_name: str, sheet_cols: Union[list[str], list[dict]]):
         self.create_sheet(sheet_name, sheet_cols, True)
     

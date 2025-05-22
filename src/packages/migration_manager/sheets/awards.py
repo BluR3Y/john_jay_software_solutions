@@ -85,12 +85,13 @@ def awards_sheet_append(
     grant_prime_sponsor = proposal_sheet_data.get('Prime Sponsor')
     grant_title = proposal_sheet_data.get('Title')
     
-    grant_start_date = proposal_sheet_data.get('Project Start Date')
-    grant_end_date = proposal_sheet_data.get('Project End Date')
+    grant_start_date = grant_data.get('Start_Date') or proposal_sheet_data.get('Project Start Date')
+    grant_end_date = grant_data.get('End_Date') or proposal_sheet_data.get('Project End Date')
     
     grant_proposal_type = proposal_sheet_data.get('Proposal Type')
     grant_activity_type = proposal_sheet_data.get('Activity Type')
     
+    grant_admin_unit_center = proposal_sheet_data.get('John Jay Centers')
     grant_admin_unit = proposal_sheet_data.get('Admin Unit')
     grant_discipline = proposal_sheet_data.get('Discipline')
     grant_abstract = proposal_sheet_data.get('Abstract')
@@ -125,12 +126,6 @@ def awards_sheet_append(
             break
 
     grant_program_name = grant_data.get('Program_Type')
-    
-    grant_admin_center = None
-
-    # Start Date = Dates > Actual Start Date
-    # End Date = Dates > Actual End Date
-
 
     award_legacy_no = None
     grant_ref_award_legacy_no = existing_award_sheet_data.get('Award Legacy Number')
@@ -170,7 +165,7 @@ def awards_sheet_append(
         "CUNY Campus": grant_campus,
         "Instrument Type": grant_instrument_type,
         "Sponsor": grant_sponsor,
-        "Sponsor Award Number": award_legacy_no,
+        "Sponsor Award Number": "",
         "Prime Sponsor": grant_prime_sponsor,
         "Prime Sponsor Award Number": "",
         "Title": grant_title,
@@ -180,7 +175,7 @@ def awards_sheet_append(
         "Program Name": grant_program_name,
         "Proposal Type": grant_proposal_type,
         "Activity Type": grant_activity_type,
-        "John Jay Centers": "",
+        "John Jay Centers": grant_admin_unit_center,
         "Admin Unit": grant_admin_unit,
         "Discipline": grant_discipline,
         "Abstract": grant_abstract,

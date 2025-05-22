@@ -8,6 +8,9 @@ from openpyxl.utils import get_column_letter
 import numpy as np
 from openpyxl.cell import cell
 
+from datetime import datetime, date, time
+from decimal import Decimal
+
 assignable_sheet_props = ["sheet_state","column_dimensions"]
 assignable_cell_props = ["comment","fill","border","font","hyperlink","value","alignment","number_format"]
 
@@ -173,19 +176,26 @@ class SheetManager:
             self.df.at[row_index, key] = val
 
         return self.df.iloc[row_index]
-    
-    def append_row(self, props: dict) -> pd.Series:
-        """
-        Append a new row to the sheet.
 
-        Parameters:
-        - props: Dictionary of column values.
-        """
+    def append_row(self, props: dict) -> pd.Series:
+        invalid_assigns = []
+        valid_assigns = {}
+
+        for key, val in props.items():
+            if self.valid_assign(val):
+                valid_assigns[key] = [val]
+            else:
+                invalid_assigns.append(f"{key} - {val}")
+        
+        if invalid_assigns:
+            raise TypeError(f"Properties included invalid assigns:\n {'\n'.join(invalid_assigns)}")
+        
         # Create a new DataFrame
-        new_row = pd.DataFrame({key: [value] for key, value in props.items()})
+        new_row = pd.DataFrame(valid_assigns)
+        
         # Append using pd.concat
         self.df = pd.concat([self.df, new_row], ignore_index=True)
-        return new_row
+        return new_row.iloc[0]
 
     def delete_row(self, row: Union[int, pd.Series]) -> pd.Series:
         """
@@ -325,7 +335,121 @@ class SheetManager:
         
         return sheet_df
 
-    def find_differences(self, target: "SheetManager", identifier_cols: list[str]) -> dict:
+    # def find_differences(self, target: "SheetManager", identifier_cols: list[str]) -> dict:
+    #     """
+    #     Compares rows between the current sheet and a target sheet using identifier columns.
+    #     Returns a dictionary where keys are row indices from self.df, and values are either:
+    #         - A dict of differing field values from the target (excluding identifier columns)
+    #         - None, if no matching row was found in the target
+
+    #     Notes:
+    #         - Rows with multiple source matches are processed using closest-match logic.
+    #         - Target matches are consumed greedily to avoid reuse in fuzzy matching.
+    #         - NaN values are considered equal.
+    #     """
+        
+    #     # Validate identifier columns
+    #     if not identifier_cols:
+    #         raise ValueError("Failed to provide identifier_cols")
+        
+    #     shared_cols = list(set(self.df.columns) & set(target.df.columns))
+    #     if not shared_cols:
+    #         raise KeyError("Sheets don't share any similar columns.")
+
+    #     if not all(col in shared_cols for col in identifier_cols):
+    #         raise ValueError("Invalid identifier columns.")
+
+    #     source_df = self.get_df(format=True)
+
+    #     # Extract unique identifier tuples
+    #     unique_identifiers = {
+    #         tuple(row[col] for col in identifier_cols)
+    #         for _, row in source_df[identifier_cols].iterrows()
+    #     }
+
+    #     # Helper: NaN-safe value diffing
+    #     def get_changes(base: dict, ref: dict) -> dict:
+    #         def differs(a, b):
+    #             if pd.isna(a) and pd.isna(b):
+    #                 return False
+    #             return a != b
+
+    #         return {
+    #             key: val for key, val in ref.items()
+    #             if key not in identifier_cols and differs(base.get(key), val)
+    #         }
+
+    #     differences = {}
+
+    #     for identifier in unique_identifiers:
+    #         # Build dict for row lookup
+    #         record_identifier = {col: identifier[i] for i, col in enumerate(identifier_cols)}
+            
+    #         source_matches_ref = self.find(record_identifier)
+    #         target_matches_ref = target.find(record_identifier, clean_copy=True)
+
+    #         # Create dict list of source matches
+    #         source_matches = source_matches_ref.to_dict(orient='records')
+    #         # Map local index to original DataFrame index
+    #         source_mapping = {
+    #             local_idx: global_idx
+    #             for local_idx, (global_idx, _) in enumerate(source_matches_ref.iterrows())
+    #         }
+
+    #         if len(source_matches_ref) > 1:
+    #             # If no target match at all, mark all source rows as unmatched
+    #             if target_matches_ref is None or target_matches_ref.empty:
+    #                 for global_idx in source_mapping.values():
+    #                     differences[global_idx] = None
+    #                 continue
+
+    #             # Sort source rows by count of non-null fields (most complete first)
+    #             sorted_local_indices = sorted(
+    #                 range(len(source_matches)),
+    #                 key=lambda idx: sum(val is not None for val in source_matches[idx].values()),
+    #                 reverse=True
+    #             )
+
+    #             for local_idx in sorted_local_indices:
+    #                 source_row = source_matches[local_idx]
+    #                 global_idx = source_mapping[local_idx]
+
+    #                 if not target_matches_ref.empty:
+    #                     closest_idx = self.find_closest_row(source_row, target_matches_ref, threshold=0.15)
+    #                     target_row = target_matches_ref.iloc[closest_idx].to_dict()
+
+    #                     changes = get_changes(source_row, target_row)
+    #                     if changes:
+    #                         differences[global_idx] = changes
+
+    #                     # Remove the used target match to prevent reuse
+    #                     target_matches_ref.drop(index=target_matches_ref.index[closest_idx], inplace=True)
+    #                 else:
+    #                     differences[global_idx] = None
+
+    #         else:
+    #             # Single source match
+    #             source_row = source_matches[0]
+    #             global_idx = source_mapping[0]
+
+    #             if target_matches_ref is None or target_matches_ref.empty:
+    #                 differences[global_idx] = None
+    #             elif len(target_matches_ref) > 1:
+    #                 closest_idx = self.find_closest_row(source_row, target_matches_ref, threshold=0.15)
+    #                 target_row = target_matches_ref.iloc[closest_idx].to_dict()
+    #                 changes = get_changes(source_row, target_row)
+    #                 if changes:
+    #                     differences[global_idx] = changes
+    #             else:
+    #                 # Single target match
+    #                 target_row = target_matches_ref.iloc[0].to_dict()
+    #                 changes = get_changes(source_row, target_row)
+    #                 if changes:
+    #                     differences[global_idx] = changes
+
+    #     return differences
+
+    def find_differences(self, target: "SheetManager", identifier_cols: list[str], checking_cols: list[str] = None) -> dict:
         """
         Compares rows between the current sheet and a target sheet using identifier columns.
         Returns a dictionary where keys are row indices from self.df, and values are either:
@@ -348,6 +472,13 @@ class SheetManager:
 
         if not all(col in shared_cols for col in identifier_cols):
             raise ValueError("Invalid identifier columns.")
+        
+        # Determine columns to check
+        if checking_cols:
+            if not all(col in shared_cols and col not in identifier_cols for col in checking_cols):
+                raise ValueError("Invalid checking columns.")
+        else:
+            checking_cols = [col for col in shared_cols if col not in identifier_cols]
 
         source_df = self.get_df(format=True)
 
@@ -357,16 +488,17 @@ class SheetManager:
             for _, row in source_df[identifier_cols].iterrows()
         }
 
-        # Helper: NaN-safe value diffing
         def get_changes(base: dict, ref: dict) -> dict:
+            """Return a dict of changed fields from `ref`, limited to `checking_cols`."""
             def differs(a, b):
                 if pd.isna(a) and pd.isna(b):
                     return False
                 return a != b
 
             return {
-                key: val for key, val in ref.items()
-                if key not in identifier_cols and differs(base.get(key), val)
+                key: ref[key]
+                for key in checking_cols
+                if differs(base.get(key), ref.get(key))
             }
 
         differences = {}
@@ -505,6 +637,10 @@ class SheetManager:
 
         # return df.loc[best_idx]
         return best_idx
+    
+    @staticmethod
+    def valid_assign(value):
+        return isinstance(value, (str, int, float, bool, datetime, date, time, Decimal)) or value is None
     
     @staticmethod
     def format_df(df: Union[pd.DataFrame, pd.Series]) -> Union[pd.DataFrame, pd.Series]:

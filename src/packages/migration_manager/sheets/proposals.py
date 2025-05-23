@@ -67,30 +67,35 @@ def determine_activity_type(activity_types: list[str], target: str) -> str:
     closest_match = find_closest_match(target, activity_types, case_sensitive=False)
     if closest_match:
         return closest_match[0]
+    
+def map_yearly_cost(cost_data: list[dict], period_key: str, amount_key: str) -> dict:
+    period_data = {}
+    for item in cost_data:
+        period = item.get(period_key)
+        period_data[int(period)] = item.get(amount_key)
+    
+    if len(period_data) > 1:
+        for idx in [period_data.keys()][1:]:
+            if not period_data.get(idx - 1):
+                return None
 
-def determine_yearly_total_cost(total_data: list[dict]) -> dict:
-    total_costs = {}
+    return period_data
 
-    for num_year, total_item in enumerate(sorted(total_data, key=(lambda d: int(d.get('RGrant_Year').lstrip()))), 1):
-        total_costs[f"Year {num_year} Total Costs"] = total_item.get('RAmount')
+def determine_yearly_cost(cost_data: dict, format_str: str) -> dict:
+    yearly_cost = {}
+    for num_year in sorted(cost_data.keys()):
+        formatted_year = format_str.format(num_year)
+        yearly_cost[formatted_year] = cost_data[num_year]
+    
+    return yearly_cost
 
-    return total_costs
-
-def determine_yearly_indirect_cost(indirect_data: list[dict]) -> dict:
-    indirect_costs = {}
-
-    for num_year, indirect_item in enumerate(sorted(indirect_data, key=(lambda d: int(d.get('RIGrant_Year').lstrip()))), 1):
-        indirect_costs[f"Year {num_year} Indirect Costs"] = indirect_item.get('RIAmount')
-
-    return indirect_costs
-
-def determine_yearly_direct_cost(yearly_total_costs, yearly_indirect_costs):
+def determine_yearly_direct_cost(total_cost: dict, indirect_cost: dict, format_str: str) -> dict:
     direct_costs = {}
 
-    for num_year in range(1, max(len(yearly_total_costs), len(yearly_indirect_costs)) + 1):
-        year_total_cost = yearly_total_costs.get(f"Year {num_year} Total Costs", 0)
-        year_indirect_cost = yearly_indirect_costs.get(f"Year {num_year} Indirect Costs", 0)
-        direct_costs[f"Year {num_year} Direct Costs"] = round(year_total_cost - year_indirect_cost, 2)
+    shared_periods = list(set(total_cost.keys()) & set(indirect_cost.keys()))
+    for num_year in sorted(shared_periods):
+        formatted_year = format_str.format(num_year)
+        direct_costs[formatted_year] = round(total_cost[num_year] - indirect_cost[num_year], 2)
 
     return direct_costs
 
@@ -184,7 +189,7 @@ def proposals_sheet_append(
                 gen_proposal_sheet_manager.add_issue(next_row, "Sponsor", "warning", f"Failed to find exact match for Sponsor '{grant_db_sponsor}' but was similar to {determined_sponsor[0]}")
             grant_gen_sponsor_name, grant_gen_sponsor_code, *_ = determined_sponsor
         except Exception as err:
-            grant_gen_sponsor_code = grant_db_sponsor
+            grant_gen_sponsor_name = grant_db_sponsor
             gen_proposal_sheet_manager.add_issue(next_row, "Sponsor", "error", err)
     else:
         gen_proposal_sheet_manager.add_issue(next_row, "Sponsor", "error", "Grant is missing Sponsor_1 in database.")
@@ -228,7 +233,7 @@ def proposals_sheet_append(
                 gen_proposal_sheet_manager.add_issue(next_row, "Prime Sponsor", "warning", f"Failed to find exact match for Prime Sponsor '{grant_db_prime_sponsor}' but was similar to {determined_prime_sponsor[0]}")
             grant_gen_prime_sponsor_name, grant_gen_prime_sponsor_code, *_ = determined_prime_sponsor
         except Exception as err:
-            grant_gen_prime_sponsor_code = grant_db_prime_sponsor
+            grant_gen_prime_sponsor_name = grant_db_prime_sponsor
             gen_proposal_sheet_manager.add_issue(next_row, "Prime Sponsor", "error", err)
     
     prime_sponsor_best_match = self.determine_best_match(grant_ref_prime_sponsor_code, grant_gen_prime_sponsor_code)
@@ -478,12 +483,17 @@ def proposals_sheet_append(
     # year_x_indirect_cost = Indirect > Requested Indirect > period_x > amount
     # year_x_total_cost = Project Funds > Requested Total > period_x > amount
 
-    grant_yearly_total_cost = determine_yearly_total_cost(total_data)
-    grant_yearly_indirect_cost = determine_yearly_indirect_cost(rifunds_data)
-    grant_yearly_direct_cost = determine_yearly_direct_cost(grant_yearly_total_cost, grant_yearly_indirect_cost)
-    
-    # IF any grant period year duplicate, disregard anual budgeting
-    # Last Here
+    formatted_total_cost = map_yearly_cost(total_data, "RGrant_Year", "RAmount")
+    formatted_indirect_cost = map_yearly_cost(rifunds_data, "RIGrant_Year", "RIAmount")
+    grant_yearly_total_cost = grant_yearly_indirect_cost = grant_yearly_direct_cost = {}
+    if (
+        formatted_total_cost and
+        formatted_indirect_cost and
+        len(formatted_total_cost) == len(formatted_indirect_cost)
+    ):
+        grant_yearly_total_cost = determine_yearly_cost(formatted_total_cost, "Year {} Total Costs")
+        grant_yearly_indirect_cost = determine_yearly_cost(formatted_indirect_cost, "Year {} Indirect Costs")
+        grant_yearly_direct_cost = determine_yearly_direct_cost(formatted_total_cost, formatted_indirect_cost, "Year {} Direct Costs")
 
     gen_proposal_sheet_manager.append_row({
         "projectLegacyNumber": grant_pln,
@@ -496,14 +506,14 @@ def proposals_sheet_append(
         "Sponsor": grant_sponsor_code,
         "Sponsor Name": grant_gen_sponsor_name,         # For Staff Use
         "Prime Sponsor": grant_prime_sponsor,
-        "Prime Sponsor Name": grant_gen_prime_sponsor_code,       # For Staff Use
+        "Prime Sponsor Name": grant_gen_prime_sponsor_name,       # For Staff Use
         "Title": grant_title,
-        "Project Start Date": grant_start_date.date(),
-        "Project End Date": grant_end_date.date(),
-        "Proposal Type": "",
+        "Project Start Date": grant_start_date.date() if grant_start_date else None,
+        "Project End Date": grant_end_date.date() if grant_end_date else None,
+        "Proposal Type": "New",
         "Activity Type": grant_activity_type,
         "Discipline": grant_discipline,
-        "Abstract": grant_abstract,
+        "Abstract": None,  # Fix bug
         "Number of Budget Periods": grant_num_budget_periods,
         "Indirect Rate Cost Type": grant_indir_cost_type,
         "IDC Rate": grant_idc_rate,
@@ -525,12 +535,12 @@ def proposals_sheet_append(
         "Subrecipient Names": grant_subrecipient_name,
         "Human Subjects": grant_yn_human_subjects,
         "IRB Protocol Status": grant_yn_irb_approval,
-        "IRB Approval Date": grant_irb_approval_date,
+        "IRB Approval Date": grant_irb_approval_date.date() if grant_irb_approval_date else None,
         "Animal Subjects": grant_yn_animal_subjects,
         "Hazardous Materials": grant_yn_hazard_material,
         "Export Control": grant_yn_export_control,
-        "Additional Comments": f"{grant_comments} | {grant_db_status}",
-        "Submission Date": grant_submit_date.date(),
+        "Additional Comments": grant_db_status + (f" | {grant_comments}" if grant_comments else ""),
+        "Submission Date": grant_submit_date.date() if grant_submit_date else None,
         "John Jay Centers": grant_admin_unit_center,
         "Admin Unit": grant_admin_unit_code,
         "Admin Unit Name": grant_admin_unit_name       # For Staff Use

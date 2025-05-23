@@ -79,7 +79,7 @@ def generate_reports(db_manager: DatabaseManager):
                     if not selected_report_name:
                         raise ValueError("Failed to provide a report name.")
                     report_workbook[selected_report_name] = report_data
-                    query_condition = search_query if source_conditions == "Conditions Query" else {record_identifier:{"operator":"IN","value":record_ids}}
+                    query_condition = search_query if source_conditions == "Conditions Query" else str({record_identifier:{"operator":"IN","value":record_ids}})
                     report_meta.append_row({
                         "sheet_name": selected_report_name,
                         "table": selected_table,

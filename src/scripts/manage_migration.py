@@ -7,7 +7,8 @@ from packages.workbook_manager import WorkbookManager
 from modules.utils import (
     single_select_input,
     request_file_path,
-    multi_select_input
+    multi_select_input,
+    request_user_confirmation
 )
 
 def generate_data():
@@ -234,15 +235,31 @@ def compile_changes():
             if not modified and sheet_differences:
                 modified = True
 
+            overwrite = request_user_confirmation("Overwrite populated cells(y/n):")
+
             print(f"Changes to {len(sheet_differences)} records determined.")
             for index, changes in sheet_differences.items():
                 if changes:
-                    row = source_sheet_manager[index].to_dict()
-                    source_sheet_manager.update_cell(index, changes)
-                    for key in changes.keys():
-                        source_sheet_manager.add_issue(index, key, "notice", f"Value was changed from: {row[key]}")
+                    row = source_sheet_manager.format_df(source_sheet_manager[index]).to_dict()
+                    # applied_changes = {key: val for key, val in changes.items() if row[key] is None} if not overwrite else changes
+                    # source_sheet_manager.update_cell(index, applied_changes)
+                    # for key in applied_changes.keys():
+                    #     source_sheet_manager.add_issue(index, key, "notice", f"Value was changed from: {row[key]}")
+                    overwrite_changes = {}
+                    fill_changes = {}
+                    for key, val in changes.items():
+                        if row[key] is None:
+                            fill_changes[key] = val
+                        else:
+                            overwrite_changes[key] = val
+                    
+                    source_sheet_manager.update_cell(index, fill_changes)
+                    if overwrite:
+                        source_sheet_manager.update_cell(index, overwrite_changes)
+                        for key in overwrite_changes.keys():
+                            source_sheet_manager.add_issue(index, key, "notice", f"Value was changed from: {row[key]}")
 
-        if modified and source_wb.set_write_path(request_file_path("Input file save path:", [".xlsx"])):
+        if modified and source_wb.set_write_path(input("Input file save path:")):
             source_wb._save_data()
 
 def manage_migration():

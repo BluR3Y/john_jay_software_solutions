@@ -35,6 +35,9 @@ class LogManager:
                 json.dump(formatted_data, log_file, indent=4)
         except IOError as err:
             raise Exception(f"An error occured while attempting to save logs to file: {err}")
+        
+    def __iter__(self):
+        yield self.logs
     
     def find_logs(self, conditions: dict):
         """

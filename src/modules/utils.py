@@ -21,19 +21,22 @@ def request_file_path(requestStr: str, validTypes: list[str]):
     
     return formatted_path
 
-def single_select_input(requestStr: str, selections: list[str]) -> str:
-    if not len(selections):
-        raise ValueError("Selections list can't be empty")
+def single_select_input(requestMsg: str, selections: list[str], emptyMsg: str = None):
+    if not requestMsg or not selections:
+        raise ValueError("Missing arguments.")
     elif len(selections) == 1:
         return selections[0]
     
-    selection_str = ""
+    input_str = ""
     for index, item in enumerate(selections):
-        selection_str += f"\t{index}) - {item}\n"
-    user_input = input(f"{requestStr}\n{selection_str}")
+        input_str += f"\t{index}) - {item}\n"
+    input_str += f"\n{requestMsg}" + (f" or leave blank({emptyMsg}): " if emptyMsg else "")
+    user_input = input(input_str)
 
     if not user_input:
-        raise Exception("Did not make a selection. Is required to continue.")
+        if emptyMsg:
+            return None
+        raise ValueError(f"Didn't provide selection.")
     
     if user_input.isdigit():
         numeric_selection = int(user_input)
@@ -41,31 +44,34 @@ def single_select_input(requestStr: str, selections: list[str]) -> str:
             raise ValueError(f"{numeric_selection} is not a valid numeric selection.")
         return selections[numeric_selection]
     else:
-        if user_input not in selection_str:
+        if user_input not in selections:
             raise ValueError(f"{user_input} is not a valid selection.")
         return user_input
 
-def multi_select_input(requestStr: str, selections: list[str]) -> list[str]:
-    if not len(selections):
-        raise ValueError("Columns list can't be empty")
-    elif len(selections) == 1:
+def multi_select_input(requestMsg: str, selections: list[str], emptyMsg: str = None):
+    if not requestMsg or not selections:
+        raise ValueError("Missing arguments.")
+    if len(selections) == 1:
         return selections
     
-    input_str = " | ".join(selections) + f"\n{requestStr} (comma-separated) or leave blank: "
+    input_str = " | ".join([*selections, "ALL"]) + f"\n{requestMsg} (comma-separated)" + (f" or leave blank({emptyMsg}): " if emptyMsg else "")
     user_input = input(input_str)
-    selected_properties = []
 
     if not user_input:
-        return selected_properties
-    elif user_input == "all":
+        if emptyMsg:
+            return []
+        raise ValueError(f"Didn't provide selections.")
+    elif user_input == "ALL":
         return selections
     
+    selected_properties = []
     for prop in user_input.split(','):
         formatted_prop = prop.strip()
         if formatted_prop not in selections:
-            raise ValueError(f"The column '{formatted_prop}' does not exist in the table.")
+            raise ValueError(f"The value '{formatted_prop}' is not a valid selection")
         selected_properties.append(formatted_prop)
     return selected_properties
+    
 
 # def find_closest_match(
 #         input,

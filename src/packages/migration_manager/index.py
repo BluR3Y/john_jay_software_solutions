@@ -89,13 +89,13 @@ class MigrationManager:
 
     #     self.PEOPLE = people
     def _retrieve_people(self):
-        with open(self.config_dir_path / 'john_jay_investigators.json', 'r', encoding='utf-8') as f:
+        with open(self.config_dir_path / 'john_jay_investigators_by_email.json', 'r', encoding='utf-8') as f:
             self.INVESTIGATORS = json.load(f)
 
         def format_name(first: str, middle: str, last: str) -> str:
             return f"{last}, {f"{first} {middle}" if middle else first}"
 
-        self.FORMAT_INVESTIGATORS = {format_name(*person.get('name').values()): empl for empl, person in self.INVESTIGATORS.items()}
+        self.FORMAT_INVESTIGATORS = {format_name(*person.get('name').values()): email for email, person in self.INVESTIGATORS.items()}
 
     def _retrieve_internal_orgs(self):
         with open(self.config_dir_path / 'john_jay_org_units.json', 'r', encoding='utf-8') as f:

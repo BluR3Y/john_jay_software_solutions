@@ -16,29 +16,60 @@ def safe_convert(x):
     except (TypeError, ValueError):
         return 0
     
-def determine_awarded_yearly_total_cost(total_data: list):
-    total_costs = {}
+# def determine_awarded_yearly_total_cost(total_data: list):
+#     total_costs = {}
 
-    for num_year, total_item in enumerate(sorted(total_data, key=(lambda d: int(d.get('FGrant_Year').lstrip()))), 1):
-        total_costs[f"Awarded Yr {num_year} Total Costs"] = total_item.get('FAmount')
+#     for num_year, total_item in enumerate(sorted(total_data, key=(lambda d: int(d.get('FGrant_Year').lstrip()))), 1):
+#         total_costs[f"Awarded Yr {num_year} Total Costs"] = total_item.get('FAmount')
 
-    return total_costs
+#     return total_costs
 
-def determine_awarded_yearly_indirect_cost(indirect_data: list):
-    indirect_costs = {}
+# def determine_awarded_yearly_indirect_cost(indirect_data: list):
+#     indirect_costs = {}
 
-    for num_year, indirect_item in enumerate(sorted(indirect_data, key=(lambda d: int(d.get('FIGrant_Year').lstrip()))), 1):
-        indirect_costs[f"Awarded Yr {num_year} Indirect Costs"] = indirect_item.get('FIAmount')
+#     for num_year, indirect_item in enumerate(sorted(indirect_data, key=(lambda d: int(d.get('FIGrant_Year').lstrip()))), 1):
+#         indirect_costs[f"Awarded Yr {num_year} Indirect Costs"] = indirect_item.get('FIAmount')
 
-    return indirect_costs
+#     return indirect_costs
 
-def determine_awarded_yearly_direct_cost(yearly_total_costs, yearly_indirect_costs):
+# def determine_awarded_yearly_direct_cost(yearly_total_costs, yearly_indirect_costs):
+#     direct_costs = {}
+
+#     for num_year in range(1, max(len(yearly_total_costs), len(yearly_indirect_costs)) + 1):
+#         year_total_cost = yearly_total_costs.get(f"Awarded Yr {num_year} Total Costs", 0)
+#         year_indirect_cost = yearly_indirect_costs.get(f"Awarded Yr {num_year} Indirect Costs", 0)
+#         direct_costs[f"Awarded Yr {num_year} Direct Costs"] = round(year_total_cost - year_indirect_cost, 2)
+
+#     return direct_costs
+
+def map_yearly_cost(cost_data: list[dict], period_key: str, amount_key: str) -> dict:
+    period_data = {}
+    for item in cost_data:
+        period = item.get(period_key)
+        period_data[int(period)] = item.get(amount_key)
+    
+    if len(period_data) > 1:
+        for idx in [period_data.keys()][1:]:
+            if not period_data.get(idx - 1):
+                return None
+
+    return period_data
+
+def determine_yearly_cost(cost_data: dict, format_str: str) -> dict:
+    yearly_cost = {}
+    for num_year in sorted(cost_data.keys()):
+        formatted_year = format_str.format(num_year)
+        yearly_cost[formatted_year] = cost_data[num_year]
+    
+    return yearly_cost
+
+def determine_yearly_direct_cost(total_cost: dict, indirect_cost: dict, format_str: str) -> dict:
     direct_costs = {}
 
-    for num_year in range(1, max(len(yearly_total_costs), len(yearly_indirect_costs)) + 1):
-        year_total_cost = yearly_total_costs.get(f"Awarded Yr {num_year} Total Costs", 0)
-        year_indirect_cost = yearly_indirect_costs.get(f"Awarded Yr {num_year} Indirect Costs", 0)
-        direct_costs[f"Awarded Yr {num_year} Direct Costs"] = round(year_total_cost - year_indirect_cost, 2)
+    shared_periods = list(set(total_cost.keys()) & set(indirect_cost.keys()))
+    for num_year in sorted(shared_periods):
+        formatted_year = format_str.format(num_year)
+        direct_costs[formatted_year] = round(total_cost[num_year] - indirect_cost[num_year], 2)
 
     return direct_costs
 
@@ -115,8 +146,6 @@ def awards_sheet_append(
     grant_has_subrecipient = proposal_sheet_data.get('Subrecipient')
     grant_has_export_control = proposal_sheet_data.get('Export Control')
 
-    grant_sponsor_award_no = None
-
 
     award_notice_recieved = None
     for date_obj in sorted(dates_data, key=lambda d: safe_convert(d.get('DatePeriod'))):
@@ -130,8 +159,8 @@ def awards_sheet_append(
     award_legacy_no = None
     grant_ref_award_legacy_no = existing_award_sheet_data.get('Award Legacy Number')
     grant_db_award_legacy_no = grant_data.get('Award_No')
-    if not grant_db_award_legacy_no:
-        gen_awards_sheet_manager.add_issue(next_row, "Award Legacy Number", "error", "Grant is missing Award_No in database.")
+    # if not grant_db_award_legacy_no:
+    #     gen_awards_sheet_manager.add_issue(next_row, "Award Legacy Number", "error", "Grant is missing Award_No in database.")
     
     award_legacy_no_best_match = self.determine_best_match(grant_ref_award_legacy_no, grant_db_award_legacy_no)
     if award_legacy_no_best_match:
@@ -153,9 +182,47 @@ def awards_sheet_append(
     # awarded_yr_x_indirect_cost = Indirect > Funded Indirect > period_x > Amount
     # awarded_yr_x_total_cost = project Funds > Funded Total > period_x > Amount
 
-    grant_awarded_yearly_total_cost = determine_awarded_yearly_total_cost(ffunds_data)
-    grant_awarded_yearly_indirect_cost = determine_awarded_yearly_indirect_cost(fifunds_data)
-    grant_awarded_yearly_direct_cost = determine_awarded_yearly_direct_cost(grant_awarded_yearly_total_cost, grant_awarded_yearly_indirect_cost)
+    # grant_awarded_yearly_total_cost = determine_awarded_yearly_total_cost(ffunds_data)
+    # grant_awarded_yearly_indirect_cost = determine_awarded_yearly_indirect_cost(fifunds_data)
+    # grant_awarded_yearly_direct_cost = determine_awarded_yearly_direct_cost(grant_awarded_yearly_total_cost, grant_awarded_yearly_indirect_cost)
+    formatted_total_cost = map_yearly_cost(ffunds_data, "FGrant_Year", "FAmount")
+    formatted_indirect_cost = map_yearly_cost(fifunds_data, "FIGrant_Year", "FIAmount")
+    grant_awarded_yearly_total_cost = grant_awarded_yearly_indirect_cost = grant_awarded_yearly_direct_cost = {}
+    if (
+        formatted_total_cost and
+        formatted_indirect_cost and
+        len(formatted_total_cost) == len(formatted_indirect_cost)
+    ):
+        grant_awarded_yearly_total_cost = determine_yearly_cost(formatted_total_cost, "Awarded Yr {} Total Costs")
+        grant_awarded_yearly_direct_cost = determine_yearly_cost(formatted_indirect_cost, "Awarded Yr {} Indirect Costs")
+        grant_awarded_yearly_direct_cost = determine_yearly_direct_cost(formatted_total_cost, formatted_indirect_cost, "Awarded Yr {} Direct Costs")
+        
+
+# def determine_awarded_yearly_total_cost(total_data: list):
+#     total_costs = {}
+
+#     for num_year, total_item in enumerate(sorted(total_data, key=(lambda d: int(d.get('FGrant_Year').lstrip()))), 1):
+#         total_costs[f"Awarded Yr {num_year} Total Costs"] = total_item.get('FAmount')
+
+#     return total_costs
+
+# def determine_awarded_yearly_indirect_cost(indirect_data: list):
+#     indirect_costs = {}
+
+#     for num_year, indirect_item in enumerate(sorted(indirect_data, key=(lambda d: int(d.get('FIGrant_Year').lstrip()))), 1):
+#         indirect_costs[f"Awarded Yr {num_year} Indirect Costs"] = indirect_item.get('FIAmount')
+
+#     return indirect_costs
+
+# def determine_awarded_yearly_direct_cost(yearly_total_costs, yearly_indirect_costs):
+#     direct_costs = {}
+
+#     for num_year in range(1, max(len(yearly_total_costs), len(yearly_indirect_costs)) + 1):
+#         year_total_cost = yearly_total_costs.get(f"Awarded Yr {num_year} Total Costs", 0)
+#         year_indirect_cost = yearly_indirect_costs.get(f"Awarded Yr {num_year} Indirect Costs", 0)
+#         direct_costs[f"Awarded Yr {num_year} Direct Costs"] = round(year_total_cost - year_indirect_cost, 2)
+
+#     return direct_costs
 
     gen_awards_sheet_manager.append_row({
         "projectLegacyNumber": grant_pln,
@@ -169,9 +236,9 @@ def awards_sheet_append(
         "Prime Sponsor": grant_prime_sponsor,
         "Prime Sponsor Award Number": "",
         "Title": grant_title,
-        "Award Notice Received": award_notice_recieved,
-        "Project Start Date": grant_start_date,
-        "Project End Date": grant_end_date,
+        "Award Notice Received": award_notice_recieved.date() if award_notice_recieved else None,
+        "Project Start Date": grant_start_date.date() if grant_start_date else None,
+        "Project End Date": grant_end_date.date() if grant_end_date else None,
         "Program Name": grant_program_name,
         "Proposal Type": grant_proposal_type,
         "Activity Type": grant_activity_type,

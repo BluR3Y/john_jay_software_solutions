@@ -2,12 +2,15 @@ from packages.database_manager import DatabaseManager
 from pprint import pprint
 import os
 import json
+import datetime
 from packages.log_manager import LogManager
 from packages.log_manager import manage_logs
+from modules.logger import logger
 from modules.utils import (
     request_file_path,
     single_select_input,
-    request_user_confirmation
+    request_user_confirmation,
+    multi_select_input
 )
 
 PROCESS_NAME = "Manage Database"
@@ -45,36 +48,67 @@ def revert_changes(db_manager: DatabaseManager):
         print(f"An unexpected error occured: {err}")
 
 def apply_latest_changes(db_manager: DatabaseManager):
-    latest_logs_path = request_file_path("Input file path of logs that will be applied to the database: ", [".json"])
-    logs = {}
-    with open(latest_logs_path, 'r', encoding='utf-8') as log_file:
-        logs = json.load(log_file)
-    
-    def format_log(log):
-        formatted = {}
-        for key, props in log.items():
-            if isinstance(props, dict):
-                formatted[key] = format_log(props)
-            elif key == "new_value":
-                return props
-        return formatted
-    
-    merged_logs = {}
-    for log_timestamp in logs.keys():
-        for lgs in logs[log_timestamp].values():
-            db_manager.log_manager._merge_dicts(merged_logs, format_log(lgs))
+    source_db_path = request_file_path("Input file path of the database whose changes will be applied to the active database.", [".accdb"])
+    with DatabaseManager(source_db_path, "Database Manager") as source_db:
+        log_timestamps = source_db.log_manager.get_runtime_dates()
+        if not log_timestamps:
+            raise ValueError("No changes were detected from the source database.")
 
-    errors = []
-    for table in merged_logs:
-        table_cols = db_manager.get_table_columns(table)
-        table_identifier = list(table_cols.keys())[0]
-        for record_identifier, record_props in merged_logs[table].items():
-            try:
-                print(record_props)
-            except Exception as err:
-                errors.append(f"An error occured while updating record '{record_identifier}': {err}")
-    if errors:
-        print(f"Errors occured while applying latest changes: {errors}")
+        selected_timestamps = multi_select_input("Select timestamp to apply its changes", log_timestamps)
+        formatted_timestamps = [datetime.datetime.strptime(ts, "%Y-%m-%d %H:%M:%S") for ts in selected_timestamps]
+        formatted_timestamps.sort()
+        compiled_changes = {}
+
+        for timestamp in [datetime.datetime.strftime(ts, "%Y-%m-%d %H:%M:%S") for ts in formatted_timestamps]:
+            logs = source_db.log_manager.get_runtime_logs(timestamp)
+            for change in logs:
+                if change.get("operation") == "update":
+                    record_id = change.get('record_id')
+                    properties = change.get('properties')
+                    table = change.get('table')
+
+                    # Missing other operations: CREATE, DELETE                    
+
+                    change_structure = {
+                        table: {
+                            record_id: properties
+                        }
+                    }
+                    db_manager.log_manager._merge_dicts(compiled_changes, change_structure)
+
+        errors = []
+        for table, record_changes in compiled_changes.items():
+            for record, changes in record_changes.items():
+                table_columns = db_manager.get_table_columns(table)
+                table_id = list(table_columns.keys())[0]
+
+                latest_properties = source_db.select_query(
+                    table,
+                    cols=list(changes.keys()),
+                    conditions={
+                        table_id: {
+                            "operator": "=",
+                            "value": record
+                        }
+                    }
+                )
+                try:
+                    db_manager.update_query(
+                        table,
+                        cols=latest_properties[0],
+                        conditions={
+                            table_id: {
+                                "operator": "=",
+                                "value": record
+                            }
+                        }
+                    )
+                except Exception as err:
+                    errors.append(f"{record}: {err}")
+        print("Finished updating database.")
+        if errors:
+            logger.get_logger().error(f"Some errors occured while updating database: \n {'\n'.join(errors)}")
+        
 
 def delete_table_records(db_manager: DatabaseManager):
     selected_table = single_select_input("Select table to remove records from: ", db_manager.get_db_tables())

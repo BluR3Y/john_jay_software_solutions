@@ -62,7 +62,7 @@ def members_sheet_append(
     # grant_pi_data = self.INVESTIGATORS[grant_pi_id] if grant_pi_id else {}
 
     grant_ref_pi_email = existing_data.get('username')
-    grant_gen_pi_email = None
+    grant_gen_pi_email = grant_pi = None
     try:
         determined_pi = find_closest_match(grant_pi_name, list(self.FORMAT_INVESTIGATORS.keys()), case_sensitive=False)
         if not determined_pi:
@@ -79,7 +79,7 @@ def members_sheet_append(
     
     grant_pi_data = self.INVESTIGATORS.get(grant_pi)
     grant_association_type = "Internal" if grant_pi_data else None
-    grant_pi_id = grant_pi_data.get('empl_id')
+    grant_pi_id = grant_pi_data.get('empl_id') if grant_pi_data else None
 
     gen_members_sheet_manager.append_row({
         "projectLegacyNumber": grant_pln,

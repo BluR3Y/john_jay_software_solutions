@@ -11,7 +11,7 @@ def projects_sheet_append(self: "MigrationManager", grant_data: dict):
     grant_pln = grant_data.get('Project_Legacy_Number')
 
     proposals_data_ref = gen_proposals_sheet_manager.find({"projectLegacyNumber": grant_pln}, return_one=True)
-    proposals_data = proposals_data_ref.to_dict() if proposals_data_ref is not None else {}
+    proposals_data = proposals_data_ref.to_dict() if not proposals_data_ref.empty else {}
     
     grant_title = proposals_data.get('Title')
     grant_status = proposals_data.get('status')

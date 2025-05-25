@@ -17,6 +17,7 @@ from modules.logger import logger
 from scripts.manage_database import manage_database
 from scripts.manage_reports import manage_reports
 from scripts.manage_migration import manage_migration
+from scripts.manage_attachments import manage_attachments
 
 # Run the program
 if __name__ == "__main__":
@@ -24,7 +25,7 @@ if __name__ == "__main__":
         "Manage Reports": manage_reports,
         "Manage Database": manage_database,
         "Manage Migration": manage_migration,
-        "Manage Workbook": None
+        "Manage Attachments": manage_attachments
     }
     
     # Initialize the argument parser
@@ -63,7 +64,7 @@ if __name__ == "__main__":
             process_script()
         else:
             while True:
-                user_selection = single_select_input("Select an action:", [*user_actions.keys(), "Exit Program"])
+                user_selection = single_select_input("Select an action", [*user_actions.keys(), "Exit Program"])
                 if user_selection == "Exit Program":
                     break
                 

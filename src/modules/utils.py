@@ -30,7 +30,7 @@ def single_select_input(requestMsg: str, selections: list[str], emptyMsg: str = 
     input_str = ""
     for index, item in enumerate(selections):
         input_str += f"\t{index}) - {item}\n"
-    input_str += f"\n{requestMsg}" + (f" or leave blank({emptyMsg}): " if emptyMsg else "")
+    input_str += f"\n{requestMsg}" + (f" or leave blank({emptyMsg})" if emptyMsg else "") + ": "
     user_input = input(input_str)
 
     if not user_input:
@@ -54,7 +54,7 @@ def multi_select_input(requestMsg: str, selections: list[str], emptyMsg: str = N
     if len(selections) == 1:
         return selections
     
-    input_str = " | ".join([*selections, "ALL"]) + f"\n{requestMsg} (comma-separated)" + (f" or leave blank({emptyMsg}): " if emptyMsg else "")
+    input_str = " | ".join([*selections, "ALL"]) + f"\n{requestMsg} (comma-separated)" + (f" or leave blank({emptyMsg})" if emptyMsg else "") + ": "
     user_input = input(input_str)
 
     if not user_input:
@@ -72,6 +72,24 @@ def multi_select_input(requestMsg: str, selections: list[str], emptyMsg: str = N
         selected_properties.append(formatted_prop)
     return selected_properties
     
+def tuple_input(requestMsg: str, keys: list[str]):
+    if not requestMsg or not keys:
+        raise ValueError("Missing arguments.")
+    if len(keys) == 1:
+        return keys
+    
+    input_str = requestMsg + f"({','.join(keys)}) (comma-separeted):"
+    user_input = input(input_str)
+
+    items = re.findall(r"\(([^()]+)\)", user_input)
+    formatted_items = []
+    for item in items:
+        values = item.strip("()").split(',')
+        if len(values) != len(keys):
+            raise ValueError("Invalid values passed")
+        formatted_items.append(tuple([int(value) if value.isdigit() else value for value in values]))
+
+    return formatted_items
 
 # def find_closest_match(
 #         input,

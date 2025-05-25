@@ -2,6 +2,7 @@ import re
 
 from typing import TYPE_CHECKING
 from datetime import datetime
+import traceback
 from dateutil.relativedelta import relativedelta
 
 from modules.utils import find_closest_match
@@ -68,10 +69,11 @@ def determine_activity_type(activity_types: list[str], target: str) -> str:
     if closest_match:
         return closest_match[0]
     
-def map_yearly_cost(cost_data: list[dict], period_key: str, amount_key: str) -> dict:
+def map_yearly_cost(cost_data: list[dict], period_key: str, amount_key: str) -> list[float]:
     period_data = {}
     for item in cost_data:
-        period = item.get(period_key)
+        # period = item.get(period_key, f"{len(period_data.keys()) + 1}")
+        period = item.get(period_key) or f"{len(period_data.keys()) + 1}"
         period_data[int(period)] = item.get(amount_key)
     
     if len(period_data) > 1:
@@ -79,25 +81,35 @@ def map_yearly_cost(cost_data: list[dict], period_key: str, amount_key: str) -> 
             if not period_data.get(idx - 1):
                 return None
 
-    return period_data
+    return list(period_data.values())
 
-def determine_yearly_cost(cost_data: dict, format_str: str) -> dict:
+        # grant_yearly_total_cost = determine_yearly_cost(formatted_total_cost, "Year {} Total Costs")
+        # grant_yearly_indirect_cost = determine_yearly_cost(formatted_indirect_cost, "Year {} Indirect Costs")
+        # grant_yearly_direct_cost = determine_yearly_direct_cost(formatted_total_cost, formatted_indirect_cost, "Year {} Direct Costs")
+
+def determine_yearly_cost(total_costs: list, indirect_costs: list):
     yearly_cost = {}
-    for num_year in sorted(cost_data.keys()):
-        formatted_year = format_str.format(num_year)
-        yearly_cost[formatted_year] = cost_data[num_year]
-    
+    for index in range(len(total_costs)):
+        period_total_cost = round(total_costs[index], 2)
+        period_indirect_cost = round(indirect_costs[index], 2)
+        period_direct_cost = round(period_total_cost - period_indirect_cost, 2)
+
+        yearly_cost[f"Year {index + 1} Total Costs"] = period_total_cost
+        yearly_cost[f"Year {index + 1} Indirect Costs"] = period_indirect_cost
+        yearly_cost[f"Year {index + 1} Direct Costs"] = period_direct_cost
+
     return yearly_cost
 
-def determine_yearly_direct_cost(total_cost: dict, indirect_cost: dict, format_str: str) -> dict:
-    direct_costs = {}
-
-    shared_periods = list(set(total_cost.keys()) & set(indirect_cost.keys()))
-    for num_year in sorted(shared_periods):
-        formatted_year = format_str.format(num_year)
-        direct_costs[formatted_year] = round(total_cost[num_year] - indirect_cost[num_year], 2)
-
-    return direct_costs
+# Valid Proposal Types
+    # Non-Competing Continuation
+    # Letter of Intent/Preliminary Proposal
+    # Renewal
+    # Resubmission
+    # Revision
+    # Supplement
+def determine_proposal_type(grant_data: dict):
+    if grant_data.get("Subcontract", False) == True:
+        return "Resubmission"
 
 def proposals_sheet_append(
     self: "MigrationManager",
@@ -200,6 +212,8 @@ def proposals_sheet_append(
         if sponsor_error:
             gen_proposal_sheet_manager.add_issue(next_row, "Sponsor", "warning", sponsor_error)
 
+    grant_sponsor_name = self.EXTERNAL_ORGS.get(grant_sponsor_code) if grant_sponsor_code else None
+
     # Fallback: Instrument Type
     if not grant_gen_instrument_type:
         str_id = str(grant_data['RF_Account'])
@@ -241,6 +255,8 @@ def proposals_sheet_append(
         grant_prime_sponsor, prime_sponsor_error = prime_sponsor_best_match
         if prime_sponsor_error:
             gen_proposal_sheet_manager.add_issue(next_row, "Prime Sponsor", "warning", prime_sponsor_error)
+    
+    grant_prime_sponsor_name = self.EXTERNAL_ORGS.get(grant_prime_sponsor) if grant_prime_sponsor else None
 
     # Title
     grant_ref_title = existing_data.get('Title')
@@ -291,7 +307,13 @@ def proposals_sheet_append(
         if end_date_error:
             gen_proposal_sheet_manager.add_issue(next_row, "Project End Date", "warning", end_date_error)
 
-    # Missing: Proposal Type
+    grant_ref_proposal_type = existing_data.get('Proposal Type')
+    grant_proposal_type = None
+    proposal_type_best_match = self.determine_best_match(grant_ref_proposal_type, determine_proposal_type(grant_data))
+    if proposal_type_best_match:
+        grant_proposal_type, proposal_type_error = proposal_type_best_match
+        if proposal_type_error:
+            gen_proposal_sheet_manager.add_issue(next_row, "Proposal Type", "warning", proposal_type_error)
 
     # Activity Type
     grant_ref_activity_type = existing_data.get('Activity Type')
@@ -414,16 +436,17 @@ def proposals_sheet_append(
     # grant_total_direct_cost = None  # total_sponsor_cost - total_indirect_cost
     grant_num_budget_periods = len(total_data)
 
-    grant_total_sponsor_cost = round(sum(map(lambda fund: fund.get('RAmount'), total_data)), 2)
-    grant_total_indirect_cost = round(sum(map(lambda fund: fund.get('RIAmount'), rifunds_data)), 2)
+    grant_total_sponsor_cost = round(sum(map(lambda fund: (fund.get('RAmount') or 0), total_data)), 2)
+    grant_total_indirect_cost = round(sum(map(lambda fund: (fund.get('RIAmount') or 0), rifunds_data)), 2)
     grant_total_direct_cost = round(grant_total_sponsor_cost - grant_total_indirect_cost, 2)
 
     # Total Cost Share - If value exists, "Cost Share Required" = Yes else No or Empty
-    grant_total_cost_share = round(sum(map(lambda fund: fund.get('CSBudAmount', 0), costshare_data)))
+    grant_total_cost_share = round(sum(map(lambda fund: (fund.get('CSBudAmount') or 0), costshare_data)), 2)
 
     # Yes/No fields
     grant_yn_subrecipient = "Yes" if grant_data.get('Subcontract') else "No"
-    grant_subrecipient_name = grant_data.get('Subrecipient_1')
+    # grant_subrecipient_name = grant_data.get('Subrecipient_1')
+    grant_subrecipient_name = existing_data.get('Subrecipient Names')
     if grant_yn_subrecipient == "Yes" and grant_subrecipient_name is None:
         gen_proposal_sheet_manager.add_issue(next_row, "Subrecipient Names", "error", "Grant assigned Subcontract in database but is missing Subrecipients")
 
@@ -432,16 +455,25 @@ def proposals_sheet_append(
     grant_yn_hazard_material = "Yes" if grant_data.get('Biohazards') else "No"
     grant_yn_export_control = "Yes" if grant_data.get('Export Control') else "No"
     grant_yn_irb_approval = "Approved" if grant_data.get('IRB_Approval') else None
+    grant_yn_off_campus = ("Yes" if grant_activity_type.lower().endswith("off campus") else "No") if grant_activity_type else "No"
 
     grant_comments = grant_data.get('Comments')
     grant_irb_approval_date = grant_data.get('IRB_Start') if grant_yn_irb_approval else None
     
-    grant_submit_date = grant_data.get('Date_Submitted')
-    if not grant_submit_date:
-        gen_proposal_sheet_manager.add_issue(next_row, "Submission Date", "error", "Grant is missing Date_Submitted in database.")
+    grant_db_submit_date = grant_data.get('Date_Submitted')
+    grant_ref_submit_date = existing_data.get('Submission Date')
+    grant_submit_date = None
+    submit_date_best_match = self.determine_best_match(grant_ref_submit_date, grant_db_submit_date)
+    if submit_date_best_match:
+        grant_submit_date, submit_date_error = submit_date_best_match
+        if submit_date_error:
+            gen_proposal_sheet_manager.add_issue(next_row, "Submission Date", "warning", submit_date_error)
 
     grant_admin_unit_center = grant_admin_unit_name = grant_admin_unit_code = None
     if grant_db_primary_dept:
+        grant_ref_admin_unit_center = existing_data.get('John Jay Centers')
+        if not self.CENTERS.get(grant_ref_admin_unit_center):
+            grant_ref_admin_unit_center = None
         grant_gen_admin_unit_center = grant_gen_admin_unit_name = None
         try:
             determined_center = find_closest_match(grant_db_primary_dept, list(self.CENTERS.keys()), case_sensitive=False)
@@ -452,30 +484,33 @@ def proposals_sheet_append(
         except Exception as err:
             gen_proposal_sheet_manager.add_issue(next_row, "John Jay Centers", "error", err)
         
-        admin_unit_center_best_match = self.determine_best_match(None, grant_gen_admin_unit_center)
+        admin_unit_center_best_match = self.determine_best_match(grant_ref_admin_unit_center, grant_gen_admin_unit_center)
         if admin_unit_center_best_match:
             grant_admin_unit_center, admin_unit_center_error = admin_unit_center_best_match
             if admin_unit_center_error:
                 gen_proposal_sheet_manager.add_issue(next_row, "John Jay Centers", "warning", admin_unit_center_error)
-            grant_admin_unit_name, grant_admin_unit_code = self.CENTERS[grant_admin_unit_center].values()
         
         if not grant_admin_unit_center:
+            grant_ref_admin_unit_code = existing_data.get('Admin Unit')
+            grant_gen_admin_unit_code = None
             try:
-                determined_admin = find_closest_match(grant_db_primary_dept, list(self.INTERNAL_ORGS), case_sensitive=False)
-                if not determined_admin:
+                determined_admin_unit = find_closest_match(grant_db_primary_dept, list(self.INTERNAL_ORGS), case_sensitive=False)
+                if not determined_admin_unit:
                     raise ValueError(f"Grant has invalid Primary_Dept in database: {grant_db_primary_dept}")
-                if determined_admin[1] < 90:
+                if determined_admin_unit[1] < 90:
                     gen_proposal_sheet_manager.add_issue(next_row, "Admin Unit", "warning", f"Failed to find exact match for Admin Unit: {grant_db_primary_dept}")
-                grant_gen_admin_unit_name = determined_admin[0]
+                grant_gen_admin_unit_code = self.INTERNAL_ORGS.get(determined_admin_unit[0]).get('Primary Code')
             except Exception as err:
                 gen_proposal_sheet_manager.add_issue(next_row, "Admin Unit", "error", err)
-        
-        admin_unit_best_match = self.determine_best_match(existing_data.get('Admin Unit Name'), grant_gen_admin_unit_name)
-        if admin_unit_best_match:
-            grant_admin_unit_name, admin_unit_error = admin_unit_best_match
-            if admin_unit_error:
-                gen_proposal_sheet_manager.add_issue(next_row, "Admin Unit", "warning", admin_unit_error)
-            grant_admin_unit_code = self.INTERNAL_ORGS[grant_admin_unit_name].get('Primary Code')
+
+            admin_unit_best_match = self.determine_best_match(grant_ref_admin_unit_code, grant_gen_admin_unit_code)
+            if admin_unit_best_match:
+                grant_admin_unit_code, admin_unit_error = admin_unit_best_match
+                if admin_unit_error:
+                    gen_proposal_sheet_manager.add_issue(next_row, "Admin Unit", "warning", admin_unit_error)
+                grant_admin_unit_name = next(iter(key for key, values in self.INTERNAL_ORGS.items() if values.get('Primary Code') == grant_admin_unit_code), None)
+        else:
+            grant_admin_unit_name, grant_admin_unit_code = self.CENTERS[grant_admin_unit_center].values()
     else:
         gen_proposal_sheet_manager.add_issue(next_row, "Admin Unit", "error", "Grant is missing Primary_Dept in database.")
     
@@ -485,15 +520,22 @@ def proposals_sheet_append(
 
     formatted_total_cost = map_yearly_cost(total_data, "RGrant_Year", "RAmount")
     formatted_indirect_cost = map_yearly_cost(rifunds_data, "RIGrant_Year", "RIAmount")
-    grant_yearly_total_cost = grant_yearly_indirect_cost = grant_yearly_direct_cost = {}
+    grant_yearly_costs = {}
     if (
         formatted_total_cost and
         formatted_indirect_cost and
         len(formatted_total_cost) == len(formatted_indirect_cost)
     ):
-        grant_yearly_total_cost = determine_yearly_cost(formatted_total_cost, "Year {} Total Costs")
-        grant_yearly_indirect_cost = determine_yearly_cost(formatted_indirect_cost, "Year {} Indirect Costs")
-        grant_yearly_direct_cost = determine_yearly_direct_cost(formatted_total_cost, formatted_indirect_cost, "Year {} Direct Costs")
+        try:
+            grant_yearly_costs = determine_yearly_cost(formatted_total_cost, formatted_indirect_cost)
+        except Exception as err:
+            self.generated_wb_manager["Errors"].append_row({
+                    "Grant_ID": grant_id,
+                    "Sheet": "Proposal - Template",
+                    "Issue": f"Error while computing yearly costs to proposals sheet: {err}",
+                    "Traceback": traceback.format_exc()
+                })
+
 
     gen_proposal_sheet_manager.append_row({
         "projectLegacyNumber": grant_pln,
@@ -504,13 +546,13 @@ def proposals_sheet_append(
         "CUNY Campus": grant_campus,
         "Instrument Type": grant_instrument_type,
         "Sponsor": grant_sponsor_code,
-        "Sponsor Name": grant_gen_sponsor_name,         # For Staff Use
+        "Sponsor Name": grant_sponsor_name,         # For Staff Use
         "Prime Sponsor": grant_prime_sponsor,
-        "Prime Sponsor Name": grant_gen_prime_sponsor_name,       # For Staff Use
+        "Prime Sponsor Name": grant_prime_sponsor_name,       # For Staff Use
         "Title": grant_title,
         "Project Start Date": grant_start_date.date() if grant_start_date else None,
         "Project End Date": grant_end_date.date() if grant_end_date else None,
-        "Proposal Type": "New",
+        "Proposal Type": grant_proposal_type,      # "New"
         "Activity Type": grant_activity_type,
         "Discipline": grant_discipline,
         "Abstract": None,  # Fix bug
@@ -521,16 +563,16 @@ def proposals_sheet_append(
         "Total Direct Costs": grant_total_direct_cost,
         "Total Indirect Costs": grant_total_indirect_cost,
         "Total Sponsor Costs": grant_total_sponsor_cost,
-        **grant_yearly_total_cost,
-        **grant_yearly_indirect_cost,
-        **grant_yearly_direct_cost,
+        **grant_yearly_costs,
         "IDC Rate Less OnCampus Rate": "No",
         "Cost Share Required": "Yes" if grant_total_cost_share != 0 else "No",
         "Total Cost Share": grant_total_cost_share,
         "Reassigned Time YN": "No",
         "Reassigned Time Details": None,
-        "On Site": "Yes",   # Fix
-        "Off Site": "No",   # Fix
+        "On Site": "Yes" if grant_yn_off_campus == "No" else "No",
+        "On Site Location": "John Jay College" if grant_yn_off_campus == "No" else None,
+        "Off Site": grant_yn_off_campus,
+        "Off Site Location": "Other" if grant_yn_off_campus == "Yes" else None,
         "Subrecipient": grant_yn_subrecipient,
         "Subrecipient Names": grant_subrecipient_name,
         "Human Subjects": grant_yn_human_subjects,

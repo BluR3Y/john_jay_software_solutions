@@ -1,28 +1,41 @@
 import pyodbc
 import os
 import datetime
+
+from pathlib import Path
 from typing import Union
 
 from . import destruct_query_conditions, parse_sql_condition
 from packages.log_manager import LogManager
 
 class DatabaseManager:
-    def __init__(self, db_path: str, process: str):
+    driver_mapping = {
+        (".mdb", ".accdb"): "Microsoft Access Driver (*.mdb, *.accdb)",
+        (".db", ".sqlite"): "SQLite3 ODBC Driver"
+    }
+
+    def __init__(self, db_path: str, process_deprecated: str):
         if not db_path:
             raise ValueError("A database file path was not provided to the DatabaseManager.")
-        if not os.path.exists(db_path):
-            raise ValueError(f"No database exists at the path: {db_path}")
-        if not process:
-            raise ValueError("A process name is required to initalize a database connection.")
         
-        self.db_path = db_path
-        self.process = process
+        path_obj = Path(db_path)
+        if not path_obj.exists():
+            raise ValueError(f"No database exists at the path: {db_path}")
+        if not path_obj.is_file():
+            raise TypeError("Path does not point to a file.")
+        
+        db_driver = next(driver for extensions, driver in self.driver_mapping.items() if path_obj.suffix in extensions)
+        if not db_driver:
+            raise TypeError("Database type not supported.")
+        print(pyodbc.drivers())
+        self.path_obj = path_obj
+        self.db_driver = db_driver
         self.connection = None
         self.cursor = None
-        
-        log_file_dir = os.path.dirname(db_path)
-        file_name = os.path.basename(db_path).split('.')[0]
-        self.log_manager = LogManager(os.path.join(log_file_dir, f"{file_name}_db_logs.json")).__enter__()
+
+        db_dir = path_obj.parent
+        db_name = path_obj.stem
+        self.log_manager = LogManager(os.path.join(db_dir, f"{db_name}_db_logs.json")).__enter__()
         
     # Only envoked when using "with"(context manager)
     def __enter__(self):
@@ -37,15 +50,9 @@ class DatabaseManager:
         
     def init_db_connection(self):
         """Initialize the database connection."""
-        try:
-            # Open the connection
-            self.connection = pyodbc.connect(
-                r'DRIVER={Microsoft Access Driver (*.mdb, *.accdb)};'
-                r'DBQ=' + self.db_path + ';'
-            )
-            self.cursor = self.connection.cursor()
-        except pyodbc.Error as err:
-            raise ConnectionError(f"An error occured while connecting to database: {err}")
+        config_str = rf"DRIVER={self.db_driver};{"DBQ" if self.db_driver == "Microsoft Access Driver (*.mdb, *.accdb)" else "DATABASE"}={self.path_obj};"
+        self.connection = pyodbc.connect(config_str)
+        self.cursor = self.connection.cursor()
 
     def _terminate_db_connection(self):
         """Terminate the database connection."""
@@ -99,7 +106,7 @@ class DatabaseManager:
         rows = self.cursor.fetchall()
         return [dict(zip([column[0] for column in self.cursor.description], row)) for row in rows] if rows else []
 
-    def update_query(self, table: str, cols: dict[str, Union[None, str, int, bool, datetime.date]], conditions: dict = None):
+    def update_query(self, table: str, cols: dict[str, Union[None, str, int, bool, datetime.date]], conditions: dict = None, transaction: str = None):
         """Execute an update query"""
         try:
             if table not in self.get_db_tables():
@@ -137,14 +144,14 @@ class DatabaseManager:
                 query_vals = [cols[field] for field in changing_properties]
 
                 self.cursor.execute(query_str, [*query_vals, row_id])
-                self.log_manager.append_runtime_log(self.process, "update", table, row_id, {prop: row[prop] for prop in changing_properties})
+                self.log_manager.append_runtime_log(transaction, "update", table, row_id, {prop: row[prop] for prop in changing_properties})
             self.connection.commit()
         except ValueError as err:
             if self.connection:
                 self.connection.rollback()
                 raise err
 
-    def delete_query(self, table: str, conditions: dict = None):
+    def delete_query(self, table: str, conditions: dict = None, transaction: str = None):
         try:
             if table not in self.get_db_tables():
                 raise ValueError(f"The table '{table}' does not exist in the database.")
@@ -164,7 +171,8 @@ class DatabaseManager:
 
                 query_str = f"DELETE FROM {table} WHERE {record_identifier} = ?"
                 self.cursor.execute(query_str, [record_id])
-                self.log_manager.append_runtime_log(self.process, "delete", table, record_id, properties)
+                # self.log_manager.append_runtime_log(self.process, "delete", table, record_id, properties)
+                self.log_manager.append_runtime_log(transaction, "delete", table, record_id, properties)
             self.connection.commit()
         except Exception as err:
             if self.connection:

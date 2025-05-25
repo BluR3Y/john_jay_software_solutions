@@ -116,6 +116,7 @@ class MigrationManager:
         self.INSTRUMENT_TYPES = association_data.get('instrument_types')
         self.ACTIVITY_TYPES = association_data.get('activity_types')
         self.DISCIPLINES = association_data.get('disciplines')
+        self.LU_DISCIPLINES = {item.get('ID'): item.get('Name') for item in self.db_manager.select_query("LU_Discipline")}
 
     @staticmethod
     def determine_best_match(ref_sol, gen_sol) -> tuple:

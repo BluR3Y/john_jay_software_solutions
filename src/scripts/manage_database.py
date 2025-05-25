@@ -79,20 +79,20 @@ def apply_latest_changes(db_manager: DatabaseManager):
         errors = []
         for table, record_changes in compiled_changes.items():
             for record, changes in record_changes.items():
-                table_columns = db_manager.get_table_columns(table)
-                table_id = list(table_columns.keys())[0]
-
-                latest_properties = source_db.select_query(
-                    table,
-                    cols=list(changes.keys()),
-                    conditions={
-                        table_id: {
-                            "operator": "=",
-                            "value": record
-                        }
-                    }
-                )
                 try:
+                    table_columns = db_manager.get_table_columns(table)
+                    table_id = list(table_columns.keys())[0]
+
+                    latest_properties = source_db.select_query(
+                        table,
+                        cols=list(changes.keys()),
+                        conditions={
+                            table_id: {
+                                "operator": "=",
+                                "value": record
+                            }
+                        }
+                    )
                     db_manager.update_query(
                         table,
                         cols=latest_properties[0],
@@ -104,7 +104,7 @@ def apply_latest_changes(db_manager: DatabaseManager):
                         }
                     )
                 except Exception as err:
-                    errors.append(f"{record}: {err}")
+                    errors.append(f"{table}.{record}: {err}")
         print("Finished updating database.")
         if errors:
             logger.get_logger().error(f"Some errors occured while updating database: \n {'\n'.join(errors)}")

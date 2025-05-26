@@ -9,7 +9,7 @@ class ContentManager:
 
     The ContentManager ensures that the destination directory is clean before copying and handles file paths relative to the source directory. It uses a context manager to handle setup and cleanup.
     """
-    def __init__(self, save_path: str, source_dir: str):
+    def __init__(self, source_dir: str, save_path: str):
         """
         Initializes the ContentManager.
 
@@ -44,7 +44,6 @@ class ContentManager:
             ContentManager: Returns the instance of the ContentManager.
         """
         if self.save_dir.exists():
-            print(self.save_dir)
             self._delete_directory(self.save_dir)
 
         # Ensure save path exists
@@ -99,12 +98,10 @@ class ContentManager:
         """
         if file_path in self.paths:
             raise ValueError(f"File with path '{file_path}' already assigned to be copied")
-        
-        file_path_obj = self._safe_path(self.source_dir / file_path) # Combine with source dir
-        if not file_path_obj.exists():
+
+        if not self.relative_file_exists(file_path):
             raise FileExistsError(f"File does not exist at path: {file_path}")
-        if not file_path_obj.is_file():
-            raise IsADirectoryError(f"The path '{file_path}' does not point to a file")
+
         self.paths.add(file_path)
 
     def find_closest_file(self, file_path: str):
@@ -136,6 +133,13 @@ class ContentManager:
         # return base_dir_obj if base_dir_obj.exists() else None  # Return closest match
         return relative_path  # Return only the relative closest path
     
+    def relative_file_exists(self, file_path: str):
+        file_path_obj = self._safe_path(self.source_dir / file_path) # Combine with source dir
+        # if not file_path_obj.is_file():
+        #     raise IsADirectoryError(f"The path '{file_path}' does not point to a file")
+        
+        return file_path_obj.exists()
+        
     @staticmethod
     def _delete_directory(dir_path: str):
         """
@@ -152,7 +156,7 @@ class ContentManager:
             try:
                 shutil.rmtree(path)
             except OSError as err:
-                raise Exception(f"An error occured while deleting the directory: {dir_path}")
+                raise Exception(f"An error occured while deleting the directory: {err}")
             
     @staticmethod
     def _safe_path(path: Path) -> Path:

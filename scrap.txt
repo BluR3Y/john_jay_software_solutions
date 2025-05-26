@@ -1,2 +1,110 @@
-95942,95955,95981,95976,95977,95978,95989,96004,95993,96000,96005,96007,96013,96038
-(1013131,92989),(1013133,92993),(1006993,92994),(1006994,92996),(1013134,92997),(1007009,93002),(1013136,93004)
+[
+    "jessica.gordon-nembhard34@login.cuny.edu": {
+        "name": {
+            "first": "Jessica",
+            "middle": null,
+            "last": "Gordon-Nembhard"
+        },
+        "empl_id": 0,
+        "email": "jessica.gordon-nembhard34@login.cuny.edu"
+    },
+    "marie-helen.maras03@login.cuny.edu": {
+        "name": {
+            "first": "Marie-Helen",
+            "middle": null,
+            "last": "Maras"
+        },
+        "empl_id": 0,
+        "email": "marie-helen.maras03@login.cuny.edu"
+    },
+    "silvia.dapia95@login.cuny.edu": {
+        "name": {
+            "first": "Silvia",
+            "middle": null,
+            "last": "Dapia"
+        },
+        "empl_id": 0,
+        "email": "silvia.dapia95@login.cuny.edu"
+    },
+    "marcia.esparza75@login.cuny.edu": {
+        "name": {
+            "first": "Marcia",
+            "middle": null,
+            "last": "Esparza"
+        },
+        "empl_id": 0,
+        "email": "marcia.esparza75@login.cuny.edu"
+    },
+    "chitra.raghavan10@login.cuny.edu": {
+        "name": {
+            "first": "Chitra",
+            "middle": null,
+            "last": "Raghavan"
+        },
+        "empl_id": 0,
+        "email": "chitra.raghavan10@login.cuny.edu"
+    },
+    "emily.haney-caron67@login.cuny.edu": {
+        "name": {
+            "first": "Emily",
+            "middle": null,
+            "last": "Haney-Caron"
+        },
+        "empl_id": 0,
+        "email": "emily.haney-caron67@login.cuny.edu"
+    },
+    "matluba.khodjaeva34@login.cuny.edu": {
+        "name": {
+            "first": "Matluba",
+            "middle": null,
+            "last": "Khodajaeva"
+        },
+        "empl_id": 0,
+        "email": "matluba.khodjaeva34@login.cuny.edu"
+    },
+    "jillian.swencionis60@login.cuny.edu": {
+        "name": {
+            "first": "Jilian",
+            "middle": null,
+            "last": "Swencionis"
+        },
+        "empl_id": 0,
+        "email": "jillian.swencionis60@login.cuny.edu"
+    },
+    "barbara.cassidy64@login.cuny.edu": {
+        "name": {
+            "first": "Barbara",
+            "middle": null,
+            "last": "Cassidy"
+        },
+        "empl_id": 0,
+        "email": "barbara.cassidy64@login.cuny.edu"
+    },
+    "moses.cowan27@login.cuny.edu": {
+        "name": {
+            "first": "Moses",
+            "middle": null,
+            "last": "Cowan"
+        },
+        "empl_id": 0,
+        "email": "moses.cowan27@login.cuny.edu"
+    },
+    "martalaura.haynes49@login.cuny.edu": {
+        "name": {
+            "first": "Marta-Laura",
+            "middle": null,
+            "last": "Haynes"
+        },
+        "empl_id": 0,
+        "email": "martalaura.haynes49@login.cuny.edu"
+    },
+    "meriem.rebbani12@login.cuny.edu": {
+        "name": {
+            "first": "Meriem",
+            "middle": null,
+            "last": "Rebbani"
+        },
+        "empl_id": 0,
+        "email": "meriem.rebbani12@login.cuny.edu"
+    }
+]

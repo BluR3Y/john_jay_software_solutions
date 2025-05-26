@@ -37,58 +37,71 @@ def members_sheet_append(
 
     investigator_association = proposal_data.get('Admin Unit')
 
-    grant_db_pi_name = grant_data.get('Primary_PI')
-    grant_ref_pi_name = existing_data.get('personName')
-    grant_gen_pi_name = grant_pi_name = None
-    try:
-        determined_pi_name = find_closest_match(grant_db_pi_name, [pi.get('PI_name') for pi in pi_data], case_sensitive=False)
-        if not determined_pi_name:
-            raise ValueError("")
-        grant_gen_pi_name = determined_pi_name[0]
-    except Exception as err:
-        pass
-
-    grant_pi_name_best_match = self.determine_best_match(grant_ref_pi_name, grant_gen_pi_name)
-    if grant_pi_name_best_match:
-        grant_pi_name, pi_name_error = grant_pi_name_best_match
-        if pi_name_error:
-            gen_members_sheet_manager.add_issue(next_row, "username", "warning", grant_pi_error)
-
-    # association type = If email is determined: Internal; Not determined: None
-    # association = admin unit code
-
-    # grant_pi_name = grant_data.get('Primary_PI')
-    # grant_pi_id = determine_pi_id(self, grant_pi_name, pi_data)
-    # grant_pi_data = self.INVESTIGATORS[grant_pi_id] if grant_pi_id else {}
-
     grant_ref_pi_email = existing_data.get('username')
-    grant_gen_pi_email = grant_pi = None
-    try:
-        determined_pi = find_closest_match(grant_pi_name, list(self.FORMAT_INVESTIGATORS.keys()), case_sensitive=False)
-        if not determined_pi:
-            raise ValueError("")
-        grant_gen_pi_email = self.FORMAT_INVESTIGATORS[determined_pi[0]]
-    except Exception as err:
-        pass
+    grant_gen_pi_email = grant_pi_name = None
 
-    grant_pi_best_match = self.determine_best_match(grant_ref_pi_email, grant_gen_pi_email)
-    if grant_pi_best_match:
-        grant_pi, grant_pi_error = grant_pi_best_match
-        if grant_pi_error:
-            gen_members_sheet_manager.add_issue(next_row, "username", "warning", grant_pi_error)
-    
-    grant_pi_data = self.INVESTIGATORS.get(grant_pi)
-    grant_association_type = "Internal" if grant_pi_data else None
-    grant_pi_id = grant_pi_data.get('empl_id') if grant_pi_data else None
+    if grant_ref_pi_email:
+        try:
+            determined_email = find_closest_match(grant_ref_pi_email, list(self.INVESTIGATORS.keys()), case_sensitive=False)
+            if not determined_email:
+                raise ValueError(f"Referenced workbook has invalid username: {grant_ref_pi_email}")
+            elif determined_email[1] < 90:
+                gen_members_sheet_manager.add_issue(next_row, "username", "warning", f"Failed to determine exact PI but was similar to: {determined_email[0]}")
+            
+            grant_gen_pi_email = determined_email[0]
+        except Exception as err:
+            gen_members_sheet_manager.add_issue(next_row, "username", "error", err)
+
+    if not grant_gen_pi_email:
+        grant_db_pi_name = grant_data.get('Primary_PI')
+        grant_ref_pi_name = existing_data.get('personName')
+        grant_gen_pi_name = grant_pi_name = None
+        try:
+            determined_pi_name = find_closest_match(grant_db_pi_name, [pi.get('PI_name') for pi in pi_data], case_sensitive=False)
+            if not determined_pi_name:
+                raise ValueError(f"Investigator information could not be determined for the name: {grant_db_pi_name}")
+            if determined_pi_name[1] < 90:
+                gen_members_sheet_manager.add_issue(next_row, "personName", "warning", f"Failed to determine exact PI but was similar to: {determined_pi_name[0]}")
+            grant_gen_pi_name = determined_pi_name[0]
+        except Exception as err:
+            gen_members_sheet_manager.add_issue(next_row, "personName", "error", err)
+
+        name_best_match = self.determine_best_match(grant_ref_pi_name, grant_gen_pi_name)
+        if name_best_match:
+            grant_pi_name, name_error = name_best_match
+            if name_error:
+                gen_members_sheet_manager.add_issue(next_row, "personName", "warning", name_error)
+        
+        try:
+            determined_pi_email = find_closest_match(grant_pi_name, list(self.FORMAT_INVESTIGATORS.keys()), case_sensitive=False)
+            if not determined_pi_email:
+                raise ValueError(f'Investigator information could not be determined using using the email: {grant_pi_name}')
+            if determined_pi_email[1] < 90:
+                gen_members_sheet_manager.add_issue(next_row, "username", "warning", f"Failed to determine exact PI email but was similar to: {determined_pi_email[0]}")
+            grant_gen_pi_email = self.FORMAT_INVESTIGATORS.get(determined_pi_email[0])
+        except Exception as err:
+            gen_members_sheet_manager.add_issue(next_row, "username", "error", err)
+
+    grant_pi_data = None
+    if grant_gen_pi_email:
+        grant_pi_data = self.INVESTIGATORS.get(grant_gen_pi_email)
+        f_name, m_name, l_name = grant_pi_data.get('name').values()
+        grant_pi_name = f"{l_name}, {f"{f_name} {m_name}" if m_name else f_name}"
+    else:
+        grant_pi_data = {
+            "email": existing_data.get('username'),
+            "empl_id": existing_data.get('personId')
+        }
+        grant_pi_name = existing_data.get('personName')
 
     gen_members_sheet_manager.append_row({
         "projectLegacyNumber": grant_pln,
         "form": "proposal",
         "legacyNumber": grant_id,
         "modificationNumber": 0,
-        "associationType": grant_association_type,
-        "username": grant_pi,
-        "personId": grant_pi_id,
+        "associationType": "Internal" if grant_pi_data.get('empl_id') else "External",
+        "username": grant_pi_data.get('email'),
+        "personId": grant_pi_data.get('empl_id'),
         "personName": grant_pi_name,
         "role": "PI",
         "association 1": investigator_association
@@ -99,9 +112,9 @@ def members_sheet_append(
             "form": "award",
             "legacyNumber": f"{grant_id}-award",
             "modificationNumber": 0,
-            "associationType": grant_association_type,
-            "username": grant_pi,
-            "personId": grant_pi_id,
+            "associationType": "Internal" if grant_pi_data.get('empl_id') else "External",
+            "username": grant_pi_data.get('email'),
+            "personId": grant_pi_data.get('empl_id'),
             "personName": grant_pi_name,
             "role": "PI",
             "association 1": investigator_association

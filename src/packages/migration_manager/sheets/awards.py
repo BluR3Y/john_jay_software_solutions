@@ -1,5 +1,6 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Union
 import traceback
+from datetime import datetime, date
 
 if TYPE_CHECKING:
     from .. import MigrationManager
@@ -14,43 +15,14 @@ def safe_convert(x):
     except (TypeError, ValueError):
         return 0
 
-# def map_yearly_cost(cost_data: list[dict], period_key: str, amount_key: str) -> dict:
-#     period_data = {}
-#     for item in cost_data:
-#         period = item.get(period_key)
-#         period_data[int(period)] = item.get(amount_key)
-    
-#     if len(period_data) > 1:
-#         for idx in [period_data.keys()][1:]:
-#             if not period_data.get(idx - 1):
-#                 return None
-
-#     return period_data
-
-# def determine_yearly_cost(cost_data: dict, format_str: str) -> dict:
-#     yearly_cost = {}
-#     for num_year in sorted(cost_data.keys()):
-#         formatted_year = format_str.format(num_year)
-#         yearly_cost[formatted_year] = cost_data[num_year]
-    
-#     return yearly_cost
-
-# def determine_yearly_direct_cost(total_cost: dict, indirect_cost: dict, format_str: str) -> dict:
-#     direct_costs = {}
-
-#     shared_periods = list(set(total_cost.keys()) & set(indirect_cost.keys()))
-#     for num_year in sorted(shared_periods):
-#         formatted_year = format_str.format(num_year)
-#         direct_costs[formatted_year] = round(total_cost[num_year] - indirect_cost[num_year], 2)
-
-#     return direct_costs
-
 def map_yearly_cost(cost_data: list[dict], period_key: str, amount_key: str) -> list[float]:
     period_data = {}
     for item in cost_data:
         # period = item.get(period_key, f"{len(period_data.keys()) + 1}")
-        period = item.get(period_key) or f"{len(period_data.keys()) + 1}"
-        period_data[int(period)] = item.get(amount_key)
+        period = item.get(period_key) or f"{len(period_data.keys()) + 1}".lstrip('0')
+        if period is period_data:
+            return None
+        period_data[int(period)] = item.get(amount_key) or 0
     
     if len(period_data) > 1:
         for idx in [period_data.keys()][1:]:
@@ -75,6 +47,13 @@ def determine_yearly_cost(total_costs: list, indirect_costs: list):
         yearly_cost[f"Awarded Yr {index + 1} Direct Costs"] = period_direct_cost
 
     return yearly_cost
+
+def format_date(date_obj: Union[None, datetime, date]):
+    if isinstance(date_obj, datetime):
+        return date_obj.date()
+    elif isinstance(date_obj, date):
+        return date_obj
+    return
 
 def awards_sheet_append(
     self: "MigrationManager",
@@ -127,7 +106,7 @@ def awards_sheet_append(
     grant_discipline = proposal_sheet_data.get('Discipline')
     grant_abstract = proposal_sheet_data.get('Abstract')
     
-    grant_num_budget_periods = proposal_sheet_data.get('Number of Budget Periods')
+    # grant_num_budget_periods = safe_convert(proposal_sheet_data.get('Number of Budget Periods'))
     grant_idc_rate = proposal_sheet_data.get('IDC Rate')
     grant_indirect_rate_cost_type = proposal_sheet_data.get('Indirect Rate Cost Type')
     idc_cost_type_explain = proposal_sheet_data.get('IDC Cost Type Explanation')
@@ -185,21 +164,9 @@ def awards_sheet_append(
     # awarded_yr_x_indirect_cost = Indirect > Funded Indirect > period_x > Amount
     # awarded_yr_x_total_cost = project Funds > Funded Total > period_x > Amount
 
-    # formatted_total_cost = map_yearly_cost(ffunds_data, "FGrant_Year", "FAmount")
-    # formatted_indirect_cost = map_yearly_cost(fifunds_data, "FIGrant_Year", "FIAmount")
-    # grant_awarded_yearly_total_cost = grant_awarded_yearly_indirect_cost = grant_awarded_yearly_direct_cost = {}
-    # if (
-    #     formatted_total_cost and
-    #     formatted_indirect_cost and
-    #     len(formatted_total_cost) == len(formatted_indirect_cost)
-    # ):
-    #     grant_awarded_yearly_total_cost = determine_yearly_cost(formatted_total_cost, "Awarded Yr {} Total Costs")
-    #     grant_awarded_yearly_direct_cost = determine_yearly_cost(formatted_indirect_cost, "Awarded Yr {} Indirect Costs")
-    #     grant_awarded_yearly_direct_cost = determine_yearly_direct_cost(formatted_total_cost, formatted_indirect_cost, "Awarded Yr {} Direct Costs")
-
     formatted_total_cost = map_yearly_cost(ffunds_data, "FGrant_Year", "FAmount")
     formatted_indirect_cost = map_yearly_cost(fifunds_data, "FIGrant_Year", "FIAmount")
-    grant_awarded_yearly_costs = None
+    grant_awarded_yearly_costs = {}
     if (
         formatted_total_cost and
         formatted_indirect_cost and
@@ -214,6 +181,18 @@ def awards_sheet_append(
                     "Issue": f"Error while computing yearly costs to awards sheet: {err}",
                     "Traceback": traceback.format_exc()
                 })
+    
+    grant_num_budget_periods = len(formatted_total_cost)
+
+    grant_requested_yearly_costs = {}
+    if grant_num_budget_periods:
+        for year_num in range(1, grant_num_budget_periods + 1):
+            direct_cost_str = f"Year {year_num} Direct Costs"
+            indirect_cost_str = f"Year {year_num} Indirect Costs"
+            total_cost_str = f"Year {year_num} Total Costs"
+            grant_requested_yearly_costs[direct_cost_str] = proposal_sheet_data.get(direct_cost_str)
+            grant_requested_yearly_costs[indirect_cost_str] = proposal_sheet_data.get(indirect_cost_str)
+            grant_requested_yearly_costs[total_cost_str] = proposal_sheet_data.get(total_cost_str)
         
     # formatted_total_cost = map_yearly_cost(total_data, "RGrant_Year", "RAmount")
     # formatted_indirect_cost = map_yearly_cost(rifunds_data, "RIGrant_Year", "RIAmount")
@@ -245,9 +224,9 @@ def awards_sheet_append(
         "Prime Sponsor": grant_prime_sponsor,
         "Prime Sponsor Award Number": "",
         "Title": grant_title,
-        "Award Notice Received": award_notice_recieved.date() if award_notice_recieved else None,
-        "Project Start Date": grant_start_date.date() if grant_start_date else None,
-        "Project End Date": grant_end_date.date() if grant_end_date else None,
+        "Award Notice Received": format_date(award_notice_recieved),
+        "Project Start Date": format_date(grant_start_date),
+        "Project End Date": format_date(grant_end_date),
         "Program Name": grant_program_name,
         "Proposal Type": grant_proposal_type,
         "Activity Type": grant_activity_type,
@@ -268,6 +247,7 @@ def awards_sheet_append(
         "Total Awarded Indirect Costs": grant_total_awarded_indirect_cost,
         "Total Expected Amount": grant_total_expected_amount,
         **grant_awarded_yearly_costs,
+        **grant_requested_yearly_costs,
         "Cost Share Required": "Yes" if grant_total_cost_share != 0 else "No",
         "Total Cost Share": grant_total_cost_share,
         "Human Subjects": grant_has_human_subjects,

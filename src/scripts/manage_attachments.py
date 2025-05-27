@@ -47,72 +47,102 @@ def populate_attachments():
             proposal_sheet_manager = wb_manager["Proposal - Template"]
             attachments_sheet_manager = wb_manager["Attachments - Template"]
 
-            grants = proposal_sheet_manager.df[["proposalLegacyNumber", "projectLegacyNumber", "OAR Status"]]
+            grants = proposal_sheet_manager.df[["proposalLegacyNumber", "projectLegacyNumber", "OAR Status", "Instrument Type"]]
 
             for grant in grants.to_dict(orient='records'):
                 grant_pln = grant.get("projectLegacyNumber")
                 grant_id = grant.get("proposalLegacyNumber")
                 grant_oar = grant.get("OAR Status")
+                grant_instrument_type = grant.get('Instrument Type')
                 is_awarded = grant_oar == "Funded"
-                grant_attachments = attachment_manager.find_record({
-                    "project_legacy_number": grant_pln,
-                    "legacy_number": grant_id
-                })
-                if not grant_attachments:
-                    attachments_sheet_manager.append_row({
-                        "projectLegacyNumber": grant_pln,
-                        "legacyNumber": grant_id
-                    })
-                    attachments_sheet_manager.add_issue(
-                        attachments_sheet_manager.df.shape[0] - 1,
-                        "projectLegacyNumber",
-                        "error",
-                        "Grant is missing attachments"
-                    )
-                    continue
+                is_psc = grant_instrument_type == "PSC CUNY"
 
-                award_attachments = []
-                proposal_attachments = []
-                for attachment in grant_attachments:
-                    if attachment.get('form_type') == "Award":
-                        award_attachments.append(attachment)
-                    else:
-                        proposal_attachments.append(attachment)
-                
-                for attachment in proposal_attachments:
-                    attachments_sheet_manager.append_row({
-                        "projectLegacyNumber": grant_pln,
-                        "form": "Proposal",
-                        "legacyNumber": grant_id,
-                        "attachment type": attachment.get('attachment_type'),
-                        "filePath": attachment.get('attachment_path')
+                if is_awarded and not is_psc:
+                    grant_attachments = attachment_manager.find_record({
+                        "project_legacy_number": grant_pln,
+                        "legacy_number": grant_id
                     })
-
-                if is_awarded:
-                    if not award_attachments:
+                    if not grant_attachments:
                         attachments_sheet_manager.append_row({
                             "projectLegacyNumber": grant_pln,
-                            "form": "Award",
-                            "legacyNumber": grant_id,
+                            "legacyNumber": grant_id
                         })
                         attachments_sheet_manager.add_issue(
                             attachments_sheet_manager.df.shape[0] - 1,
                             "projectLegacyNumber",
                             "error",
-                            "Grant is missing 'Award' attachments"
+                            "Grant is missing attachments"
                         )
                         continue
 
-                    for attachment in award_attachments:
+                    for attachment in grant_attachments:
                         attachments_sheet_manager.append_row({
                             "projectLegacyNumber": grant_pln,
-                            "form": "Award",
+                            "form": attachment.get('form_type'),
                             "legacyNumber": grant_id,
                             "attachment type": attachment.get('attachment_type'),
                             "filePath": attachment.get('attachment_path')
                         })
+                    
+                # grant_attachments = attachment_manager.find_record({
+                #     "project_legacy_number": grant_pln,
+                #     "legacy_number": grant_id
+                # })
+                # if not grant_attachments:
+                #     attachments_sheet_manager.append_row({
+                #         "projectLegacyNumber": grant_pln,
+                #         "legacyNumber": grant_id
+                #     })
+                #     attachments_sheet_manager.add_issue(
+                #         attachments_sheet_manager.df.shape[0] - 1,
+                #         "projectLegacyNumber",
+                #         "error",
+                #         "Grant is missing attachments"
+                #     )
+                #     continue
+
+                # award_attachments = []
+                # proposal_attachments = []
+                # for attachment in grant_attachments:
+                #     if attachment.get('form_type') == "Award":
+                #         award_attachments.append(attachment)
+                #     else:
+                #         proposal_attachments.append(attachment)
                 
-            wb_manager.set_write_path("C:/Users/reyhe/OneDrive/Documents/JJay/data_pull_2025_05_24/generated_data_25_05_2025_attachments.xlsx")
+                # for attachment in proposal_attachments:
+                #     attachments_sheet_manager.append_row({
+                #         "projectLegacyNumber": grant_pln,
+                #         "form": "Proposal",
+                #         "legacyNumber": grant_id,
+                #         "attachment type": attachment.get('attachment_type'),
+                #         "filePath": attachment.get('attachment_path')
+                #     })
+
+                # if is_awarded:
+                #     if not award_attachments:
+                #         attachments_sheet_manager.append_row({
+                #             "projectLegacyNumber": grant_pln,
+                #             "form": "Award",
+                #             "legacyNumber": grant_id,
+                #         })
+                #         attachments_sheet_manager.add_issue(
+                #             attachments_sheet_manager.df.shape[0] - 1,
+                #             "projectLegacyNumber",
+                #             "error",
+                #             "Grant is missing 'Award' attachments"
+                #         )
+                #         continue
+
+                #     for attachment in award_attachments:
+                #         attachments_sheet_manager.append_row({
+                #             "projectLegacyNumber": grant_pln,
+                #             "form": "Award",
+                #             "legacyNumber": grant_id,
+                #             "attachment type": attachment.get('attachment_type'),
+                #             "filePath": attachment.get('attachment_path')
+                #         })
+                
+            wb_manager.set_write_path(request_file_path("Save file at:", [".xlsx"]))
             wb_manager._save_data()
 
 def copy_attachments():

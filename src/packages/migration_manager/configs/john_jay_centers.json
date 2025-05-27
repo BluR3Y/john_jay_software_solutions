@@ -31,11 +31,11 @@
         "Admin Unit": "Grant & Research Admin",
         "Admin Unit Code": "JJC-80170"
     },
-    "Institution for Justice and Opportunity (formerly the Prisoner Reentry Institute)": {
+    "Institute for Justice and Opportunity (formerly the Prisoner Reentry Institute)": {
         "Admin Unit": "Grant & Research Admin",
         "Admin Unit Code": "JJC-80170"
     },
-    "Internalional Research Partnership": {
+    "International Research Partnerships": {
         "Admin Unit": "Grant & Research Admin",
         "Admin Unit Code": "JJC-80170"
     },
@@ -48,6 +48,18 @@
         "Admin Unit Code": "JJC-80170"
     },
     "Center on Terrorism": {
+        "Admin Unit": "Grant & Research Admin",
+        "Admin Unit Code": "JJC-80170"
+    },
+    "Center on Race, Crime and Justice": {
+        "Admin Unit": "Grant & Research Admin",
+        "Admin Unit Code": "JJC-80170"
+    },
+    "Professional Studies": {
+        "Admin Unit": "Grant & Research Admin",
+        "Admin Unit Code": "JJC-80170"
+    },
+    "Research and Evaluation Center (REC) formerly Criminal Justice Center or Criminal Justice Research Center or The Criminal Justice Evaluation Center": {
         "Admin Unit": "Grant & Research Admin",
         "Admin Unit Code": "JJC-80170"
     }

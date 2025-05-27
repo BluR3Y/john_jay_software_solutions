@@ -410,7 +410,9 @@ def compile_changes():
             check_columns = multi_select_input("Select columns to check changes", [col for col in shared_columns if col not in record_identifiers])
             sheet_differences = source_sheet_manager.find_differences(target_sheet_manager, record_identifiers, checking_cols=check_columns)
 
-            if not modified and sheet_differences:
+            if not sheet_differences:
+                continue
+            if not modified:
                 modified = True
 
             overwrite = request_user_confirmation("Overwrite populated cells(y/n):")
@@ -426,11 +428,16 @@ def compile_changes():
                         else:
                             overwrite_changes[key] = val
                     
-                    source_sheet_manager.update_cell(index, fill_changes)
-                    if overwrite:
-                        source_sheet_manager.update_cell(index, overwrite_changes)
-                        for key in overwrite_changes.keys():
-                            source_sheet_manager.add_issue(index, key, "notice", f"Value was changed from: {row[key]}")
+                    if fill_changes:
+                        source_sheet_manager.update_cell(index, fill_changes)
+                    if overwrite_changes:
+                        if overwrite:
+                            source_sheet_manager.update_cell(index, overwrite_changes)
+                            for key in overwrite_changes.keys():
+                                source_sheet_manager.add_issue(index, key, "notice", f"Value was changed from: {row.get(key)}")
+                        else:
+                            for key in overwrite_changes.keys():
+                                source_sheet_manager.add_issue(index, key, "notice", f"Value differs in reference sheet: {overwrite_changes.get(key)}")
 
         if modified and source_wb.set_write_path(input("Input file save path:")):
             source_wb._save_data()

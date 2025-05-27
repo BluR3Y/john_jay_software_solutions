@@ -73,8 +73,10 @@ def map_yearly_cost(cost_data: list[dict], period_key: str, amount_key: str) -> 
     period_data = {}
     for item in cost_data:
         # period = item.get(period_key, f"{len(period_data.keys()) + 1}")
-        period = item.get(period_key) or f"{len(period_data.keys()) + 1}"
-        period_data[int(period)] = item.get(amount_key)
+        period = item.get(period_key) or f"{len(period_data.keys()) + 1}".lstrip('0')
+        if period in period_data:
+            return None
+        period_data[int(period)] = item.get(amount_key) or 0
     
     if len(period_data) > 1:
         for idx in [period_data.keys()][1:]:
@@ -536,6 +538,7 @@ def proposals_sheet_append(
                     "Traceback": traceback.format_exc()
                 })
 
+    # If there are grant_period duplicates, disregard budgeting for record
 
     gen_proposal_sheet_manager.append_row({
         "projectLegacyNumber": grant_pln,

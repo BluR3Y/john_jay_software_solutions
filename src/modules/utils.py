@@ -12,8 +12,8 @@ def request_file_path(requestStr: str, validTypes: list[str]):
     
     formatted_path = selected_path.strip('"')
     
-    if not os.path.isfile(formatted_path):
-        raise FileExistsError(f"The file does not exist at the provided path: {formatted_path}")
+    # if not os.path.isfile(formatted_path):
+    #     raise FileExistsError(f"The file does not exist at the provided path: {formatted_path}")
     
     file_type = os.path.splitext(formatted_path)[1]
     if file_type not in validTypes:
@@ -90,48 +90,6 @@ def tuple_input(requestMsg: str, keys: list[str]):
         formatted_items.append(tuple([int(value) if value.isdigit() else value for value in values]))
 
     return formatted_items
-
-# def find_closest_match(
-#         input,
-#         string_list,
-#         threshold=85,
-#         case_sensitive=True
-#     ) -> tuple[str, int]:
-#     """
-#     Determines the closest similar string in a list of strings.
-
-#     Parameters:
-#         - input (str): The target string to compare against others.
-#         - string_list (list[str]): A list of strings to compare against target string.
-#         - threshold (int): Minimum similarity score.
-#         - case_sensitive (bool): Boolean dictating whether to check case(Upper/Lower).
-    
-#     Returns:
-#         tuple[str, int]: (best_match, best_score)
-#     """
-#     if not isinstance(input, str):
-#         raise ValueError("The input must be a string.")
-    
-#     if not isinstance(string_list, list) or not all(isinstance(s, str) for s in string_list):
-#         raise ValueError("string_list must be a list of strings.")
-    
-#     formatted_items = string_list if case_sensitive else [item.lower() for item in string_list]
-#     formatted_input = input if case_sensitive else input.lower()
-
-#     # Use rapidfuzz.process to calculate similarity scores for all strings
-#     matches = rapidfuzz.process.extract(formatted_input, formatted_items, scorer=rapidfuzz.fuzz.ratio, score_cutoff=threshold)
-    
-#     if not matches:
-#         for index, item in enumerate(formatted_items):
-#             if item.startswith(formatted_input) or item.endswith(formatted_input):
-#                 matches = [(item, 90, index)]
-#                 break
-#     if not matches:
-#         return None
-    
-#     # Extract the best match
-#     best_match, best_score, best_index = max(matches, key=lambda x: x[1])
-#     return (string_list[best_index], best_score)
 
 def find_closest_match(
         target: str,

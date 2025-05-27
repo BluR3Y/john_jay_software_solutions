@@ -568,7 +568,6 @@ class SheetManager:
                     changes = get_changes(source_row, target_row)
                     if changes:
                         differences[global_idx] = changes
-
         return differences
 
     @staticmethod
@@ -625,18 +624,21 @@ class SheetManager:
 
         match_counts = {idx: num_matches(row) for idx, row in df.iterrows()}
 
+        match_counts = {
+            pos: num_matches(row)
+            for pos, (_, row) in enumerate(df.iterrows())
+        }
+
         if not match_counts:
             return None
 
-        best_idx = max(match_counts, key=match_counts.get)
-        max_matches = match_counts[best_idx]
+        best_pos = max(match_counts, key=match_counts.get)
+        max_matches = match_counts[best_pos]
         total_possible = len(base)
 
         if total_possible == 0 or (max_matches / total_possible) < threshold:
             return None
-
-        # return df.loc[best_idx]
-        return best_idx
+        return best_pos
     
     @staticmethod
     def valid_assign(value):

@@ -6,7 +6,8 @@ from modules.utils import(
 )
 from modules.record_manager import RecordManager
 from packages.workbook_manager import WorkbookManager
-from packages.content_manager import ContentManager
+# from packages.content_manager import ContentManager
+from modules.content_manager import ContentManager
 
 def compile_attachments():
     with RecordManager(os.getenv("ATTACHMENT_RECORD_PATH")) as attachment_manager:
@@ -145,28 +146,51 @@ def populate_attachments():
             wb_manager.set_write_path(request_file_path("Save file at:", [".xlsx"]))
             wb_manager._save_data()
 
+# def copy_attachments():
+#     with ContentManager(os.getenv("ATTACHMENT_STORAGE_PATH"), os.path.join(os.getenv("SAVE_PATH"), "attachment_files")) as content_manager:
+#         with WorkbookManager(os.getenv("EXCEL_FILE_PATH")) as wb_manager:
+#             attachment_sheet_manager = wb_manager["Attachment - Template"]
+
+#             for index, attachment in attachment_sheet_manager.get_df(["filePath"], format=True).iterrows():
+#                 file_path = attachment.get('filePath')
+#                 if file_path and file_path not in content_manager.paths:
+#                     if not content_manager.relative_file_exists(file_path):
+#                         closest_file = content_manager.find_closest_file(file_path)
+#                         if not closest_file:
+#                             attachment_sheet_manager.add_issue(index, "filePath", "error", "File does not exist in folder")
+#                             continue
+
+#                         content_manager.add_file(closest_file)
+#                         attachment_sheet_manager.add_issue(index, "filePath", "warning", f"File does not exist in folder but is similar to: {closest_file}")
+#                     else:
+#                         content_manager.add_file(file_path)
+            
+#             wb_manager.set_write_path("C:/Users/reyhe/OneDrive/Documents/JJay/test_environment/test_attachment_copy_results.xlsx")
+#             wb_manager._save_data()
 def copy_attachments():
-    with ContentManager(os.getenv("ATTACHMENT_STORAGE_PATH"), os.path.join(os.getenv("SAVE_PATH"), "attachment_files")) as content_manager:
+    with ContentManager(os.getenv('ATTACHMENT_STORAGE_PATH'), os.path.join(os.getenv("SAVE_PATH"), "attachment_files")) as content_manager:
         with WorkbookManager(os.getenv("EXCEL_FILE_PATH")) as wb_manager:
-            attachment_sheet_manager = wb_manager["Attachment - Template"]
+            attachment_sheet_manager = wb_manager["Attachments - Template"]
 
             for index, attachment in attachment_sheet_manager.get_df(["filePath"], format=True).iterrows():
-                file_path = attachment.get('filePath')
-                if file_path and file_path not in content_manager.paths:
-                    if not content_manager.relative_file_exists(file_path):
-                        closest_file = content_manager.find_closest_file(file_path)
-                        if not closest_file:
-                            attachment_sheet_manager.add_issue(index, "filePath", "error", "File does not exist in folder")
-                            continue
+                try:
+                    file_path = attachment.get('filePath')
+                    if not file_path or content_manager.relative_dest_file_exists(file_path):
+                        continue
 
-                        content_manager.add_file(closest_file)
+                    if not content_manager.relative_source_file_exists(file_path):
+                        closest_file = content_manager.find_closest_relative_file(file_path)
+                        if not closest_file:
+                            raise ValueError("File does not exist in source folder")
+                        
+                        content_manager.copy_file(closest_file)
                         attachment_sheet_manager.add_issue(index, "filePath", "warning", f"File does not exist in folder but is similar to: {closest_file}")
                     else:
-                        content_manager.add_file(file_path)
-            
-            wb_manager.set_write_path("C:/Users/reyhe/OneDrive/Documents/JJay/test_environment/test_attachment_copy_results.xlsx")
+                        content_manager.copy_file(file_path)
+                except Exception as err:
+                    attachment_sheet_manager.add_issue(index, "filePath", "error", err)
+            wb_manager.set_write_path(request_file_path("Save file path", [".xlsx"]))
             wb_manager._save_data()
-# Last Here
 
 def manage_attachments():
     print("Current Process: Attachment Manager")

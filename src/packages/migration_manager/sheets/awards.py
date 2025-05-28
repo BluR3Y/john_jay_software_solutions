@@ -41,6 +41,8 @@ def determine_yearly_cost(total_costs: list, indirect_costs: list):
         period_total_cost = round(total_costs[index], 2)
         period_indirect_cost = round(indirect_costs[index], 2)
         period_direct_cost = round(period_total_cost - period_indirect_cost, 2)
+        if period_direct_cost < 0:
+            return {}
 
         yearly_cost[f"Awarded Yr {index + 1} Total Costs"] = period_total_cost
         yearly_cost[f"Awarded Yr {index + 1} Indirect Costs"] = period_indirect_cost
@@ -186,13 +188,20 @@ def awards_sheet_append(
 
     grant_requested_yearly_costs = {}
     if grant_num_budget_periods:
-        for year_num in range(1, grant_num_budget_periods + 1):
-            direct_cost_str = f"Year {year_num} Direct Costs"
-            indirect_cost_str = f"Year {year_num} Indirect Costs"
-            total_cost_str = f"Year {year_num} Total Costs"
-            grant_requested_yearly_costs[direct_cost_str] = proposal_sheet_data.get(direct_cost_str)
-            grant_requested_yearly_costs[indirect_cost_str] = proposal_sheet_data.get(indirect_cost_str)
-            grant_requested_yearly_costs[total_cost_str] = proposal_sheet_data.get(total_cost_str)
+        for year_num in range(1, 11):
+            # direct_cost_str = f"Year {year_num} Direct Costs"
+            # indirect_cost_str = f"Year {year_num} Indirect Costs"
+            # total_cost_str = f"Year {year_num} Total Costs"
+            # grant_requested_yearly_costs[direct_cost_str] = proposal_sheet_data.get(direct_cost_str)
+            # grant_requested_yearly_costs[indirect_cost_str] = proposal_sheet_data.get(indirect_cost_str)
+            # grant_requested_yearly_costs[total_cost_str] = proposal_sheet_data.get(total_cost_str)
+            period_direct_cost = proposal_sheet_data.get(f"Year {year_num} Direct Costs")
+            period_indirect_cost = proposal_sheet_data.get(f"Year {year_num} Indirect Costs")
+            period_total_cost = proposal_sheet_data.get(f"Year {year_num} Total Costs")
+            if period_direct_cost and period_indirect_cost and period_total_cost:
+                grant_requested_yearly_costs[f"Year {year_num} Direct Costs"] = period_direct_cost
+                grant_requested_yearly_costs[f"Year {year_num} Indirect Costs"] = period_indirect_cost
+                grant_requested_yearly_costs[f"Year {year_num} Total Costs"] = period_total_cost
         
     # formatted_total_cost = map_yearly_cost(total_data, "RGrant_Year", "RAmount")
     # formatted_indirect_cost = map_yearly_cost(rifunds_data, "RIGrant_Year", "RIAmount")

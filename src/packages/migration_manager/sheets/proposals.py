@@ -95,6 +95,8 @@ def determine_yearly_cost(total_costs: list, indirect_costs: list):
         period_total_cost = round(total_costs[index], 2)
         period_indirect_cost = round(indirect_costs[index], 2)
         period_direct_cost = round(period_total_cost - period_indirect_cost, 2)
+        if period_direct_cost < 0:
+            return {}
 
         yearly_cost[f"Year {index + 1} Total Costs"] = period_total_cost
         yearly_cost[f"Year {index + 1} Indirect Costs"] = period_indirect_cost

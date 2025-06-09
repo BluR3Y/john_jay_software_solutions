@@ -80,6 +80,7 @@ def populate_attachments():
                         attachments_sheet_manager.append_row({
                             "projectLegacyNumber": grant_pln,
                             "form": attachment.get('form_type'),
+                            "awardLegacyNumber": f"{grant_id}-award" if attachment.get('form_type') == "Award" else "",
                             "legacyNumber": grant_id,
                             "attachment type": attachment.get('attachment_type'),
                             "filePath": attachment.get('attachment_path')

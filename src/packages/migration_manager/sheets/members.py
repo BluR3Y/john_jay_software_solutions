@@ -104,7 +104,8 @@ def members_sheet_append(
         "personId": grant_pi_data.get('empl_id'),
         "personName": grant_pi_name,
         "role": "PI",
-        "association 1": investigator_association
+        "association": investigator_association,
+        "association 1": existing_data.get('association 1')
     })
     if grant_data.get('Status') == "Funded":
         gen_members_sheet_manager.append_row({
@@ -117,5 +118,6 @@ def members_sheet_append(
             "personId": grant_pi_data.get('empl_id'),
             "personName": grant_pi_name,
             "role": "PI",
-            "association 1": investigator_association
+            "association": investigator_association,
+            "association 1": existing_data.get('association 1')
         })

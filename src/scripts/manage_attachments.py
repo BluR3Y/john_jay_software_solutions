@@ -176,8 +176,12 @@ def copy_attachments():
             for index, attachment in attachment_sheet_manager.get_df(["filePath"], format=True).iterrows():
                 try:
                     file_path = attachment.get('filePath')
-                    if not file_path or content_manager.relative_dest_file_exists(file_path):
+                    # if not file_path or content_manager.relative_dest_file_exists(file_path):
+                    #     continue
+                    if not file_path:
                         continue
+                    if content_manager.relative_dest_file_exists(file_path):
+                        attachment_sheet_manager.add_issue(index, "filePath", "notice", "Path exists for different attachment.")
 
                     if not content_manager.relative_source_file_exists(file_path):
                         closest_file = content_manager.find_closest_relative_file(file_path)

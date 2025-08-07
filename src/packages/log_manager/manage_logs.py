@@ -14,7 +14,7 @@ def manage_logs(log_manager: "LogManager"):
         print(f"Resource does not contain any logs.")
         return
     
-    selected_date = single_select_input("Input date of logs: ", log_dates)
+    selected_date = single_select_input("Input date of logs", log_dates)
     date_logs = log_manager.get_runtime_logs(selected_date)
 
     pprint(date_logs, indent=4)

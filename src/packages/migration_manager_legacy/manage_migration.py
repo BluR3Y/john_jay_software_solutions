@@ -206,7 +206,7 @@ def manage_migration():
     print(f"Current Process:{MigrationManager.process_name}")
     generate_data(os.getenv("ACCESS_DB_PATH"))
     # while True:
-    #         user_selection = single_select_input("Select a Database Manager Action:",[
+    #         user_selection = single_select_input("Select a Database Manager Action",[
     #             "Migrate Data",
     #             "Merge Workbooks",
     #             "Exit Process"

@@ -84,7 +84,7 @@ def manage_workbook():
     with WorkbookManager(os.getenv("EXCEL_FILE_PATH")) as wb:
         print(f"Current Process: {PROCESS_NAME}")
         while True:
-            user_selection = single_select_input("Select a Workbook action: ", [
+            user_selection = single_select_input("Select a Workbook action", [
                 "Highlight Differences",
                 "Exit Process"
             ])

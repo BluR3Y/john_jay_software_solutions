@@ -2,6 +2,9 @@ import os
 import rapidfuzz
 import re
 
+from prompt_toolkit import prompt
+from prompt_toolkit.completion import WordCompleter
+
 def request_file_path(requestStr: str, validTypes: list[str]):
     if not validTypes:
         raise ValueError("No file extensions were provided.")
@@ -21,22 +24,27 @@ def request_file_path(requestStr: str, validTypes: list[str]):
     
     return formatted_path
 
-def single_select_input(requestMsg: str, selections: list[str], emptyMsg: str = None):
+def single_select_input(requestMsg: str, selections: list[str], emptyMsg: str = None, as_list: bool = True):
     if not requestMsg or not selections:
         raise ValueError("Missing arguments.")
     elif len(selections) == 1:
         return selections[0]
     
     input_str = ""
-    for index, item in enumerate(selections):
-        input_str += f"\t{index}) - {item}\n"
-    input_str += f"\n{requestMsg}" + (f" or leave blank({emptyMsg})" if emptyMsg else "") + ": "
-    user_input = input(input_str)
+    if as_list:
+        for index, item in enumerate(selections):
+            input_str += f"    {index}) - {item}\n"
+    else:
+        input_str = " | ".join(selections) + '\n'
+    input_str += f"{requestMsg} {f"or leave blank({emptyMsg})" if emptyMsg else ""}: "
+
+    completer = WordCompleter(selections, ignore_case=True)
+    user_input = prompt(input_str, completer=completer).strip()
 
     if not user_input:
-        if emptyMsg:
-            return None
-        raise ValueError(f"Didn't provide selection.")
+        if emptyMsg == None:
+            raise ValueError("Didn't provide selection.")
+        return None
     
     if user_input.isdigit():
         numeric_selection = int(user_input)
@@ -54,23 +62,24 @@ def multi_select_input(requestMsg: str, selections: list[str], emptyMsg: str = N
     if len(selections) == 1:
         return selections
     
-    input_str = " | ".join([*selections, "ALL"]) + f"\n{requestMsg} (comma-separated)" + (f" or leave blank({emptyMsg})" if emptyMsg else "") + ": "
-    user_input = input(input_str)
+    remaining_items = selections[:]
+    selected_items = []
 
-    if not user_input:
-        if emptyMsg:
-            return []
-        raise ValueError(f"Didn't provide selections.")
-    elif user_input == "ALL":
-        return selections
+    while remaining_items:
+        input_str = (f"Selected: {" | ".join(selected_items)}\n" if selected_items else "") + requestMsg
+        user_input = single_select_input(input_str, [*remaining_items, "ALL"], "", False)
+
+        if not user_input:
+            if not emptyMsg and not selected_items:
+                raise ValueError(f"Did not provide selections.")
+            return selected_items
+        elif user_input == "ALL":
+            return selections
+        
+        remaining_items.remove(user_input)
+        selected_items.append(user_input)
     
-    selected_properties = []
-    for prop in user_input.split(','):
-        formatted_prop = prop.strip()
-        if formatted_prop not in selections:
-            raise ValueError(f"The value '{formatted_prop}' is not a valid selection")
-        selected_properties.append(formatted_prop)
-    return selected_properties
+    return selected_items
     
 def tuple_input(requestMsg: str, keys: list[str]):
     if not requestMsg or not keys:

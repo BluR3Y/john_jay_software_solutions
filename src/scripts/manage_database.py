@@ -17,7 +17,7 @@ PROCESS_NAME = "Manage Database"
 
 def view_logs(db_manager: DatabaseManager):
     log_manager = db_manager.log_manager
-    selected_date = single_select_input("Select date logs:", list(log_manager.get_runtime_dates()))
+    selected_date = single_select_input("Select date logs", list(log_manager.get_runtime_dates()))
     date_logs = log_manager.get_runtime_logs(selected_date)
     
     pprint(date_logs)
@@ -25,7 +25,7 @@ def view_logs(db_manager: DatabaseManager):
 def revert_changes(db_manager: DatabaseManager):
     try:
         log_manager = db_manager.log_manager
-        selected_date = single_select_input("Select date logs:", list(log_manager.get_runtime_dates()))
+        selected_date = single_select_input("Select date logs", list(log_manager.get_runtime_dates()))
         date_logs = log_manager.get_runtime_logs(selected_date)
 
         pprint(date_logs)
@@ -111,13 +111,13 @@ def apply_latest_changes(db_manager: DatabaseManager):
         
 
 def delete_table_records(db_manager: DatabaseManager):
-    selected_table = single_select_input("Select table to remove records from: ", db_manager.get_db_tables())
+    selected_table = single_select_input("Select table to remove records from", db_manager.get_db_tables())
     table_columns = db_manager.get_table_columns(selected_table)
     record_identifier = list(table_columns.keys())[0]
 
     record_ids = None
     # From file or query
-    source_conditions = single_select_input("Select source for search conditions:", ["Conditions Query","Identifier File"])
+    source_conditions = single_select_input("Select source for search conditions", ["Conditions Query","Identifier File"])
     if source_conditions == "Conditions Query":
         search_query = input("WHERE: ")
         if not search_query:
@@ -151,7 +151,7 @@ def manage_database():
     with DatabaseManager(os.getenv("ACCESS_DB_PATH"), PROCESS_NAME) as db_manager:
         print(f"Current Process: {PROCESS_NAME}")
         while True:
-            user_selection = single_select_input("Select a Database Manager Action:",[
+            user_selection = single_select_input("Select a Database Manager Action",[
                 "View changes",
                 "Revert changes",
                 "Apply latest changes",

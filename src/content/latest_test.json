@@ -1,0 +1,28 @@
+{
+    "mod_path": "C:/Users/reyhe/Downloads/SP_Proposals_2025_Jul_21.xlsx",
+    "sheets": {
+        "Proposal - Template": {
+           "mod_name": "SP_Proposals_2025_Jul_21",
+           "columns": {
+            "projectLegacyNumber": {
+                "mod_name": "Project Legacy Number",
+                "identifier": true,
+                "mutations": [
+                    { "affix": { "kind": "prefix", "target": "jjc-" } }
+                ]
+            },
+            "proposalLegacyNumber": {
+                "mod_name": "Proposal Legacy Number",
+                "mutations": [
+                    { "affix": { "kind": "prefix", "target": "jjc-" } }
+                ]
+            }
+           } 
+        }
+    },
+    "defaults": {
+        "mutations": [
+            {"strip": { "kind": "trailing", "target": " " }}
+        ]
+    }
+}

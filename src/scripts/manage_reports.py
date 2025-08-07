@@ -16,17 +16,17 @@ def generate_reports(db_manager: DatabaseManager):
         while True:
             try:
                 if report_meta.df.shape[0]:
-                    selected_action = single_select_input("Enter a next step:", ["Generate another report.", "Save and Exit"])
+                    selected_action = single_select_input("Enter a next step", ["Generate another report.", "Save and Exit"])
                     if selected_action == "Save and Exit":
                         break
                 
-                selected_table = single_select_input("Enter the name of the table whose records will be used to populate the report:", db_tables)
-                table_columns = db_manager.get_table_columns(selected_table)
-                record_identifier = list(table_columns.keys())[0]
+                selected_table = single_select_input("Enter the name of the table whose records will be used to populate the report", db_tables)
+                table_columns = list(db_manager.get_table_columns(selected_table).keys())
+                record_identifier = table_columns[0]
                 
                 record_ids = None
                 # From file or query
-                source_conditions = single_select_input("Select source for search conditions:", ["Conditions Query","Identifier File"])
+                source_conditions = single_select_input("Select source for search conditions", ["Conditions Query","Identifier File"])
                 if source_conditions == "Conditions Query":
                     search_query = input("WHERE: ")
                     if not search_query:
@@ -144,7 +144,7 @@ def resolve_reports(db_manager: DatabaseManager):
 def manage_reports():
     with DatabaseManager(os.getenv("ACCESS_DB_PATH"), "REPORT-MANAGER") as db_manager:
         while True:
-            user_selection = single_select_input("Select a Report Manager Action:", ["Generate Reports", "Resolve Reports", "Exit Process"])
+            user_selection = single_select_input("Select a Report Manager Action", ["Generate Reports", "Resolve Reports", "Exit Process"])
 
             match user_selection:
                 case "Generate Reports":

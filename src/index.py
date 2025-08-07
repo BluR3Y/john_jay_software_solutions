@@ -18,6 +18,8 @@ from scripts.manage_database import manage_database
 from scripts.manage_reports import manage_reports
 from scripts.manage_migration import manage_migration
 from scripts.manage_attachments import manage_attachments
+from scripts.manage_workbook import manage_workbook
+from scripts.test_env import test_env
 
 # Run the program
 if __name__ == "__main__":
@@ -25,7 +27,9 @@ if __name__ == "__main__":
         "Manage Reports": manage_reports,
         "Manage Database": manage_database,
         "Manage Migration": manage_migration,
-        "Manage Attachments": manage_attachments
+        "Manage Attachments": manage_attachments,
+        "Manage Workbook": manage_workbook,
+        "Test Environment": test_env
     }
     
     # Initialize the argument parser

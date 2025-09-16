@@ -1,0 +1,170 @@
+{
+    "compare": {
+        "case_insensitive": true,
+        "ignore_whitespace": true
+    },
+    "aliases": {
+        "proposal_legacy_number": {
+            "type": "string",
+            "identifier": true
+        },
+        "title": {
+            "type": "string",
+            "not_null": true
+        },
+        "status": {
+            "type": "string",
+            "not_null": true,
+            "allowed_values": [
+                "Funded",
+                "Closed",
+                "Submitted to Sponsor"
+            ]
+        },
+        "instrument_type": {
+            "type": "string",
+            "not_null": true
+        },
+        "sponsor_1": {
+            "type": "string",
+            "not_null": true
+        },
+        "sponsor_2": {
+            "type": "string"
+        },
+        "start_date": {
+            "type": "date",
+            "not_null": true,
+            "date": {
+                "format": "%Y-%m-%d",
+                "granularity": "day",
+                "abs_tol": "0D"
+            }
+        },
+        "end_date": {
+            "type": "date",
+            "not_null": true,
+            "date": {
+                "format": "%Y-%m-%d",
+                "granularity": "day",
+                "abs_tol": "0D"
+            }
+        },
+        "proposal_type": {
+            "type": "string"
+        },
+        "activity_type": {
+            "type": "string",
+            "not_null": true
+        },
+        "discipline": {
+            "type": "string",
+            "not_null": true
+        },
+        "admin_unit_center": {
+            "type": "string"
+        },
+        "admin_unit": {
+            "type": "string",
+            "not_null": true
+        }
+    },
+    "files": [
+        {
+            "id": "submitted_version",
+            "path": "C:/Users/reyhe/OneDrive/Documents/JJay/data_pull_2025_05_28/John Jay College Final Data Set for Cayuse Migration-052825.xlsx",
+            "sheets": [
+                {
+                    "name": "Proposal - Template",
+                    "table_id": "proposal_sheet",
+                    "columns": {
+                        "proposalLegacyNumber": {
+                            "alias": "proposal_legacy_number"
+                        },
+                        "Title": {
+                            "alias": "title"
+                        },
+                        "status": {
+                            "alias": "status"
+                        },
+                        "Instrument Type": {
+                            "alias": "instrument_type"
+                        },
+                        "Sponsor": {
+                            "alias": "sponsor_1"
+                        },
+                        "Prime Sponsor": {
+                            "alias": "sponsor_2"
+                        },
+                        "Project Start Date": {
+                            "alias": "start_date"
+                        },
+                        "Project End Date": {
+                            "alias": "end_date"
+                        },
+                        "Proposal Type": {
+                            "alias": "proposal_type"
+                        },
+                        "Activity Type": {
+                            "alias": "activity_type"
+                        },
+                        "Discipline": {
+                            "alias": "discipline"
+                        },
+                        "Admin Unit": {
+                            "alias": "admin_unit"
+                        },
+                        "John Jay Centers": {
+                            "alias": "admin_unit_center"
+                        }
+                    }
+                },
+                {
+                    "name": "Award - Template",
+                    "table_id": "award_sheet",
+                    "columns": {
+                        "awardLegacyNumber": {
+                            "alias": "proposal_legacy_number",
+                            "mutations": [
+                                { "op": "strip_suffix", "value": "-award" }
+                            ]
+                        },
+                        "Title": {
+                            "alias": "title"
+                        },
+                        "Instrument Type": {
+                            "alias": "instrument_type"
+                        },
+                        "Sponsor": {
+                            "alias": "sponsor_1"
+                        },
+                        "Prime Sponsor": {
+                            "alias": "sponsor_2"
+                        },
+                        "Project Start Date": {
+                            "alias": "start_date"
+                        },
+                        "Project End Date": {
+                            "alias": "end_date"
+                        },
+                        "Proposal Type": {
+                            "alias": "proposal_type"
+                        },
+                        "Activity Type": {
+                            "alias": "activity_type"
+                        },
+                        "Discipline": {
+                            "alias": "discipline"
+                        },
+                        "Admin Unit": {
+                            "alias": "admin_unit"
+                        },
+                        "John Jay Centers": {
+                            "alias": "admin_unit_center"
+                        }
+                    }
+                }
+            ]
+        }
+    ]
+}

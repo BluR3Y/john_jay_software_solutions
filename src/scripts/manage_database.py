@@ -3,6 +3,7 @@ from pprint import pprint
 import os
 import json
 import datetime
+import pandas as pd
 from packages.log_manager import LogManager
 from packages.log_manager import manage_logs
 from modules.logger import logger
@@ -12,6 +13,50 @@ from modules.utils import (
     request_user_confirmation,
     multi_select_input
 )
+
+import re
+import pandas as pd
+
+# 1) Illegal character patterns and helpers
+_ILLEGAL_CTRL = re.compile(r"[\x00-\x08\x0B-\x0C\x0E-\x1F]")
+_INVALID_SHEET_CHARS = re.compile(r"[:\\/?*\[\]]")
+
+def clean_value(v):
+    # Bytes → text
+    if isinstance(v, (bytes, bytearray)):
+        try:
+            v = v.decode("utf-8", errors="replace")
+        except Exception:
+            v = str(v)
+    # Strip Excel-illegal control chars from strings
+    if isinstance(v, str):
+        # Normalize newlines and remove control chars
+        v = v.replace("\r\n", "\n").replace("\r", "\n")
+        v = _ILLEGAL_CTRL.sub("", v)
+    return v
+
+def sanitize_df(df: pd.DataFrame) -> pd.DataFrame:
+    # Only touch object/string/bytes-like columns for speed
+    cols = df.select_dtypes(include=["object", "string"]).columns.tolist()
+    if cols:
+        df = df.copy()
+        df[cols] = df[cols].applymap(clean_value)
+    return df
+
+def safe_sheet_name(name: str, taken: set) -> str:
+    # Remove invalid chars and trim to 31
+    base = _INVALID_SHEET_CHARS.sub(" ", str(name)).strip()
+    base = base[:31] if base else "Sheet"
+    candidate = base
+    # Ensure uniqueness within workbook
+    i = 2
+    while candidate in taken:
+        suffix = f" ({i})"
+        candidate = (base[: 31 - len(suffix)] + suffix) if len(base) + len(suffix) > 31 else base + suffix
+        i += 1
+    taken.add(candidate)
+    return candidate
+
 
 PROCESS_NAME = "Manage Database"
 
@@ -147,6 +192,44 @@ def delete_table_records(db_manager: DatabaseManager):
             }
         })
 
+def convert_to_excel(db_manager: DatabaseManager):
+# 2) Export everything to one workbook (multi-sheet)
+# If you previously had: with pd.ExcelWriter("all_tables.xlsx") as writer:
+    with pd.ExcelWriter(r"C:\Users\reyhe\OneDrive\all_tables.xlsx") as writer:
+        taken_sheet_names = set()
+
+        for table in db_manager.get_db_tables():  # your list of table names
+            try:
+                df = pd.read_sql(f"SELECT * FROM [{table}]", db_manager.connection)
+
+                # Optional: if the table is extremely wide, reduce memory spikes
+                # df = df.convert_dtypes()
+
+                # Sanitize before writing
+                df = sanitize_df(df)
+
+                sheet = safe_sheet_name(table, taken_sheet_names)
+
+                # Excel single-sheet row limit; fall back to CSV if too big
+                if len(df) > 1_048_576:
+                    csv_path = f"overflow_{sheet}.csv"
+                    df.to_csv(csv_path, index=False)
+                    # Also write a small notice sheet instead of failing silently
+                    notice = pd.DataFrame({
+                        "message": [f"Table '{table}' had {len(df):,} rows; saved to '{csv_path}' instead."]
+                    })
+                    notice.to_excel(writer, sheet_name=sheet, index=False)
+                else:
+                    df.to_excel(writer, sheet_name=sheet, index=False)
+
+            except Exception as e:
+                # If a particular table still fails, record the error instead of aborting the whole export
+                err_sheet = safe_sheet_name(f"{table}_ERR", taken_sheet_names)
+                pd.DataFrame({"table": [table], "error": [str(e)]}).to_excel(
+                    writer, sheet_name=err_sheet, index=False
+                )
+
+
 def manage_database():
     with DatabaseManager(os.getenv("ACCESS_DB_PATH"), PROCESS_NAME) as db_manager:
         print(f"Current Process: {PROCESS_NAME}")
@@ -156,6 +239,7 @@ def manage_database():
                 "Revert changes",
                 "Apply latest changes",
                 "Delete Records",
+                "Convert To Excel",
                 "Exit Process"
             ])
 
@@ -168,5 +252,7 @@ def manage_database():
                     apply_latest_changes(db_manager)
                 case "Delete Records":
                     delete_table_records(db_manager)
+                case "Convert To Excel":
+                    convert_to_excel(db_manager)
                 case _:
                     return

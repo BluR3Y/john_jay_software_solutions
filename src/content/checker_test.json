@@ -1,0 +1,74 @@
+{
+    "compare": { "case_insensitive": true, "ignore_whitespace": true },
+    "aliases": {
+        "grant_id": {
+            "type": "string",
+            "identifier": true
+        },
+        "title": {
+            "type": "string",
+            "not_null": true
+        },
+        "submission_date": {
+            "type": "date",
+            "not_null": true,
+            "date": {
+                "format": "%m/%d/%Y",
+                "granularity": "day",
+                "abs_tol": "0D"
+            }
+        },
+        "status": {
+            "type": "string",
+            "not_null": true,
+            "allowed_values": ["Active", "Closed", "Pending"]
+        }
+    },
+    "files": [
+        {
+            "id": "test1",
+            "path": "C:/Users/reyhe/OneDrive/Desktop/checker_file_1.xlsx",
+            "sheets": [
+                {
+                    "name": "Sheet1",
+                    "table_id": "test1_sheet1",
+                    "columns": {
+                        "grant_id": {
+                            "alias": "grant_id"
+                        },
+                        "Title": {
+                            "alias": "title"
+                        },
+                        "submission_date": {
+                            "alias": "submission_date"
+                        },
+                        "Status": {
+                            "alias": "status"
+                        }
+                    }
+                },
+                {
+                    "name": "Sheet2",
+                    "table_id": "test1_sheet2",
+                    "columns": {
+                        "Grant_ID": {
+                            "alias": "grant_id",
+                            "mutations": [
+                                { "op": "strip_prefix", "value": "jjc-" }
+                            ]
+                        },
+                        "Project Title": {
+                            "alias": "title"
+                        },
+                        "Submit": {
+                            "alias": "submission_date"
+                        },
+                        "grant status": {
+                            "alias": "status"
+                        }
+                    }
+                }
+            ]
+        }
+    ]
+}

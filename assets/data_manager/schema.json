@@ -1,0 +1,32 @@
+{
+    "schema": {
+        "aliases": {
+            "grant_id": {
+                "type": "integer",
+                "identifier": true
+            },
+            "title": {
+                "type": "string",
+                "not_null": false
+            },
+            "submission_date": {
+                "type": "date",
+                "not_null": true,
+                "date": {
+                    "format": "%Y-%m-%d %H:%M:%S",
+                    "granularity": "day",
+                    "abs_tol": "0D"
+                }
+            },
+            "status": {
+                "type": "string",
+                "not_null": true,
+                "enum": [
+                    "Active",
+                    "Closed",
+                    "Pending"
+                ]
+            }
+        }
+    }
+}

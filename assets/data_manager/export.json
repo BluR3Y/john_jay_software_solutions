@@ -1,0 +1,77 @@
+{
+    "export": {
+        "workbooks": [
+            {
+                "save_name": "access_1_export",
+                "sheets": [
+                    {
+                        "name": "Project - Template",
+                        "columns": {
+                            "Grant Identifier": {
+                                "alias": "grant_id"
+                            },
+                            "Grant Title": {
+                                "alias": "title"
+                            }
+                        },
+                        "filter": {
+                            "AND": [
+                                {
+                                    "submission_date": {
+                                        "op": ">=",
+                                        "value": "01-01-2017"
+                                    }
+                                },
+                                {
+                                    "submission_date": {
+                                        "op": "<=",
+                                        "value": "01-01-2020"
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "name": "Proposal - Template",
+                        "filter": {
+                            "status": {
+                                "op": "=",
+                                "value": "Active"
+                            }
+                        },
+                        "columns": {
+                            "Project Title": {
+                                "alias": "title"
+                            },
+                            "Grant Status": {
+                                "alias": "status"
+                            }
+                        }
+                    },
+                    {
+                        "name": "Award - Template",
+                        "filter": {
+                            "award_number": {
+                                "op": "!=",
+                                "value": null
+                            }
+                        },
+                        "columns": {
+                            "Award No": {
+                                "alias": "award_number"
+                            },
+                            "PI": {
+                                "alias": "primary_investigator",
+                                "transforms": [
+                                    {
+                                        "titlecase": {}
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                ]
+            }
+        ]
+    }
+}

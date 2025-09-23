@@ -1,0 +1,102 @@
+{
+    "sources": [
+        {
+            "path": "C:/Users/reyhe/OneDrive/Desktop/checker_file_1.xlsx",
+            "id": "excel_doc_1",
+            "tables": [
+                {
+                    "name": "Sheet1",
+                    "table_id": "excel_1_sheet_1",
+                    "filter": {
+                        "submission_date": {
+                            "op": ">=",
+                            "value": "01-01-2017"
+                        }
+                    },
+                    "columns": {
+                        "grant_id": {},
+                        "Title": {
+                            "alias": "title"
+                        },
+                        "submission_date": {},
+                        "Status": {
+                            "alias": "status"
+                        }
+                    }
+                },
+                {
+                    "name": "Sheet2",
+                    "table_id": "excel_1_sheet_2",
+                    "filter": {
+                        "AND": [
+                            {
+                                "submission_date": {
+                                    "op": ">=",
+                                    "value": "01-01-2017"
+                                }
+                            },
+                            {
+                                "submission_date": {
+                                    "op": "<=",
+                                    "value": "01-01-2020"
+                                }
+                            }
+                        ]
+                    },
+                    "columns": {
+                        "Grant_ID": {
+                            "alias": "grant_id",
+                            "transforms": [
+                                {
+                                    "regex_replace": {
+                                        "pattern": "^jjc-",
+                                        "repl": "",
+                                        "flags": "i"
+                                    }
+                                },
+                                {
+                                    "cast": {
+                                        "to": "integer"
+                                    }
+                                }
+                            ]
+                        },
+                        "Project Title": {
+                            "alias": "title"
+                        },
+                        "Submit": {
+                            "alias": "submission_date"
+                        },
+                        "grant status": {
+                            "alias": "status"
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "id": "access_db_1",
+            "path": "C:/Users/reyhe/OneDrive/Desktop/my_db.accdb",
+            "tables": [
+                {
+                    "name": "Table1",
+                    "table_id": "access_1_table_1",
+                    "filter": {
+                        "grant_id": {
+                            "op": ">=",
+                            "value": "140"
+                        }
+                    },
+                    "columns": {
+                        "Grant_ID": {
+                            "alias": "grant_id"
+                        },
+                        "Project_Title": {
+                            "alias": "title"
+                        }
+                    }
+                }
+            ]
+        }
+    ]
+}

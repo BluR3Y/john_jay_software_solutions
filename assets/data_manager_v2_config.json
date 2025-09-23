@@ -1,0 +1,271 @@
+{
+    "version": "1.1",
+    "output": "C:/Users/reyhe/OneDrive/Desktop/data_manager",
+    "schema": {
+        "aliases": {
+            "grant_id": {
+                "type": "integer",
+                "identifier": true
+            },
+            "title": {
+                "type": "string"
+            },
+            "submission_date": {
+                "type": "date",
+                "date": {
+                    "format": "%Y-%m-%d"
+                }
+            },
+            "status": {
+                "type": "string",
+                "enum": [
+                    "Active",
+                    "Closed",
+                    "Pending",
+                    "Rejected"
+                ]
+            }
+        }
+    },
+    "sources": [
+        {
+            "path": "C:/Users/reyhe/OneDrive/Desktop/checker_file_1.xlsx",
+            "id": "excel_doc_1",
+            "tables": [
+                {
+                    "name": "Sheet1",
+                    "table_id": "excel_1_sheet_1",
+                    "columns": {
+                        "grant_id": {},
+                        "Title": {
+                            "alias": "title"
+                        },
+                        "submission_date": {},
+                        "Status": {
+                            "alias": "status",
+                            "transforms": [
+                                {
+                                    "map": {
+                                        "Open": "Active"
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Sheet2",
+                    "table_id": "excel_1_sheet_2",
+                    "columns": {
+                        "Grant_ID": {
+                            "alias": "grant_id",
+                            "transforms": [
+                                {
+                                    "regex_replace": {
+                                        "pattern": "^jjc-",
+                                        "repl": "",
+                                        "flags": "i"
+                                    }
+                                },
+                                {
+                                    "cast": {
+                                        "to": "integer"
+                                    }
+                                }
+                            ]
+                        },
+                        "Project Title": {
+                            "alias": "title"
+                        },
+                        "Submit": {
+                            "alias": "submission_date"
+                        },
+                        "grant status": {
+                            "alias": "status",
+                            "transforms": [
+                                {
+                                    "map": {
+                                        "Open": "Active"
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "id": "access_db_1",
+            "path": "C:/Users/reyhe/OneDrive/Documents/JJay/data_pull_2025_05_28/db_resources/New_RF_Grant_Status-Working_DB_updated 051325.accdb",
+            "tables": [
+                {
+                    "name": "grants",
+                    "table_id": "access_1_table_1",
+                    "columns": {
+                        "Grant_ID": {
+                            "alias": "grant_id"
+                        },
+                        "Project_Title": {
+                            "alias": "title"
+                        },
+                        "Date_Submitted": {
+                            "alias": "submission_date"
+                        }
+                    }
+                }
+            ]
+        }
+    ],
+    "compile": {
+        "targets": [
+            {
+                "name": "excel_compiled_grants",
+                "key": [
+                    "grant_id"
+                ],
+                "inputs": [
+                    "excel_1_sheet_1",
+                    "excel_1_sheet_2"
+                ],
+                "merge_rules": {
+                    "title": {
+                        "strategy": "first_non_null",
+                        "priority": [
+                            "excel_1_sheet_1",
+                            "excel_1_sheet_2"
+                        ]
+                    }
+                }
+            },
+            {
+                "name": "excel_first_grants",
+                "key": [
+                    "grant_id"
+                ],
+                "inputs": [
+                    "excel_1_sheet_1"
+                ]
+            },
+            {
+                "name": "excel_second_grants",
+                "key": [
+                    "grant_id"
+                ],
+                "inputs": [
+                    "excel_1_sheet_2"
+                ]
+            },
+            {
+                "name": "access_compiled_grants",
+                "key": [
+                    "grant_id"
+                ],
+                "inputs": [
+                    "access_1_table_1"
+                ]
+            }
+        ]
+    },
+    "compare": {
+        "pairs": [
+            {
+                "left": "excel_first_grants",
+                "right": "excel_second_grants",
+                "on": [
+                    "grant_id"
+                ],
+                "save_name": "excel_sheet_1_vs_sheet_2"
+            }
+        ]
+    },
+    "export": {
+        "workbooks": [
+            {
+                "save_name": "compiled_excel_grants",
+                "sheets": [
+                    {
+                        "name": "Gen Sheet 1",
+                        "from": "excel_compiled_grants",
+                        "filter": {
+                            "OR": [
+                                {
+                                    "grant_id": {
+                                        "op": ">=",
+                                        "value": 130
+                                    }
+                                },
+                                {
+                                    "grant_id": {
+                                        "op": "in",
+                                        "value": [
+                                            106,
+                                            112,
+                                            118,
+                                            124
+                                        ]
+                                    }
+                                }
+                            ]
+                        },
+                        "columns": {
+                            "Grant Identifier": {
+                                "alias": "grant_id",
+                                "transforms": [
+                                    {
+                                        "affix": {
+                                            "text": "JJC-",
+                                            "position": "prefix"
+                                        }
+                                    }
+                                ]
+                            },
+                            "Grant Title": {
+                                "alias": "title"
+                            },
+                            "Submitted": {
+                                "alias": "submission_date"
+                            },
+                            "Status": {
+                                "alias": "status",
+                                "transforms": [
+                                    {
+                                        "map": {
+                                            "Pending": "Active",
+                                            "Closed": "Inactive"
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                ]
+            },
+            {
+                "save_name": "compiled_access_grants",
+                "sheets": [
+                    {
+                        "name": "Sheet1",
+                        "from": "access_compiled_grants",
+                        "filter": {
+                            "submission_date": {
+                                "op": ">=",
+                                "value": "2017-01-01"
+                            }
+                        },
+                        "columns": {
+                            "Grant Identifier": {
+                                "alias": "grant_id"
+                            },
+                            "Grant Title": {
+                                "alias": "title"
+                            },
+                            "Date Submitted": {
+                                "alias": "submission_date"
+                            }
+                        }
+                    }
+                ]
+            }
+        ]
+    }
+}

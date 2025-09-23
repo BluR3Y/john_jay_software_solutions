@@ -1,0 +1,406 @@
+{
+  "version": "1.1",
+  "metadata": {
+    "description": "Reference config for data_manager demonstrating all core features"
+  },
+  "timezone": "America/New_York",
+  "output": "${DATA_MANAGER_OUT}/data_manager_out",
+  "schema": {
+    "aliases": {
+      "grant_id": {
+        "type": "integer",
+        "identifier": true
+      },
+      "title": {
+        "type": "string"
+      },
+      "submission_date": {
+        "type": "date",
+        "not_null": true,
+        "date": {
+          "format": "%Y-%m-%d",
+          "granularity": "day",
+          "abs_tol": "0D"
+        }
+      },
+      "status": {
+        "type": "string",
+        "not_null": true,
+        "enum": [
+          "Active",
+          "Closed",
+          "Pending"
+        ]
+      },
+      "award_number": {
+        "type": "string"
+      },
+      "primary_investigator": {
+        "type": "string"
+      }
+    }
+  },
+  "sources": [
+    {
+      "id": "excel_doc_1",
+      "path": "C:/Data/grants_book.xlsx",
+      "tables": [
+        {
+          "name": "Sheet1",
+          "table_id": "excel_1_sheet_1",
+          "columns": {
+            "grant_id": {},
+            "Title": {
+              "alias": "title"
+            },
+            "submission_date": {},
+            "Status": {
+              "alias": "status"
+            }
+          }
+        },
+        {
+          "name": "Sheet2",
+          "table_id": "excel_1_sheet_2",
+          "columns": {
+            "Grant_ID": {
+              "alias": "grant_id",
+              "transforms": [
+                {
+                  "regex_replace": {
+                    "pattern": "^jjc-",
+                    "repl": "",
+                    "flags": "i"
+                  }
+                },
+                {
+                  "cast": {
+                    "to": "integer",
+                    "on_cast_error": "coerce_null"
+                  }
+                }
+              ]
+            },
+            "Project Title": {
+              "alias": "title"
+            },
+            "Submit": {
+              "alias": "submission_date"
+            },
+            "grant status": {
+              "alias": "status"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "access_db_1",
+      "path": "C:/Data/my_db.accdb",
+      "tables": [
+        {
+          "name": "Table1",
+          "table_id": "access_1_table_1",
+          "columns": {
+            "Grant_ID": {
+              "alias": "grant_id"
+            },
+            "Project_Title": {
+              "alias": "title"
+            },
+            "Award_No": {
+              "alias": "award_number"
+            },
+            "PI_Name": {
+              "alias": "primary_investigator",
+              "transforms": [
+                {
+                  "titlecase": {}
+                }
+              ]
+            },
+            "StatusText": {
+              "alias": "status"
+            },
+            "Date_Submitted": {
+              "alias": "submission_date",
+              "transforms": [
+                {
+                  "cast": {
+                    "to": "date",
+                    "format": "%Y-%m-%d"
+                  }
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "compile": {
+    "targets": [
+      {
+        "name": "excel_grants",
+        "key": [
+          "grant_id"
+        ],
+        "inputs": [
+          "excel_1_sheet_1",
+          "excel_1_sheet_2"
+        ],
+        "pre_filter": {
+          "excel_1_sheet_1": {
+            "submission_date": {
+              "op": "between",
+              "start": "2017-01-01",
+              "end": "2024-12-31"
+            }
+          },
+          "excel_1_sheet_2": {
+            "AND": [
+              {
+                "submission_date": {
+                  "op": ">=",
+                  "value": "2017-01-01"
+                }
+              },
+              {
+                "status": {
+                  "op": "in",
+                  "value": [
+                    "Active",
+                    "Pending"
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "post_filter": {
+          "AND": [
+            {
+              "grant_id": {
+                "op": ">=",
+                "value": 10
+              }
+            },
+            {
+              "status": {
+                "op": "!=",
+                "value": "Closed"
+              }
+            }
+          ]
+        },
+        "merge_rules": {
+          "title": {
+            "strategy": "first_non_null",
+            "priority": [
+              "excel_1_sheet_1",
+              "excel_1_sheet_2"
+            ]
+          },
+          "status": {
+            "strategy": "prefer_source",
+            "prefer_source": "excel_1_sheet_1",
+            "fallback": [
+              "excel_1_sheet_2"
+            ]
+          }
+        }
+      },
+      {
+        "name": "access_grants",
+        "key": [
+          "grant_id"
+        ],
+        "inputs": [
+          "access_1_table_1"
+        ],
+        "pre_filter": {
+          "access_1_table_1": {
+            "OR": [
+              {
+                "grant_id": {
+                  "op": ">=",
+                  "value": 140
+                }
+              },
+              {
+                "status": {
+                  "op": "==",
+                  "value": "Active"
+                }
+              }
+            ]
+          }
+        },
+        "post_filter": {
+          "award_number": {
+            "op": "not_null"
+          }
+        },
+        "merge_rules": {
+          "primary_investigator": "first_non_null",
+          "award_number": "first_non_null"
+        }
+      }
+    ]
+  },
+  "compare": {
+    "pairs": [
+      {
+        "left": "excel_grants",
+        "right": "access_grants",
+        "on": [
+          "grant_id"
+        ],
+        "filter": {
+          "AND": [
+            {
+              "status": {
+                "op": "==",
+                "value": "Active"
+              }
+            },
+            {
+              "grant_id": {
+                "op": ">=",
+                "value": 100
+              }
+            }
+          ]
+        },
+        "save_name": "excel_vs_access_active_100_plus"
+      },
+      {
+        "left": "excel_grants",
+        "right": "access_grants",
+        "on": [
+          "grant_id"
+        ],
+        "filter": {
+          "status": {
+            "op": "in",
+            "value": [
+              "Pending",
+              "Active"
+            ]
+          }
+        },
+        "save_name": "excel_vs_access_pending_active"
+      }
+    ]
+  },
+  "export": {
+    "workbooks": [
+      {
+        "save_name": "compiled_grants_export",
+        "sheets": [
+          {
+            "name": "Grants – Excel View",
+            "from": "excel_grants",
+            "filter": {
+              "submission_date": {
+                "op": "between",
+                "start": "2019-01-01",
+                "end": "2025-01-01"
+              }
+            },
+            "columns": {
+              "Grant Identifier": {
+                "alias": "grant_id",
+                "transforms": [
+                  {
+                    "affix": {
+                      "text": "JJC-",
+                      "position": "prefix"
+                    }
+                  }
+                ]
+              },
+              "Grant Title": {
+                "alias": "title"
+              },
+              "Submitted": {
+                "alias": "submission_date"
+              },
+              "Grant Status": {
+                "alias": "status",
+                "transforms": [
+                  {
+                    "map": {
+                      "Closed": "Inactive",
+                      "Pending": "Active"
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "name": "Grants – Access View",
+            "from": "access_grants",
+            "filter": {
+              "AND": [
+                {
+                  "status": {
+                    "op": "==",
+                    "value": "Active"
+                  }
+                },
+                {
+                  "award_number": {
+                    "op": "not_null"
+                  }
+                }
+              ]
+            },
+            "columns": {
+              "Grant ID": {
+                "alias": "grant_id"
+              },
+              "Title": {
+                "alias": "title"
+              },
+              "PI": {
+                "alias": "primary_investigator",
+                "transforms": [
+                  {
+                    "titlecase": {}
+                  }
+                ]
+              },
+              "Award No": {
+                "alias": "award_number"
+              }
+            }
+          },
+          {
+            "name": "PI Directory",
+            "from": "access_grants",
+            "filter": {
+              "primary_investigator": {
+                "op": "not_null"
+              }
+            },
+            "columns": {
+              "PI (Titlecase)": {
+                "alias": "primary_investigator",
+                "transforms": [
+                  {
+                    "titlecase": {}
+                  }
+                ]
+              },
+              "Projects": {
+                "alias": "title"
+              }
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,242 @@
+{
+    "config_version": 1,
+    "metadata": {
+        "description": "Configuration file used to test development of package"
+    },
+    "schema": {
+        "aliases": {
+            "grant_id": {
+                "type": "integer",
+                "identifier": true
+            },
+            "title": {
+                "type": "string",
+                "not_null": false
+            },
+            "submission_date": {
+                "type": "date",
+                "not_null": true,
+                "date": {
+                    "format": "%Y-%m-%d %H:%M:%S",
+                    "granularity": "day",
+                    "abs_tol": "0D"
+                }
+            },
+            "status": {
+                "type": "string",
+                "not_null": true,
+                "allowed_values": [
+                    "Active",
+                    "Closed",
+                    "Pending"
+                ]
+            }
+        }
+    },
+    "sources": [
+        {
+            "id": "excel1",
+            "type": "excel",
+            "path": "C:/Users/reyhe/OneDrive/Desktop/checker_file_1.xlsx",
+            "tables": [
+                {
+                    "name": "Sheet1",
+                    "table_id": "excel1_sheet1",
+                    "columns": {
+                        "grant_id": {},
+                        "Title": {
+                            "alias": "title"
+                        },
+                        "submission_date": {},
+                        "Status": {
+                            "alias": "status"
+                        }
+                    }
+                },
+                {
+                    "name": "Sheet2",
+                    "table_id": "excel1_sheet2",
+                    "columns": {
+                        "Grant_ID": {
+                            "alias": "grant_id"
+                        },
+                        "Project Title": {
+                            "alias": "title"
+                        },
+                        "Submit": {
+                            "alias": "submission_date"
+                        },
+                        "grant status": {
+                            "alias": "status"
+                        }
+                    },
+                    "transforms": {
+                        "columns": {
+                            "grant_id": [
+                                {
+                                    "regex_replace": {
+                                        "pattern": "^jjc-",
+                                        "repl": "",
+                                        "flags": "i"
+                                    }
+                                },
+                                {
+                                    "cast": {
+                                        "to": "integer"
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "id": "access1",
+            "type": "access",
+            "path": "C:/Users/reyhe/OneDrive/Documents/JJay/data_pull_2025_05_28/db_resources/New_RF_Grant_Status-Working_DB_updated 051325.accdb",
+            "tables": [
+                {
+                    "name": "grants",
+                    "table_id": "grants",
+                    "columns": {
+                        "Grant_ID": {
+                            "alias": "grant_id"
+                        },
+                        "Project_Title": {
+                            "alias": "title"
+                        }
+                    }
+                }
+            ]
+        }
+    ],
+    "compile": {
+        "targets": [
+            {
+                "name": "sheet1_passthrough",
+                "key": [
+                    "grant_id"
+                ],
+                "inputs": [
+                    "excel1_sheet1"
+                ],
+                "merge_rules": {}
+            },
+            {
+                "name": "sheet2_passthrough",
+                "key": [
+                    "grant_id"
+                ],
+                "inputs": [
+                    "excel1_sheet2"
+                ],
+                "merge_rules": {}
+            },
+            {
+                "name": "table1_passthrough",
+                "key": [
+                    "grant_id"
+                ],
+                "inputs": [
+                    "grants"
+                ],
+                "merge_rules": {}
+            }
+        ]
+    },
+    "compare": {
+        "pairs": [
+            {
+                "left": "sheet1_passthrough",
+                "right": "sheet2_passthrough",
+                "on": [
+                    "grant_id"
+                ],
+                "output": {
+                    "path": "C:/Users/reyhe/OneDrive/Desktop/data_manager/reports/sheet1_vs_sheet2.xlsx",
+                    "format": "excel"
+                }
+            },
+            {
+                "left": "table1_passthrough",
+                "right": "sheet1_passthrough",
+                "on": [
+                    "grant_id"
+                ],
+                "output": {
+                    "path": "C:/Users/reyhe/OneDrive/Desktop/data_manager/reports/table1_vs_sheet1.xlsx",
+                    "format": "excel"
+                }
+            }
+        ]
+    },
+    "export": {
+        "workbooks": [
+            {
+                "path": "C:/Users/reyhe/OneDrive/Desktop/data_manager/exports/access1_export.xlsx",
+                "sheets": [
+                    {
+                        "name": "Project - Template",
+                        "columns": {
+                            "Grant Identifier": {
+                                "alias": "grant_id"
+                            },
+                            "Grant Title": {
+                                "alias": "title"
+                            }
+                        }
+                    },
+                    {
+                        "name": "Proposal - Template",
+                        "filter": {
+                            "status": {
+                                "op": "=",
+                                "value": "Active"
+                            }
+                        },
+                        "columns": {
+                            "Project Title": {
+                                "alias": "title"
+                            },
+                            "Grant Status": {
+                                "alias": "status"
+                            }
+                        }
+                    },
+                    {
+                        "name": "Award - Template",
+                        "filter": {
+                            "award_number": {
+                                "op": "!=",
+                                "value": null
+                            }
+                        },
+                        "columns": {
+                            "Award No": {
+                                "alias": "award_number"
+                            },
+                            "PI": {
+                                "alias": "primary_investigator",
+                                "transforms": [
+                                    {
+                                        "titlecase": {}
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                ]
+            }
+        ]
+    },
+    "output": {
+        "snapshots": {
+            "path": "C:/Users/reyhe/OneDrive/Desktop/data_manager/snapshots",
+            "format": "parquet"
+        },
+        "reports": {
+            "path": "C:/Users/reyhe/OneDrive/Desktop/data_manager/reports"
+        }
+    }
+}

@@ -1,0 +1,68 @@
+{
+    "compile": {
+        "targets": [
+            {
+                "name": "excel_grants",
+                "key": [
+                    "grant_id"
+                ],
+                "inputs": [
+                    "excel_1_sheet_1",
+                    "excel_1_sheet_2"
+                ],
+                "pre_filter": {
+                    "excel_1_sheet_1": {
+                        "submission_date": {
+                            "op": ">=",
+                            "value": "01-01-2017"
+                        }
+                    },
+                    "excel_1_sheet_2": {
+                        "AND": [
+                            {
+                                "submission_date": {
+                                    "op": ">=",
+                                    "value": "01-01-2017"
+                                }
+                            },
+                            {
+                                "submission_date": {
+                                    "op": "<=",
+                                    "value": "01-01-2020"
+                                }
+                            }
+                        ]
+                    }
+                },
+                "post_filter": {
+                    "grant_id": {
+                        "op": ">=",
+                        "value": "10"
+                    }
+                },
+                "merge_rules": {
+                    "title": "first_non_null",
+                    "status": "excel_1_sheet_1"
+                }
+            },
+            {
+                "name": "access_grants",
+                "key": [
+                    "grant_id"
+                ],
+                "inputs": [
+                    "access_1_table_1"
+                ],
+                "pre_filter": {
+                    "access_1_table_1": {
+                        "grant_id": {
+                            "op": ">=",
+                            "value": "140"
+                        }
+                    }
+                },
+                "merge_rules": {}
+            }
+        ]
+    }
+}

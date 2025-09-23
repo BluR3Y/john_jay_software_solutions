@@ -1,0 +1,18 @@
+{
+    "compare": {
+        "pairs": [
+            {
+                "left": "excel_grants",
+                "right": "access_grants",
+                "on": ["grant_id"],
+                "filter": {
+                    "status": {
+                        "op": "==",
+                        "value": "Active"
+                    }
+                },
+                "save_name": "excel_vs_access_report"
+            }
+        ]
+    }
+}

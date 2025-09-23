@@ -1,0 +1,114 @@
+{
+    "export": {
+        "workbooks": [
+            {
+                "path": "C:/Users/reyhe/OneDrive/Desktop/data_manager/exports/access1_export.xlsx",
+                "sheets": [
+                    {
+                        "name": "Project - Template",
+                        "source": "grants_compiled",
+                        "fields": [
+                            {
+                                "name": "grant_id",
+                                "header": "Grant Identifier"
+                            },
+                            {
+                                "name": "title",
+                                "header": "Project Title",
+                                "transforms": [
+                                    {
+                                        "titlecase": {}
+                                    }
+                                ]
+                            },
+                            {
+                                "name": "status",
+                                "header": "Project Status"
+                            }
+                        ],
+                        "filter": {
+                            "submission_date": {
+                                "op": ">=",
+                                "value": "12-01-2017"
+                            }
+                        }
+                    },
+                    {
+                        "name": "Proposal - Template",
+                        "filter": {
+                            "AND": [
+                                {
+                                    "grant_id": {
+                                        "op": ">=",
+                                        "value": 10
+                                    }
+                                },
+                                {
+                                    "grant_id": {
+                                        "op": "<=",
+                                        "value": 90
+                                    }
+                                }
+                            ]
+                        },
+                        "fields": [
+                            {
+                                "header": "Grant Identifier",
+                                "name": "grant_id"
+                            },
+                            {
+                                "header": "Project Title",
+                                "name": "title"
+                            },
+                            {
+                                "header": "Project OAR Status",
+                                "name": "status",
+                                "transforms": [
+                                    { "map": { "Pending": "Active", "Closed": "Inactive" } }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "name": "Award - Template",
+                        "filter": {
+                            "OR": [
+                                {
+                                    "award_no": {
+                                        "op": "!=",
+                                        "value": null
+                                    }
+                                },
+                                {
+                                    "submission_date": {
+                                        "op": "!=",
+                                        "value": null
+                                    }
+                                },
+                                {
+                                    "status": {
+                                        "op": "IS NOT IN",
+                                        "value": ["Closed", "Unsubmitted"]
+                                    }
+                                }
+                            ]
+                        },
+                        "fields": [
+                            {
+                                "header": "Award Number",
+                                "name": "award_number"
+                            },
+                            {
+                                "header": "PI",
+                                "name": "primary_investigator",
+                                "transforms": [
+                                    { "udf": "get_investigator_info" }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+    }
+}

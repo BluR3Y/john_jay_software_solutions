@@ -1,0 +1,266 @@
+{
+    "version": "1.1",
+    "metadata": {
+        "description": "IPSUM LOREM"
+    },
+    "output": "C:/Users/reyhe/OneDrive/Desktop/data_manager",
+    "schema": {
+        "aliases": {
+            "grant_id": {
+                "type": "integer",
+                "identifier": true
+            },
+            "title": {
+                "type": "string",
+                "not_null": false
+            },
+            "submission_date": {
+                "type": "date",
+                "not_null": true,
+                "date": {
+                    "format": "%Y-%m-%d %H:%M:%S",
+                    "granularity": "day",
+                    "abs_tol": "0D"
+                }
+            },
+            "status": {
+                "type": "string",
+                "not_null": true,
+                "enum": [
+                    "Active",
+                    "Closed",
+                    "Pending"
+                ]
+            }
+        }
+    },
+    "sources": [
+        {
+            "path": "C:/Users/reyhe/OneDrive/Desktop/checker_file_1.xlsx",
+            "id": "excel_doc_1",
+            "tables": [
+                {
+                    "name": "Sheet1",
+                    "table_id": "excel_1_sheet_1",
+                    "columns": {
+                        "grant_id": {},
+                        "Title": {
+                            "alias": "title"
+                        },
+                        "submission_date": {},
+                        "Status": {
+                            "alias": "status"
+                        }
+                    }
+                },
+                {
+                    "name": "Sheet2",
+                    "table_id": "excel_1_sheet_2",
+                    "columns": {
+                        "Grant_ID": {
+                            "alias": "grant_id",
+                            "transforms": [
+                                {
+                                    "regex_replace": {
+                                        "pattern": "^jjc-",
+                                        "repl": "",
+                                        "flags": "i"
+                                    }
+                                },
+                                {
+                                    "cast": {
+                                        "to": "integer"
+                                    }
+                                }
+                            ]
+                        },
+                        "Project Title": {
+                            "alias": "title"
+                        },
+                        "Submit": {
+                            "alias": "submission_date"
+                        },
+                        "grant status": {
+                            "alias": "status"
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "id": "access_db_1",
+            "path": "C:/Users/reyhe/OneDrive/Desktop/my_db.accdb",
+            "tables": [
+                {
+                    "name": "Table1",
+                    "table_id": "access_1_table_1",
+                    "columns": {
+                        "Grant_ID": {
+                            "alias": "grant_id"
+                        },
+                        "Project_Title": {
+                            "alias": "title"
+                        }
+                    }
+                }
+            ]
+        }
+    ],
+    "compile": {
+        "targets": [
+            {
+                "name": "excel_grants",
+                "key": [
+                    "grant_id"
+                ],
+                "inputs": [
+                    "excel_1_sheet_1",
+                    "excel_1_sheet_2"
+                ],
+                "pre_filter": {
+                    "excel_1_sheet_1": {
+                        "submission_date": {
+                            "op": ">=",
+                            "value": "01-01-2017"
+                        }
+                    },
+                    "excel_1_sheet_2": {
+                        "AND": [
+                            {
+                                "submission_date": {
+                                    "op": ">=",
+                                    "value": "01-01-2017"
+                                }
+                            },
+                            {
+                                "submission_date": {
+                                    "op": "<=",
+                                    "value": "01-01-2020"
+                                }
+                            }
+                        ]
+                    }
+                },
+                "post_filter": {
+                    "grant_id": {
+                        "op": ">=",
+                        "value": "10"
+                    }
+                },
+                "merge_rules": {
+                    "title": "first_non_null",
+                    "status": "excel_1_sheet_1"
+                }
+            },
+            {
+                "name": "access_grants",
+                "key": [
+                    "grant_id"
+                ],
+                "inputs": [
+                    "access_1_table_1"
+                ],
+                "pre_filter": {
+                    "access_1_table_1": {
+                        "grant_id": {
+                            "op": ">=",
+                            "value": "140"
+                        }
+                    }
+                },
+                "merge_rules": {}
+            }
+        ]
+    },
+        "compare": {
+        "pairs": [
+            {
+                "left": "excel_grants",
+                "right": "access_grants",
+                "on": ["grant_id"],
+                "filter": {
+                    "status": {
+                        "op": "==",
+                        "value": "Active"
+                    }
+                },
+                "save_name": "excel_vs_access_report"
+            }
+        ]
+    },
+        "export": {
+        "workbooks": [
+            {
+                "save_name": "access_1_export",
+                "sheets": [
+                    {
+                        "name": "Project - Template",
+                        "columns": {
+                            "Grant Identifier": {
+                                "alias": "grant_id"
+                            },
+                            "Grant Title": {
+                                "alias": "title"
+                            }
+                        },
+                        "filter": {
+                            "AND": [
+                                {
+                                    "submission_date": {
+                                        "op": ">=",
+                                        "value": "01-01-2017"
+                                    }
+                                },
+                                {
+                                    "submission_date": {
+                                        "op": "<=",
+                                        "value": "01-01-2020"
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "name": "Proposal - Template",
+                        "filter": {
+                            "status": {
+                                "op": "=",
+                                "value": "Active"
+                            }
+                        },
+                        "columns": {
+                            "Project Title": {
+                                "alias": "title"
+                            },
+                            "Grant Status": {
+                                "alias": "status"
+                            }
+                        }
+                    },
+                    {
+                        "name": "Award - Template",
+                        "filter": {
+                            "award_number": {
+                                "op": "!=",
+                                "value": null
+                            }
+                        },
+                        "columns": {
+                            "Award No": {
+                                "alias": "award_number"
+                            },
+                            "PI": {
+                                "alias": "primary_investigator",
+                                "transforms": [
+                                    {
+                                        "titlecase": {}
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                ]
+            }
+        ]
+    }
+}

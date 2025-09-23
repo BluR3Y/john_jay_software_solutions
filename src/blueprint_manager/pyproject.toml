@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+
+[project]
+name = "data_manager"
+version = "0.1.0"
+description = "Dataset manager for multi-source ingest, compile, compare, and export"
+readme = "README.md"
+authors = [{name = "Rey Flores"}]
+requires-python = ">=3.10"
+dependencies = [
+"pandas>=2.1",
+"openpyxl>=3.1",
+"xlrd>=2.0",
+"pyodbc>=5.1; platform_system == 'Windows'",
+"jsonschema>=4.22",
+"python-dateutil>=2.9",
+]
+
+
+[project.scripts]
+data-manager = "data_manager.cli:main"
+
+
+[tool.setuptools.packages.find]
+where = ["packages"]
+
+
+[tool.setuptools.package-data]
+"data_manager" = ["py.typed"]

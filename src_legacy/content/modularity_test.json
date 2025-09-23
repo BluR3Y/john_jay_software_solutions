@@ -1,0 +1,68 @@
+{
+    "compile": {},
+    "aliases": {
+        "grant_id": {
+            "type": "number",
+            "identifier": true
+        },
+        "title": {
+            "type": "string",
+            "not_null": true
+        },
+        "submission_date": {
+            "type": "date",
+            "not_null": true,
+            "date": {
+                "format": "%m%d/%Y",
+                "granularity": "day",
+                "abs_tol": "0D"
+            }
+        },
+        "status": {
+            "type": "string",
+            "not_null": true,
+            "allowed_values": ["Active", "Closed", "Pending"]
+        }
+    },
+    "files": [
+        {
+            "id": "excel1",
+            "path": "C:/Users/reyhe/OneDrive/Desktop/checker_file_1.xlsx",
+            "tables": [
+                {
+                    "name": "ExcelSheet1",
+                    "table_id": "excel1_sheet1",
+                    "columns": {
+                        "grant_id": {
+                            "alias": "grant_id"
+                        },
+                        "Title": {
+                            "alias": "title"
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "id": "access1",
+            "path": "C:/Users/reyhe/OneDrive/Desktop/checker_file_2.accdb",
+            "tables": [
+                {
+                    "name": "grants",
+                    "table_id": "grants_table",
+                    "columns": {
+                        "grant_id": {
+                            "alias": "grant_id"
+                        },
+                        "SubmissionDate": {
+                            "alias": "submission_date"
+                        },
+                        "GrantStatus": {
+                            "alias": "status"
+                        }
+                    }
+                }
+            ]
+        }
+    ]
+}

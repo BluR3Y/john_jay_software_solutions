@@ -234,3 +234,156 @@ storage (S3, GCS) - Visualization of compare reports
 ------------------------------------------------------------------------
 
 Happy data managing! 🚀
+
+# Computed Columns in Exports
+
+This section documents the **computed column** feature for `data_manager` exports. It allows you to define new columns in an export workbook based on algebraic or logical expressions that reference other columns.
+
+---
+
+## Overview
+
+In addition to mapping existing aliases or setting fixed values, you can now define a column as a **computed expression**. Expressions are written as a small JSON-based Abstract Syntax Tree (AST).
+
+Each expression evaluates vectorized with pandas for performance and safety. No Python code or `eval` is executed from configs.
+
+---
+
+## Defining a Computed Column
+
+In your `export.workbooks[*].sheets[*].columns` block, you can use three forms:
+
+- **Alias** (existing column):  
+  ```json
+  "Grant Title": { "alias": "title" }
+  ```
+
+- **Constant value**:  
+  ```json
+  "Fixed Rate": { "value": 0.05 }
+  ```
+
+- **Computed expression**:  
+  ```json
+  "Total With Fee": {
+    "compute": ["add", {"col": "grant_amount"}, ["mul", {"col": "grant_amount"}, {"col": "overhead_rate"}]]
+  }
+  ```
+
+If both `alias` and `compute` are defined, `compute` takes precedence. If `value` is provided, it overrides both.
+
+---
+
+## Expression Syntax
+
+### General form
+
+An expression node can be:
+
+- A primitive value (`number`, `string`, `boolean`, or `null`)
+- A column reference: `{ "col": "field_name" }`
+- An operation: `{ "op": "add", "args": [ <expr>, <expr>, ... ] }`
+- A shorthand array: `["add", <expr>, <expr>, ...]`
+
+### Supported Operations
+
+**Arithmetic**  
+- `add`: sum of arguments  
+- `sub`: subtract two arguments  
+- `mul`: multiply arguments  
+- `div`: divide two arguments  
+- `pow`: exponentiation  
+- `neg`: negate a value  
+- `abs`: absolute value  
+- `round`: round to N decimals
+
+**Comparison**  
+- `eq`, `neq`, `gt`, `gte`, `lt`, `lte`
+
+**Boolean**  
+- `and`, `or`, `not`
+
+**Null handling**  
+- `coalesce`: return the first non-null among arguments  
+- `fillna`: replace null with a value
+
+**Strings**  
+- `concat`: concatenate strings  
+- `len`: string length
+
+**Dates**  
+- `strftime`: format a datetime with given pattern  
+- `datediff`: difference between two datetimes (units: `day`, `hour`, `minute`)
+
+**Misc**  
+- `clip`: clip values between min and max  
+- `percent`: apply a percentage (e.g., amount × rate)  
+- `if`: conditional (`["if", <cond>, <then>, <else>]`)
+
+---
+
+## Examples
+
+### Arithmetic with constants
+
+```json
+"Double Plus Five": {
+  "compute": ["add", ["mul", 2, {"col": "grant_amount"}], 5]
+}
+```
+
+→ For each row: `(2 × grant_amount) + 5`
+
+### Overhead calculation
+
+```json
+"Overhead Amount": {
+  "compute": ["mul", {"col": "grant_amount"}, {"col": "overhead_rate"}]
+}
+```
+
+### Conditional logic
+
+```json
+"Active?": {
+  "compute": ["if", ["eq", {"col": "status"}, "Active"], "Yes", "No"]
+}
+```
+
+### Date calculations
+
+```json
+"Days Open": {
+  "compute": ["datediff", "day", {"col": "close_date"}, {"col": "submission_date"}]
+}
+```
+
+### String formatting
+
+```json
+"Pretty Date": {
+  "compute": ["strftime", "%Y-%m-%d", {"col": "submission_date"}]
+}
+```
+
+---
+
+## Best Practices
+
+- **Keep expressions small**: Nest only what you need for clarity.  
+- **Use schema types**: Cast source columns to the right type (`date`, `integer`, etc.) at ingest.  
+- **Handle nulls explicitly**: Use `coalesce` or `fillna` if nulls are expected.  
+- **Validate configs**: CI should run configs through `jsonschema` and test one row for expression sanity.  
+- **Auditability**: Every computed column is reproducible from config; avoid external code injection.
+
+---
+
+## Error Handling
+
+- If a referenced column does not exist, an error is raised at export.  
+- If an operator is unknown or arguments are missing, `ExprError` is raised.  
+- For datetime operations, invalid values are coerced to `NA` instead of crashing.
+
+---
+
+This feature makes it possible to calculate new values (totals, percentages, conditional flags) directly in your JSON configuration, without custom Python code.

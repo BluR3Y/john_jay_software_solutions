@@ -324,7 +324,14 @@
                 "alias": "title"
               },
               "Submitted": {
-                "alias": "submission_date"
+                "alias": "submission_date",
+                "transforms": [
+                  {
+                    "strftime": {
+                      "format": "%Y-%m-%d"
+                    }
+                  }
+                ]
               },
               "Grant Status": {
                 "alias": "status",

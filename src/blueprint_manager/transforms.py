@@ -18,7 +18,11 @@ def _regex_replace(series: pd.Series, params: dict) -> pd.Series:
     re_flags = 0
     if "i" in flags:
         re_flags |= re.IGNORECASE
-    return series.astype(str).str.replace(pat, repl, regex=True, flags=re_flags)
+    # Work in pandas' nullable string dtype but preserve NA
+    s = series.astype("string")  # keeps <NA> as NA
+    mask = s.notna()
+    s.loc[mask] = s.loc[mask].str.replace(pat, repl, regex=True, flags=re_flags)
+    return s
 
 def _cast(series: pd.Series, params: dict) -> pd.Series:
     target = params.get("to")
@@ -64,12 +68,17 @@ def _affix(series: pd.Series, params: dict) -> pd.Series:
         return text + series
     return series + text
 
+def _strftime(series: pd.Series, params: dict) -> pd.Series:
+    fmt = params.get("format", "%Y-%m-%d")
+    return pd.to_datetime(series, errors="coerce").dt.strftime(fmt)
+
 REGISTRY: Dict[str, Transform] = {
     "regex_replace": _regex_replace,
     "cast": _cast,
     "titlecase": _titlecase,
     "map": _map,
-    "affix": _affix
+    "affix": _affix,
+    "strftime": _strftime
 }
 
 def apply_pipeline(series: pd.Series, steps: list[dict]) -> pd.Series:

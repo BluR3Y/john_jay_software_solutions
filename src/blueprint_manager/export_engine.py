@@ -1,6 +1,7 @@
 from __future__ import annotations
 from typing import Any, Dict
 from pathlib import Path
+from openpyxl.cell.cell import ILLEGAL_CHARACTERS_RE # regex: [\000-\010\013\014\016-\037]
 import pandas as pd
 
 
@@ -18,7 +19,6 @@ class Exporter:
     def __init__(self, output_dir: str | None):
         self.out_dir = resolve_output_dir(output_dir)
         self.out_dir.mkdir(parents=True, exist_ok=True)
-
 
     def export_workbook(self, wb_cfg: Dict[str, Any], compiled: dict[str, pd.DataFrame]) -> str:
         save_name = wb_cfg.get("save_name", "export") + ".xlsx"
@@ -72,6 +72,12 @@ class Exporter:
                     if out_df.empty:
                         log.warning(f"Sheet '{name}' produced 0 rows; skipping.")
                         continue
+                    
+                    # normalize NAs to None (helps openpyxl with mixed dtypes)
+                    out_df = out_df.where(pd.notna(out_df), None)
+
+                    # sanitize illegal characters & line endings
+                    out_df = self._sanitize_excel_strings(out_df)
 
                     out_df.to_excel(xl, sheet_name=name, index=False)
                     created_any = True
@@ -88,3 +94,32 @@ class Exporter:
             log.warning("No sheets written; emitted placeholder README sheet.")
 
         return str(out_path)
+    
+    @staticmethod
+    def _sanitize_excel_strings(df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Clean strings for Excel:
+          - strip Excel-illegal control chars
+          - normalize newlines
+          - clip to 32,767 chars
+        Works safely with NA values.
+        """
+        out = df.copy()
+        pattern = ILLEGAL_CHARACTERS_RE.pattern  # use pattern string for .str.replace
+
+        for col in out.columns:
+            # Only process likely-text columns
+            if pd.api.types.is_object_dtype(out[col]) or str(out[col].dtype) == "string":
+                s = out[col].astype("string")  # may contain <NA>
+
+                # 1) strip illegal control chars (vectorized; NAs untouched)
+                s = s.str.replace(pattern, " ", regex=True)
+
+                # 2) normalize newlines
+                s = s.str.replace("\r\n", "\n", regex=False).str.replace("\r", "\n", regex=False)
+
+                # 3) clip to Excel cell limit
+                s = s.str.slice(0, 32767)
+
+                out[col] = s
+        return out

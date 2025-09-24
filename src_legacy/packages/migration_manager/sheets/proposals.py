@@ -555,8 +555,8 @@ def proposals_sheet_append(
         "Prime Sponsor": grant_prime_sponsor,
         "Prime Sponsor Name": grant_prime_sponsor_name,       # For Staff Use
         "Title": grant_title,
-        "Project Start Date": grant_start_date.date() if grant_start_date else None,
-        "Project End Date": grant_end_date.date() if grant_end_date else None,
+        "Project Start Date": grant_db_start_date.date() if grant_db_start_date else None,
+        "Project End Date": grant_db_end_date.date() if grant_db_end_date else None,
         "Proposal Type": grant_proposal_type,      # "New"
         "Activity Type": grant_activity_type,
         "Discipline": grant_discipline,

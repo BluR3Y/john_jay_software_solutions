@@ -387,3 +387,134 @@ An expression node can be:
 ---
 
 This feature makes it possible to calculate new values (totals, percentages, conditional flags) directly in your JSON configuration, without custom Python code.
+
+# Enrichment Mechanism
+
+The **enrich** block extends the `compile.targets` functionality by allowing you to *augment* a compiled dataset with values pulled from another dataset (dimension table). This is particularly useful when you need to bring in codes, IDs, or reference attributes based on a key like organization name.
+
+---
+
+## Basic Structure
+
+An `enrich` block is defined inside a compile target:
+
+```json
+{
+  "name": "access_grants_enriched",
+  "key": ["grant_id"],
+  "inputs": ["grants_table"],
+  "enrich": [
+    {
+      "from": "excel_external_orgs",
+      "left_on": "sponsor_1_name",
+      "right_on": "external_org_name",
+      "add": { "sponsor_1_code": "external_org_code" }
+    }
+  ]
+}
+```
+
+- **from**: dataset (compiled target or raw table) to join against  
+- **left_on**: column in the current dataset  
+- **right_on**: column in the enrichment dataset  
+- **add**: mapping of `{ new_column: source_column }`
+
+---
+
+## Match Options
+
+By default, enrich uses an **exact match** between `left_on` and `right_on`.  
+For real-world messy data, you can specify a `match` block:
+
+```json
+"match": {
+  "strategy": ["exact", "normalized", "fuzzy"],
+  "normalize": ["strip", "lower", "collapse_ws", "strip_punct"],
+  "fuzzy": {
+    "scorer": "token_sort_ratio",
+    "threshold": 90,
+    "top_k": 1,
+    "block": "first_char"
+  },
+  "on_miss": "leave_null",
+  "audit": true
+}
+```
+
+### Keys
+
+- **strategy**: order of matching attempts (`exact` → `normalized` → `fuzzy`)  
+- **normalize**: canonicalization steps applied to both sides before comparison  
+- **fuzzy**: configuration for approximate matching  
+  - **scorer**: similarity algorithm (`ratio`, `partial_ratio`, `token_sort_ratio`, `token_set_ratio`)  
+  - **threshold**: minimum score (0–100) to accept a match  
+  - **top_k**: how many candidates to consider (default: 1)  
+  - **block**: restrict fuzzy candidates by a heuristic (e.g. `first_char`)  
+- **on_miss**: what to do if no match found  
+  - `leave_null`: leave blank  
+  - `keep_source`: preserve original text  
+  - `fail`: stop with an error  
+- **audit**: if true, adds columns like `<col>_match_to`, `<col>_match_score`, `<col>_match_method` for QA
+
+---
+
+## Example: Enriching Org Codes
+
+Suppose you have:
+
+- `access_grants` with `sponsor_1_name`
+- `excel_external_orgs` with `external_org_name` + `external_org_code`
+
+Config:
+
+```json
+{
+  "name": "access_grants_enriched",
+  "key": ["grant_id"],
+  "inputs": ["grants_table"],
+  "enrich": [
+    {
+      "from": "excel_external_orgs",
+      "left_on": "sponsor_1_name",
+      "right_on": "external_org_name",
+      "add": { "sponsor_1_code": "external_org_code" },
+      "match": {
+        "strategy": ["exact", "normalized", "fuzzy"],
+        "normalize": ["strip","lower","collapse_ws","strip_punct"],
+        "fuzzy": { "scorer": "token_sort_ratio", "threshold": 90 },
+        "on_miss": "leave_null",
+        "audit": true
+      }
+    }
+  ]
+}
+```
+
+During compilation, `sponsor_1_name` will be matched to `external_org_name`. If an exact match is not found, normalized forms are compared. If still not found, a fuzzy match is attempted. If matched, the corresponding `external_org_code` is pulled in as `sponsor_1_code`.
+
+---
+
+## Best Practices
+
+1. **Pre-normalize sources**: Apply transforms (trim, lowercase, strip punctuation) at ingest for cleaner matching.  
+2. **Keep dimensions unique**: Ensure the enrichment dataset has unique keys (`right_on`) before joining.  
+3. **Audit**: Always enable `audit` when testing; review low-confidence matches.  
+4. **Overrides**: Maintain a curated mapping table for edge cases; apply it as a transform before enrich.  
+5. **Fail fast for critical joins**: Use `on_miss: fail` when enrichment is mandatory.  
+6. **Performance**: Blocking (`first_char`, `first2`) speeds up fuzzy matches when enrichment dataset is large.
+
+---
+
+## Outputs
+
+When `audit: true`, enrichment adds metadata columns:
+
+- `<col>_match_to` → the value in the enrichment dataset chosen  
+- `<col>_match_score` → similarity score (0–100)  
+- `<col>_match_method` → which strategy was used (`exact`, `normalized`, `fuzzy`, `miss`)
+
+These can be exported into workbooks for quality assurance.
+
+---
+
+With enrichment, you can declaratively connect datasets by codes and names, while handling imperfect data safely and transparently.

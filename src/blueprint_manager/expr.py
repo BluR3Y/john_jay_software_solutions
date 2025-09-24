@@ -47,7 +47,17 @@ def eval_expr(df: pd.DataFrame, node: Node) -> pd.Series:
     if "col" in ast:
         return _col(df, ast["col"])
 
-    # recursively evaluate args
+    # ---------- SPECIAL-CASE IF (lazy) ----------
+    if op == "if":
+        if len(args) < 2:
+            raise ExprError("if expects at least 2 args: ['if', cond, then, else?]")
+        cond = eval_expr(df, args[0]).astype("boolean")
+        then_val = eval_expr(df, args[1]) if len(args) > 1 else _to_series(df, None)
+        else_val = eval_expr(df, args[2]) if len(args) > 2 else _to_series(df, None)
+        return then_val.where(cond, else_val)
+    # --------------------------------------------
+
+    # For all other ops, now evaluate arguments
     ev = [eval_expr(df, a) if isinstance(a, (dict, list)) else _to_series(df, a) for a in args]
 
     # arithmetic
@@ -70,9 +80,9 @@ def eval_expr(df: pd.DataFrame, node: Node) -> pd.Series:
         nd = int(args[1]) if len(args) > 1 and not isinstance(args[1], (dict, list)) else 0
         return ev[0].round(nd)
 
-    # comparison (returns boolean Series, NA-propagating)
-    if op == "eq":  return ev[0].astype(object) == ev[1].astype(object)
-    if op == "neq": return ev[0].astype(object) != ev[1].astype(object)
+    # comparison (NA-aware; avoids object-casting unless needed)
+    if op == "eq":  return ev[0].eq(ev[1])
+    if op == "neq": return ev[0].ne(ev[1])
     if op == "gt":  return ev[0] > ev[1]
     if op == "gte": return ev[0] >= ev[1]
     if op == "lt":  return ev[0] < ev[1]
@@ -89,7 +99,8 @@ def eval_expr(df: pd.DataFrame, node: Node) -> pd.Series:
         for s in ev[1:]:
             out = out | s.astype("boolean")
         return out
-    if op == "not": return (~ev[0].astype("boolean")).astype("boolean")
+    if op == "not":
+        return (~ev[0].astype("boolean")).astype("boolean")
 
     # null handling
     if op == "coalesce":
@@ -99,10 +110,13 @@ def eval_expr(df: pd.DataFrame, node: Node) -> pd.Series:
         return out
     if op == "fillna":
         return ev[0].fillna(ev[1])
+    if op == "is_null":
+        return ev[0].isna()
+    if op == "not_null":
+        return ~ev[0].isna()
 
     # strings
     if op == "concat":
-        # ensure string dtype without forcing "nan"
         parts = [s.astype("string") for s in ev]
         out = parts[0]
         for s in parts[1:]:
@@ -118,10 +132,9 @@ def eval_expr(df: pd.DataFrame, node: Node) -> pd.Series:
         ser = pd.to_datetime(ser, errors="coerce")
         return ser.dt.strftime(fmt)
     if op == "datediff":
-        unit = args[0] if isinstance(args[0], str) else "day"
-        end = ev[1]; start = ev[2]
-        end = pd.to_datetime(end, errors="coerce")
-        start = pd.to_datetime(start, errors="coerce")
+        unit = (args[0] if isinstance(args[0], str) else "day").lower()
+        end = pd.to_datetime(ev[1], errors="coerce")
+        start = pd.to_datetime(ev[2], errors="coerce")
         delta = (end - start)
         if unit == "day": return delta.dt.days
         if unit == "hour": return (delta.dt.total_seconds() / 3600)
@@ -130,26 +143,12 @@ def eval_expr(df: pd.DataFrame, node: Node) -> pd.Series:
 
     # misc
     if op == "clip":
-        # args: expr, min, max
         base = ev[0]
         minv = ev[1] if len(ev) > 1 else None
         maxv = ev[2] if len(ev) > 2 else None
         return base.clip(lower=minv if minv is not None else -np.inf,
                          upper=maxv if maxv is not None else  np.inf)
     if op == "percent":
-        # args: amount, rate (0.05 for 5%)
         return ev[0] * ev[1]
-
-    if op == "if":
-        # args: cond, then, else
-        if len(args) < 2:
-            raise ExprError("if expects at least 2 args: ['if', cond, then, else?]")
-
-        cond = eval_expr(df, args[0]).astype("boolean")
-        then_val = eval_expr(df, args[1]) if len(args) > 1 else _to_series(df, None)
-        else_val = eval_expr(df, args[2]) if len(args) > 2 else _to_series(df, None)
-
-        # Return THEN where cond is True, ELSE otherwise (NA in cond => False)
-        return then_val.where(cond, else_val)
 
     raise ExprError(f"Unknown op: {op}")

@@ -136,7 +136,37 @@
           }
         }
       ]
+    },
+  {
+  "id": "misc_data",
+  "data": [
+    {
+      "table_id": "activity_types",
+      "orient": "records",
+      "rows": [
+        { "Name": "Applied Research on Campus", "Code": 1 },
+        { "Name": "Departmental Administration", "Code": 2 },
+        { "Name": "Equipment on Campus",        "Code": 3 }
+      ],
+      "columns": {
+        "Name": { "alias": "activity_name", "transforms": [{ "lower": {} }] },
+        "Code": { "alias": "activity_code",  "transforms": [{ "cast": { "to": "integer" } }] }
+      }
+    },
+    {
+      "table_id": "disciplines",
+      "orient": "columns",
+      "columns_payload": {
+        "Name": ["Comp Sci", "Math", "Pol Sci"],
+        "Code": [1, 2, 3]
+      },
+      "columns": {
+        "Name": { "alias": "discipline_name" },
+        "Code": { "alias": "discipline_code" }
+      }
     }
+  ]
+}
   ],
   "compile": {
     "targets": [

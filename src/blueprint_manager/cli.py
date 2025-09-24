@@ -11,22 +11,27 @@ from modules.script_logger import logger
 log = logger.get_logger()
 from .sources.excel_adapter import ExcelAdapter
 from .sources.access_adapter import AccessAdapter
+from .sources.inline_adapter import InlineAdapter
 from .compile_engine import Compiler
 from .compare_engine import Comparator
 from .export_engine import Exporter
+
+def _select_adapter(src: dict, aliases: dict):
+    if "data" in src:
+        return InlineAdapter(src, aliases)
+    path = (src.get("path") or "").lower()
+    if path.endswith((".xlsx", ".xls", ".xlsb")):
+        return ExcelAdapter(src, aliases)
+    if path.endswith((".accdb", ".mdb")):
+        return AccessAdapter(src, aliases)
+    raise RuntimeError(f"Unrecognized source type: {src}")
 
 def _load_sources(cfg: Config) -> dict[str, pd.DataFrame]:
     frames: dict[str, pd.DataFrame] = {}
     aliases = cfg.schema_aliases
 
     for src in cfg.sources:
-        path = (src.get("path") or "").lower()
-        if path.endswith((".xlsx", ".xls", ".x;sb")):
-            adapter = ExcelAdapter(src, aliases)
-        elif path.endswith((".accdb", ".mdb")):
-            adapter = AccessAdapter(src, aliases)
-        else:
-            raise RuntimeError(f"Unrecognized source type for path: {src.get('path')}")
+        adapter = _select_adapter(src, aliases)
         frames.update(adapter.load_tables())
     return frames
 

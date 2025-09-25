@@ -4,6 +4,7 @@ import math
 import numpy as np
 import pandas as pd
 from pandas.api import types as ptypes
+from .plugins import EXPR_OP_PLUGINS
 
 class ExprError(Exception): pass
 
@@ -51,7 +52,7 @@ def eval_expr(df: pd.DataFrame, node: Node) -> pd.Series:
     if op == "if":
         if len(args) < 2:
             raise ExprError("if expects at least 2 args: ['if', cond, then, else?]")
-        cond = eval_expr(df, args[0]).astype("boolean")
+        cond = eval_expr(df, args[0]).astype("boolean").fillna(False)
         then_val = eval_expr(df, args[1]) if len(args) > 1 else _to_series(df, None)
         else_val = eval_expr(df, args[2]) if len(args) > 2 else _to_series(df, None)
         return then_val.where(cond, else_val)
@@ -150,5 +151,9 @@ def eval_expr(df: pd.DataFrame, node: Node) -> pd.Series:
                          upper=maxv if maxv is not None else  np.inf)
     if op == "percent":
         return ev[0] * ev[1]
+    
+    # UDF
+    if op in EXPR_OP_PLUGINS:
+        return EXPR_OP_PLUGINS[op](df, *ev)
 
     raise ExprError(f"Unknown op: {op}")

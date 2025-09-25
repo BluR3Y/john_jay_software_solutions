@@ -518,3 +518,310 @@ These can be exported into workbooks for quality assurance.
 ---
 
 With enrichment, you can declaratively connect datasets by codes and names, while handling imperfect data safely and transparently.
+
+# Modular Configuration Loader
+
+The configuration loader in **data_manager** has been enhanced to support **modular, layered, and reusable configurations**. This feature helps keep configuration files clean, maintainable, and production-ready.
+
+---
+
+## 1. Features
+
+### Includes
+- Any JSON config can include other files with the `include` key.
+- Supports file paths and glob patterns.
+- Example:
+  ```json
+  {
+    "include": [
+      "./schema.json",
+      "./filters.json",
+      "./sources/*.json",
+      "./compile/*.json"
+    ]
+  }
+  ```
+
+### $ref (Reusable References)
+- Any config block can reference another value by path.
+- Syntax: `{ "$ref": "filters.active_only" }`
+- Useful for reusing filters, transforms, and expressions across multiple places.
+
+### Variables and Interpolation
+- Environment variables and config keys can be interpolated inside strings.
+- Example:
+  ```json
+  "output": "${DATA_MANAGER_OUT}/exports"
+  ```
+  - `${DATA_MANAGER_OUT}` → expands to environment variable.
+  - `${paths.base}` → expands to another key in config.
+
+### Profiles
+- Profiles allow environment-specific overrides (e.g., `dev`, `prod`).
+- Located under `config/profiles/`.
+- Example:
+  ```json
+  {
+    "sources": [
+      { "id": "excel_doc_1", "path": "${paths.base}/dev/grants.xlsx" }
+    ]
+  }
+  ```
+- Activated with:
+  ```bash
+  data-manager run --config ./config/base.json --profile dev
+  ```
+
+### Modular File Structure
+Recommended structure:
+```
+config/
+├─ base.json
+├─ schema.json
+├─ filters.json
+├─ macros.json
+├─ sources/
+│  ├─ access.main.json
+│  ├─ excel.main.json
+│  └─ inline.main.json
+├─ compile/
+│  └─ compile.json
+├─ compare/
+│  └─ pairs.json
+├─ export/
+│  └─ workbooks.json
+└─ profiles/
+   ├─ dev.json
+   └─ prod.json
+```
+
+### Deep Merge Rules
+- Objects are deep-merged (later overrides earlier).
+- Arrays are replaced by default (not concatenated).
+- Optional extensions can allow `{ "$append": [...] }` or `{ "$remove": [...] }`.
+
+---
+
+## 2. Workflow
+
+1. Load the entry file (`base.json`).
+2. Expand all `include`s (glob-friendly).
+3. Resolve `$ref` references to other config paths.
+4. Interpolate `${}` variables from env or config.
+5. Merge in selected `profile` (if provided).
+6. Validate against schema and semantic rules.
+7. Pass resolved config to the pipeline.
+
+---
+
+## 3. Benefits
+
+- **Readability**: smaller, focused JSON files.
+- **Reusability**: filters, transforms, and expressions are defined once.
+- **Portability**: environment and profile support for dev/prod.
+- **Safety**: strict validation and friendly error messages.
+- **Scalability**: supports large, complex projects without monolithic configs.
+
+---
+
+## 4. Example Run
+
+```bash
+DATA_MANAGER_OUT=./out data-manager run --config ./config/base.json --profile prod
+```
+
+Loader will:
+1. Expand includes (`schema.json`, `filters.json`, `sources/*.json`, etc.).
+2. Resolve all `$ref` and `${}` variables.
+3. Apply `prod` profile overrides.
+4. Provide a single resolved config for execution.
+
+---
+
+## 5. Best Practices
+
+- Keep configs modular (one file per concern).
+- Always reference reusable filters/expressions instead of duplicating them.
+- Use `AND`/`OR` with `$ref` to extend filters.
+- Parameterize paths and environment-specific values with `${}`.
+- Store secrets in a separate git-ignored file (`secrets.local.json`).
+- Validate configs in CI/CD.
+
+---
+
+This loader makes large, complex configuration files **manageable, maintainable, and production-grade**.
+
+# User-Defined Functions (UDFs) in data_manager
+
+The **data_manager** package supports extending its functionality with **user-defined functions (UDFs)**.  
+This feature makes it possible to handle more complex or custom dataset logic in a **production-quality, safe, and reusable way**.
+
+---
+
+## 1. UDF Types
+
+UDFs can plug into different stages of the pipeline:
+
+- **Transforms**: applied to a single column (at source ingestion).
+- **Compute expressions**: custom operators used inside `compute` blocks (export time).
+- **Enrich**: DataFrame-wide enrichments, including cross-schema joins or inference.
+
+---
+
+## 2. Local vs. Packaged UDFs
+
+You have two ways to use UDFs:
+
+### a) Local (manual registration)
+- Define UDFs in your project folder.
+- Import and register them in the plugin registry:
+
+```python
+from my_udfs import normalize_org_transform
+
+TRANSFORM_PLUGINS = {
+    "normalize_org": normalize_org_transform,
+}
+```
+
+- No packaging or installation required if UDFs live in the same repo.
+
+### b) Packaged (production-grade, reusable)
+- Package UDFs in their own repo with a `pyproject.toml`.
+- Expose them via **entry points** so they are auto-discovered.
+
+Example `pyproject.toml`:
+
+```toml
+[project]
+name = "dm-extra-udfs"
+version = "0.1.0"
+dependencies = ["pandas>=2.1"]
+
+[project.entry-points."data_manager.transforms"]
+normalize_org = "dm_extra_udfs.org:normalize_org_transform"
+
+[project.entry-points."data_manager.expr_ops"]
+weighted_sum = "dm_extra_udfs.ops:weighted_sum"
+
+[project.entry-points."data_manager.enrich"]
+infer_irb_status = "dm_extra_udfs.irb:infer_irb_status"
+```
+
+Install into the same environment as `data_manager`:
+
+```bash
+pip install -e ../dm-extra-udfs
+```
+
+---
+
+## 3. Interfaces
+
+Each UDF must conform to a predictable function signature:
+
+- **Transform**  
+  ```python
+  def my_transform(series: pd.Series, params: dict) -> pd.Series:
+      ...
+  ```
+
+- **Expression Operator**  
+  ```python
+  def my_op(df: pd.DataFrame, *args) -> pd.Series:
+      ...
+  ```
+
+- **Enrich Function**  
+  ```python
+  def my_enrich(df: pd.DataFrame, params: dict) -> pd.DataFrame:
+      ...
+  ```
+
+---
+
+## 4. Config Usage
+
+### Transform UDF
+```json
+"columns": {
+  "Org (normalized)": {
+    "alias": "organization_name",
+    "transforms": [
+      { "normalize_org": { "drop_suffixes": ["inc", "llc", "corp"] } }
+    ]
+  }
+}
+```
+
+### Compute UDF (Expression Operator)
+```json
+"columns": {
+  "Score": {
+    "compute": ["weighted_sum", {"col": "pubs"}, 0.5]
+  }
+}
+```
+
+### Enrich UDF
+```json
+"compile": {
+  "targets": [
+    {
+      "name": "grants_enriched",
+      "key": ["grant_id"],
+      "inputs": ["grants_table"],
+      "enrich": [
+        { "fn": "infer_irb_status", "params": { "fallback_days": 90 } }
+      ]
+    }
+  ]
+}
+```
+
+---
+
+## 5. Multi-Schema Access
+
+- **Transforms**: only see a single column.  
+- **Compute**: can reference any column in the current dataset.  
+- **Enrich**: can access multiple DataFrames (both raw and compiled), making it the right place for cross-schema logic.
+
+---
+
+## 6. Best Practices
+
+- Keep transforms **simple and vectorized**.  
+- Use compute expressions for **row-level formulas**.  
+- Use enrich for **cross-dataset joins or inference**.  
+- Never embed raw Python in configs — only reference UDFs by name.  
+- Test UDFs with sample DataFrames.  
+- Log plugin names and versions for auditability.  
+- Install both `data_manager` and UDF packages into the **same environment**.
+
+---
+
+## 7. Example Workflow
+
+**Repo structure**:
+```
+data_manager/           # core package
+dm-extra-udfs/          # separate UDF package
+```
+
+**requirements.txt**:
+```
+data-manager @ git+https://github.com/you/data_manager.git@v1.2
+dm-extra-udfs @ git+https://github.com/you/dm_extra_udfs.git@v0.1
+```
+
+**Install**:
+```bash
+pip install -r requirements.txt
+```
+
+Now, `data_manager` will auto-discover the UDFs from `dm-extra-udfs`.
+
+---
+
+This makes UDFs in **data_manager** flexible, reusable, and production-ready.

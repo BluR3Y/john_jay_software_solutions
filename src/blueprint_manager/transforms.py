@@ -5,7 +5,7 @@ import pandas as pd
 
 
 from .exceptions import TransformError
-
+from .plugins import TRANSFORM_PLUGINS
 
 Transform = Callable[[pd.Series, dict], pd.Series]
 
@@ -80,6 +80,7 @@ REGISTRY: Dict[str, Transform] = {
     "affix": _affix,
     "strftime": _strftime
 }
+REGISTRY.update(TRANSFORM_PLUGINS)
 
 def apply_pipeline(series: pd.Series, steps: list[dict]) -> pd.Series:
     out = series

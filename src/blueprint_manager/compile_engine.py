@@ -5,6 +5,8 @@ import pandas as pd
 from .fuzzy import fuzzy_match_series
 from .textnorm import normalize
 from .filters import build_mask
+from .plugins import ENRICH_PLUGINS
+from .enrich import enrich_join
 from modules.script_logger import logger
 log = logger.get_logger()
 
@@ -78,83 +80,42 @@ def _apply_merge_rules(df: pd.DataFrame, rules: Dict[str, Any], inputs: list[str
     keep = [c for c in out.columns if "__" not in c]
     return out[keep]
 
-def _enrich(df: pd.DataFrame, frames: dict[str, pd.DataFrame], steps: list[dict]) -> pd.DataFrame:
+
+def _apply_enrich(df: pd.DataFrame, frames: dict[str, pd.DataFrame], steps: list[dict]) -> pd.DataFrame:
     out = df.copy()
     for step in steps or []:
-        src_name = step["from"]
-        left_on  = step["left_on"]
-        right_on = step["right_on"]
-        add_map  = step.get("add", {})
-        how      = step.get("how", "left")
-        match    = step.get("match") or {"strategy": ["exact"]}
-
-        dim = frames[src_name].copy()
-        # Keep right key + needed columns
-        need_cols = {right_on} | set(add_map.values())
-        dim = dim[[c for c in need_cols if c in dim.columns]].drop_duplicates(subset=[right_on])
-
-        # Fast path: exact join only
-        if match.get("strategy", ["exact"]) == ["exact"]:
-            merged = out.merge(dim, how=how, left_on=left_on, right_on=right_on, suffixes=("", "_dim"))
-            for new_col, src_col in add_map.items():
-                merged.rename(columns={src_col: new_col}, inplace=True)
-            merged.drop(columns=[right_on], inplace=True, errors="ignore")
-            out = merged
+        # Two modes:
+        # 1) Built-in join-based enrich:
+        if "from" in step and "left_on" in step and "right_on" in step:
+            src = step["from"]
+            if src not in frames:
+                raise ValueError(f"Enrich source '{src}' not found among frames: {list(frames.keys())}")
+            dim = frames[src]
+            out = enrich_join(
+                out, dim,
+                left_on=step["left_on"],
+                right_on=step["right_on"],
+                add_map=step.get("add", {}),
+                how=step.get("how", "left"),
+                match=step.get("match"),
+            )
             continue
 
-        # Build match result against dim[right_on]
-        strategies = match.get("strategy", ["exact","normalized","fuzzy"])
-        norm_steps = match.get("normalize", ["strip","lower","collapse_ws","strip_punct"])
-        fuzzy_cfg  = match.get("fuzzy", {})
-        scorer     = fuzzy_cfg.get("scorer", "token_sort_ratio")
-        threshold  = int(fuzzy_cfg.get("threshold", 90))
-        top_k      = int(fuzzy_cfg.get("top_k", 1))
-        block      = fuzzy_cfg.get("block", "first_char")
+        # 2) Plugin enrichers by name:
+        if "fn" in step:
+            fn = ENRICH_PLUGINS.get(step["fn"])
+            if fn is None:
+                raise ValueError(f"Unknown enrich fn: {step['fn']}")
+            out = fn(out, step.get("params", {}), frames=frames)  # signature: (df, params) -> df
+            continue
 
-        # Produce a match-to column (value from dim[right_on])
-        match_to, match_score, match_method = fuzzy_match_series(
-            out[left_on].astype(object),
-            dim[right_on].astype(object),
-            normalize_steps=norm_steps,
-            scorer=scorer,
-            threshold=threshold,
-            top_k=top_k,
-            block=block,
-        )
-
-        # Join via matched right value
-        out["_match_key_tmp"] = match_to
-        merged = out.merge(dim, how="left", left_on="_match_key_tmp", right_on=right_on, suffixes=("", "_dim"))
-        out = merged.drop(columns=["_match_key_tmp", right_on], errors="ignore")
-        # Rename ‘add’ columns
-        for new_col, src_col in add_map.items():
-            out.rename(columns={src_col: new_col}, inplace=True)
-
-        # Audit columns if requested
-        if match.get("audit"):
-            base = left_on
-            out[f"{base}_match_to"] = match_to
-            out[f"{base}_match_score"] = match_score
-            out[f"{base}_match_method"] = match_method
-
-        # on_miss policy
-        on_miss = match.get("on_miss", "leave_null")
-        if on_miss == "fail":
-            # fail if any ‘add’ column is null while left had a non-null candidate
-            for new_col in add_map.keys():
-                bad = out[left_on].notna() & out[new_col].isna()
-                if bad.any():
-                    sample = out.loc[bad, [left_on]].head(5).to_dict(orient="records")
-                    raise ValueError(f"Fuzzy enrich missed matches for {left_on}→{src_name}. Examples: {sample}")
-        # keep_source/leave_null require no action; the computed codes remain NaN when no match
+        raise ValueError(f"Invalid enrich step: {step}")
     return out
-
 
 class Compiler:
     def __init__(self, frames: dict[str, pd.DataFrame]):
-        self.frames = frames    # raw sources
-        self.compiled = {}      # hold compiled targets
-
+        self.frames = frames
+        self.compiled: dict[str, pd.DataFrame] = {}
 
     def compile_target(self, cfg: Dict[str, Any]) -> pd.DataFrame:
         name = cfg.get("name")
@@ -164,20 +125,27 @@ class Compiler:
         post_filter = cfg.get("post_filter") or {}
         merge_rules = cfg.get("merge_rules") or {}
 
-
         log.info(f"Compiling target: {name}")
-        filtered = _apply_filters({i: self.frames[i] for i in inputs}, pre_filter)
+
+        # Validate inputs early
+        missing = [i for i in inputs if i not in self.frames]
+        if missing:
+            raise ValueError(f"Target '{name}' references unknown inputs: {missing}. "
+                             f"Available: {list(self.frames.keys())}")
+
+        # Merge inputs
+        per_table = {i: self.frames[i] for i in inputs}
+        filtered = _apply_filters(per_table, pre_filter)
         merged = _merge_inputs(inputs, filtered, key)
         merged = _apply_merge_rules(merged, merge_rules, inputs)
 
-        # Allow enrich using both raw + compiled
+        # Enrich (has access to both raw + compiled)
         enrich_steps = cfg.get("enrich") or []
-        merged = _enrich(merged, {**self.frames, **self.compiled}, enrich_steps)
+        merged = _apply_enrich(merged, {**self.frames, **self.compiled}, enrich_steps)
 
         if post_filter:
             mask = build_mask(merged, post_filter)
             merged = merged[mask].copy()
-        
-        # Save it for later enrich steps
-        self.compiled[cfg["name"]] = merged
+
+        self.compiled[name] = merged
         return merged

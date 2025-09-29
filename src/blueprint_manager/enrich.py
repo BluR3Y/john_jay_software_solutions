@@ -422,24 +422,51 @@ def enrich_join(
                 pass
 
         # Initialize with NA using right dtype (nullable ints normalized)
+        # r_dtype = _nullable_int_dtype(right[src_col].dtype)
+        # out[target_name] = pd.Series([pd.NA] * len(out), dtype=r_dtype)
+
+        # mask = matched_mask.to_numpy()
+        # if not mask.any():
+        #     continue
+
+        # right_pos = links[mask].astype(int).to_numpy()
+        # values = right.iloc[right_pos][src_col].to_numpy()
+
+        # if write_policy == "fillna" and out_col in out.columns:
+        #     # only fill nulls in existing column
+        #     tgt = out[out_col]
+        #     fill_mask = mask & tgt.isna().to_numpy()
+        #     if fill_mask.any():
+        #         out.loc[fill_mask, out_col] = values[fill_mask[mask]]
+        # else:
+        #     out.loc[mask, target_name] = values
         r_dtype = _nullable_int_dtype(right[src_col].dtype)
-        out[target_name] = pd.Series([pd.NA] * len(out), dtype=r_dtype)
-
         mask = matched_mask.to_numpy()
-        if not mask.any():
-            continue
 
-        right_pos = links[mask].astype(int).to_numpy()
-        values = right.iloc[right_pos][src_col].to_numpy()
-
-        if write_policy == "fillna" and out_col in out.columns:
-            # only fill nulls in existing column
-            tgt = out[out_col]
-            fill_mask = mask & tgt.isna().to_numpy()
-            if fill_mask.any():
-                out.loc[fill_mask, out_col] = values[fill_mask[mask]]
+        if target_name in out.columns:
+            # Column exists
+            if write_policy == "fillna":
+                # Do NOT reinitialize — preserve existing non-null values
+                tgt = out[target_name]
+                fill_mask = mask & tgt.isna().to_numpy()
+                if fill_mask.any():
+                    right_pos = links[mask].astype(int).to_numpy()
+                    values = right.iloc[right_pos][src_col].to_numpy()
+                    out.loc[fill_mask, target_name] = values[fill_mask[mask]]
+            else:  # write_policy == "overwrite"
+                # Overwrite only matched rows; keep dtype
+                if out[target_name].dtype != r_dtype:
+                    out[target_name] = out[target_name].astype(r_dtype)
+                right_pos = links[mask].astype(int).to_numpy()
+                values = right.iloc[right_pos][src_col].to_numpy()
+                out.loc[mask, target_name] = values
         else:
-            out.loc[mask, target_name] = values
+            # Column doesn't exist → create it with right dtype, then write matched rows
+            out[target_name] = pd.Series([pd.NA] * len(out), dtype=r_dtype)
+            if mask.any():
+                right_pos = links[mask].astype(int).to_numpy()
+                values = right.iloc[right_pos][src_col].to_numpy()
+                out.loc[mask, target_name] = values
 
     # on_miss policy (non-null, non-empty left keys that remained unmatched)
     if on_miss == "fail" and how == "left":

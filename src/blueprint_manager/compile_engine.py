@@ -85,6 +85,7 @@ def _apply_enrich(df: pd.DataFrame, frames: dict[str, pd.DataFrame], steps: list
                     right_on=step["right_on"],
                     add=step.get("add", {}),
                     how=step.get("how", "left"),
+                    on_conflict=step.get("on_conflict", "error"),
                     match=step.get("match"),
                 )
             elif "fn" in step:

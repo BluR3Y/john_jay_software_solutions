@@ -1,6 +1,6 @@
 from __future__ import annotations
 import re
-from typing import Any, Callable, Dict
+from typing import Any, Callable, Dict, Iterable
 import pandas as pd
 
 
@@ -83,6 +83,22 @@ REGISTRY: Dict[str, Transform] = {
 REGISTRY.update(TRANSFORM_PLUGINS)
 
 def apply_pipeline(series: pd.Series, steps: list[dict]) -> pd.Series:
+    if steps is None:
+        return series
+    # Allow single dict or list
+    if isinstance(steps, dict):
+        steps = [steps]
+
+    # Flatten any nested lists produced by $ref expansion
+    def _flatten(seq: Iterable):
+        for x in seq:
+            if isinstance(x, list):
+                yield from _flatten(x)
+            else:
+                yield x
+
+    steps = list(_flatten(steps))
+
     out = series
     for step in steps:
         if not isinstance(step, dict) or len(step) != 1:

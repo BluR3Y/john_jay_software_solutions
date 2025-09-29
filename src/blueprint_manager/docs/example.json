@@ -137,36 +137,73 @@
         }
       ]
     },
-  {
-  "id": "misc_data",
-  "data": [
     {
-      "table_id": "activity_types",
-      "orient": "records",
-      "rows": [
-        { "Name": "Applied Research on Campus", "Code": 1 },
-        { "Name": "Departmental Administration", "Code": 2 },
-        { "Name": "Equipment on Campus",        "Code": 3 }
-      ],
-      "columns": {
-        "Name": { "alias": "activity_name", "transforms": [{ "lower": {} }] },
-        "Code": { "alias": "activity_code",  "transforms": [{ "cast": { "to": "integer" } }] }
-      }
-    },
-    {
-      "table_id": "disciplines",
-      "orient": "columns",
-      "columns_payload": {
-        "Name": ["Comp Sci", "Math", "Pol Sci"],
-        "Code": [1, 2, 3]
-      },
-      "columns": {
-        "Name": { "alias": "discipline_name" },
-        "Code": { "alias": "discipline_code" }
-      }
+      "id": "misc_data",
+      "data": [
+        {
+          "table_id": "activity_types",
+          "orient": "records",
+          "rows": [
+            {
+              "Name": "Applied Research on Campus",
+              "Code": 1
+            },
+            {
+              "Name": "Departmental Administration",
+              "Code": 2
+            },
+            {
+              "Name": "Equipment on Campus",
+              "Code": 3
+            }
+          ],
+          "columns": {
+            "Name": {
+              "alias": "activity_name",
+              "transforms": [
+                {
+                  "lower": {}
+                }
+              ]
+            },
+            "Code": {
+              "alias": "activity_code",
+              "transforms": [
+                {
+                  "cast": {
+                    "to": "integer"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "table_id": "disciplines",
+          "orient": "columns",
+          "columns_payload": {
+            "Name": [
+              "Comp Sci",
+              "Math",
+              "Pol Sci"
+            ],
+            "Code": [
+              1,
+              2,
+              3
+            ]
+          },
+          "columns": {
+            "Name": {
+              "alias": "discipline_name"
+            },
+            "Code": {
+              "alias": "discipline_code"
+            }
+          }
+        }
+      ]
     }
-  ]
-}
   ],
   "compile": {
     "targets": [
@@ -242,6 +279,7 @@
       },
       {
         "name": "access_grants",
+        "mode": "merge",
         "key": [
           "grant_id"
         ],
@@ -274,6 +312,58 @@
         "merge_rules": {
           "primary_investigator": "first_non_null",
           "award_number": "first_non_null"
+        }
+      },
+      {
+        "name": "deduped_investigators",
+        "mode": "union",
+        "inputs": [
+          "investigators_a",
+          "investigators_b",
+          "investigators_c"
+        ],
+        "pre_filter": {
+          "investigators_a": {
+            "status": {
+              "op": "==",
+              "value": "Active"
+            }
+          },
+          "investigators_c": {
+            "department": {
+              "op": "in",
+              "value": [
+                "Biology",
+                "Physics"
+              ]
+            }
+          }
+        },
+        "columns": [
+          "investigator_id",
+          "first_name",
+          "last_name",
+          "email",
+          "department"
+        ],
+        "add_source": true,
+        "dedupe_on": [
+          "email"
+        ],
+        "keep": "last",
+        "enrich": [
+          {
+            "fn": "score_investigator_activity",
+            "params": {
+              "lookback_days": 365
+            }
+          }
+        ],
+        "post_filter": {
+          "activity_score": {
+            "op": ">=",
+            "value": 0.5
+          }
         }
       }
     ]

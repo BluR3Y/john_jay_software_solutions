@@ -222,20 +222,6 @@ def _interpolate(obj, ctx):
         return {k: _interpolate(v, ctx) for k, v in obj.items()}
     return obj
 
-# def load_config(path: str | Path) -> Config:
-#     p = Path(path)
-#     try:
-#         data = json.loads(p.read_text(encoding="utf-8"))
-#     except Exception as e:
-#         raise ConfigError(f"Failed to read config: {e}")
-    
-#     # Validate
-#     try:
-#         Draft202012Validator(_SCHEMA).validate(data)
-#     except ValidationError as e:
-#         raise ConfigError(_friendly_error(e))
-    
-#     return Config(raw=data)
 
 def load_config(entry: str, profile: str | None = None) -> Config:
     base = load_config_file(Path(entry))

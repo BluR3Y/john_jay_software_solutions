@@ -83,7 +83,7 @@ def _apply_enrich(df: pd.DataFrame, frames: dict[str, pd.DataFrame], steps: list
                     out, dim,
                     left_on=step["left_on"],
                     right_on=step["right_on"],
-                    add_map=step.get("add", {}),
+                    add=step.get("add", {}),
                     how=step.get("how", "left"),
                     match=step.get("match"),
                 )

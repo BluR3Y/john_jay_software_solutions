@@ -13,7 +13,8 @@ from .sources.excel_adapter import ExcelAdapter
 from .sources.access_adapter import AccessAdapter
 from .sources.inline_adapter import InlineAdapter
 from .compile_engine import Compiler
-from .compare_engine import Comparator
+from .compare_engine import write_compare_workbook
+# from .compare_engine import Comparator
 from .export_engine import Exporter
 
 def _select_adapter(src: dict, aliases: dict):
@@ -44,14 +45,17 @@ def _compile_all(cfg: Config, frames: dict[str, pd.DataFrame]) -> dict[str, pd.D
     return compiled
 
 
-def _compare_all(cfg: Config, compiled: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
-    comparator = Comparator(compiled)
-    reports = {}
-    for pair in cfg.compare_pairs:
-        name = pair.get("save_name") or f"{pair['left']}_vs_{pair['right']}"
-        reports[name] = comparator.compare_pair(pair)
-    return reports
+# def _compare_all(cfg: Config, compiled: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
+#     comparator = Comparator(compiled)
+#     reports = {}
+#     for pair in cfg.compare_pairs:
+#         name = pair.get("save_name") or f"{pair['left']}_vs_{pair['right']}"
+#         reports[name] = comparator.compare_pair(pair)
+#     return reports
 
+def _compare_all(cfg, compiled):
+    for pair in cfg.compare_pairs:
+        write_compare_workbook(compiled[pair["left"]], compiled[pair["right"]], pair.get("key_cols"), pair.get("compare_cols"), pair.get("path"))
 
 def _export_all(cfg: Config, compiled: dict[str, pd.DataFrame]) -> list[str]:
     exporter = Exporter(cfg.output)
@@ -86,10 +90,11 @@ def main(argv: list[str] | None = None) -> int:
             base = Path(exported[0]).parent
         else:
             base = Path.cwd() / "out"
-        for name, df in reports.items():
-            path = base / f"{name}.csv"
-            df.to_csv(path, index=False)
-            out_paths.append(str(path))
+        # for name, df in reports.items():
+        #     path = base / f"{name}.csv"
+        #     df.to_csv(path, index=False)
+        #     out_paths.append(str(path))
+        
         log.info(f"Done. Exported: {exported}; Reports: {out_paths}")
         return 0
     return 1

@@ -35,6 +35,23 @@ def _as_ast(node: Node) -> dict:
     # primitives allowed
     return {"op": "lit", "args": [node]}
 
+def _materialize_list(node: Any) -> list:
+    # Accept {"list":[...]} or {"set":[...]} as literal lists
+    if isinstance(node, dict):
+        if "list" in node and isinstance(node["list"], list):
+            return node["list"]
+        if "set" in node and isinstance(node["set"], list):
+            return node["set"]
+    raise ExprError("List membership expects {'list': [...]} (or {'set': [...]}) as RHS")
+
+def op_in(df: pd.DataFrame, series: pd.Series, values: list) -> pd.Series:
+    s = series if isinstance(series, pd.Series) else pd.Series([series]*len(df), index=df.index)
+    return s.isin(values)
+
+def op_not_in(df: pd.DataFrame, series: pd.Series, values: list) -> pd.Series:
+    s = series if isinstance(series, pd.Series) else pd.Series([series]*len(df), index=df.index)
+    return ~s.isin(values)
+
 def eval_expr(df: pd.DataFrame, node: Node) -> pd.Series:
     ast = _as_ast(node)
     op = ast.get("op")
@@ -56,6 +73,15 @@ def eval_expr(df: pd.DataFrame, node: Node) -> pd.Series:
         then_val = eval_expr(df, args[1]) if len(args) > 1 else _to_series(df, None)
         else_val = eval_expr(df, args[2]) if len(args) > 2 else _to_series(df, None)
         return then_val.where(cond, else_val)
+    
+    # --- Membership operators use literal RHS ---
+    if op in ("in", "not_in"):
+        if len(args) != 2:
+            raise ExprError(f"{op} expects 2 args: ['{op}', expr, {{'list':[ ... ]}}]")
+        left = eval_expr(df, args[0])
+        values = _materialize_list(args[1])  # keeps RHS as literal
+        return op_in(df, left, values) if op == "in" else op_not_in(df, left, values)
+
     # --------------------------------------------
 
     # For all other ops, now evaluate arguments

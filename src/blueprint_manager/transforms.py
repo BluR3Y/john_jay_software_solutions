@@ -54,6 +54,37 @@ def _cast(series: pd.Series, params: dict) -> pd.Series:
 def _titlecase(series: pd.Series, params: dict) -> pd.Series:
     return series.astype(str).str.title()
 
+def _normalize(series: pd.Series, steps: list[str]) -> pd.Series:
+    """
+    Normalize a pandas Series by applying a list of string operations in sequence.
+
+    Parameters:
+    - series: pandas Series containing string values.
+    - steps: list of string operations to apply. Supported operations are:
+        'strip', 'lower', 'upper', 'title'.
+
+    Returns:
+    - A pandas Series with the applied string transformations.
+    """
+    
+    # Ensure the series contains strings to prevent errors in string operations
+    series = series.astype(str)
+    
+    # Apply transformations based on the steps
+    for step in steps:
+        if step == "strip":
+            series = series.str.strip()
+        elif step == "lower":
+            series = series.str.lower()
+        elif step == "upper":
+            series = series.str.upper()
+        elif step == "title":
+            series = series.str.title()
+        else:
+            raise ValueError(f"Unsupported operation: {step}")
+    
+    return series
+
 def _map(series: pd.Series, params: dict) -> pd.Series:
     if not isinstance(params, dict):
         raise TransformError("map transform requires a dict under 'map'")
@@ -75,7 +106,7 @@ def _strftime(series: pd.Series, params: dict) -> pd.Series:
 REGISTRY: Dict[str, Transform] = {
     "regex_replace": _regex_replace,
     "cast": _cast,
-    "titlecase": _titlecase,
+    "normalize": _normalize,
     "map": _map,
     "affix": _affix,
     "strftime": _strftime

@@ -9,7 +9,7 @@ from .transforms import apply_pipeline
 from .filters import build_mask
 from .expr import eval_expr, ExprError
 from .utils.output_resolve import resolve_output_dir
-from modules.script_logger import logger
+from ..modules.script_logger import logger
 log = logger.get_logger()
 
 

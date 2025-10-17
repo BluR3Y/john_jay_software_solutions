@@ -2,9 +2,9 @@ from pathlib import Path
 import os
 from datetime import datetime
 
-from packages.database_manager import DatabaseManager
-from packages.workbook_manager import WorkbookManager
-from modules.utils import request_file_path, multi_select_input, single_select_input
+from ..packages.database_manager import DatabaseManager
+from ..packages.workbook_manager import WorkbookManager
+from ..modules.utils import request_file_path, multi_select_input, single_select_input
 
 
 def generate_reports(db_manager: DatabaseManager):

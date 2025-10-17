@@ -5,9 +5,9 @@ from pathlib import Path
 from datetime import datetime
 from collections import defaultdict
 
-from packages.workbook_manager import WorkbookManager
-from packages.database_manager import DatabaseManager
-from packages.content_manager import ContentManager
+from ...packages.workbook_manager import WorkbookManager
+from ...packages.database_manager import DatabaseManager
+from ...packages.content_manager import ContentManager
 
 from .sheets.projects import projects_sheet_append
 from .sheets.members import members_sheet_append

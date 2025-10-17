@@ -6,7 +6,7 @@ import pandas as pd
 from .filters import build_mask
 from .plugins import ENRICH_PLUGINS
 from .enrich import enrich_join  # your join primitive
-from modules.script_logger import logger
+from ..modules.script_logger import logger
 log = logger.get_logger()
 
 # ------------------------------

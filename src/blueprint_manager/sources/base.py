@@ -5,7 +5,7 @@ import pandas as pd
 
 from ..transforms import apply_pipeline
 from ..utils.type_enforce import enforce_types, validate_frame
-from modules.script_logger import logger
+from ...modules.script_logger import logger
 log = logger.get_logger()
 
 

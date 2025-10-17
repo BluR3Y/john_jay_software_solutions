@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Union
 
 from . import destruct_query_conditions, parse_sql_condition
-from packages.log_manager import LogManager
+from ...packages.log_manager import LogManager
 
 class DatabaseManager:
     driver_mapping = {

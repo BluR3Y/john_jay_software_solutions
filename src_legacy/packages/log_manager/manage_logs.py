@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING
 from pprint import pprint
-from modules.utils import (
+from ...modules.utils import (
     single_select_input,
     multi_select_input
 )

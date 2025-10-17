@@ -1,13 +1,13 @@
-from packages.database_manager import DatabaseManager
+from ..packages.database_manager import DatabaseManager
 from pprint import pprint
 import os
 import json
 import datetime
 import pandas as pd
-from packages.log_manager import LogManager
-from packages.log_manager import manage_logs
-from modules.logger import logger
-from modules.utils import (
+from ..packages.log_manager import LogManager
+from ..packages.log_manager import manage_logs
+from ..modules.logger import logger
+from ..modules.utils import (
     request_file_path,
     single_select_input,
     request_user_confirmation,

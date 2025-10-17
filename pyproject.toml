@@ -3,7 +3,7 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "data_manager"
+name = "data-manager"
 version = "0.1.0"
 description = "Dataset manager for multi-source ingest, compile, compare, and export"
 readme = "README.md"
@@ -48,12 +48,19 @@ dependencies = [
     "wcwidth==0.2.13"
 ]
 
-[project.scripts]
-blueprint-manager = "blueprint_manager.cli:main"
-cli-manager = "cli_manager:main"
-
 [tool.setuptools.packages.find]
-where = ["src"]
+where = ["."]
 
-[tool.setuptools.package-data]
-"blueprint_manager" = ["py.typed"]
+[project.scripts]
+blueprint-manager = "src.blueprint_manager.cli:main"
+legacy-data-manager = "src_legacy.index:main"
+
+# [project.scripts]
+# blueprint-manager = "blueprint_manager.cli:main"
+# cli-manager = "cli_manager:main"
+
+# [tool.setuptools.packages.find]
+# where = ["src"]
+
+# [tool.setuptools.package-data]
+# "blueprint_manager" = ["py.typed"]

@@ -4,7 +4,7 @@ import pandas as pd
 
 
 from .base import SourceAdapter
-from modules.script_logger import logger
+from ...modules.script_logger import logger
 log = logger.get_logger()
 
 class ExcelAdapter(SourceAdapter):

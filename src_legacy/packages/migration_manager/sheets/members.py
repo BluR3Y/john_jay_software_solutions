@@ -1,5 +1,5 @@
 from typing import TYPE_CHECKING
-from modules.utils import find_closest_match
+from ....modules.utils import find_closest_match
 import pandas as pd
 
 if TYPE_CHECKING:

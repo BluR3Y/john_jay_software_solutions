@@ -1,7 +1,7 @@
 import shutil
 import platform
 from pathlib import Path
-from modules.utils import find_closest_match
+from ...modules.utils import find_closest_match
 
 class ContentManager:
     """

@@ -7,7 +7,7 @@ import pandas as pd
 
 from .config_loader import load_config
 from .models import Config
-from modules.script_logger import logger
+from ..modules.script_logger import logger
 log = logger.get_logger()
 from .sources.excel_adapter import ExcelAdapter
 from .sources.access_adapter import AccessAdapter

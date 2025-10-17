@@ -6,7 +6,7 @@ import openpyxl
 
 from ..log_manager import LogManager
 from . import SheetManager
-from modules.utils import request_user_confirmation
+from ...modules.utils import request_user_confirmation
 
 class WorkbookManager:
     def __init__(self, read_file_path: str = None, write_file_path: str = None):

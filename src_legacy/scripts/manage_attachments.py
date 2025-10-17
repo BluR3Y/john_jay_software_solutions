@@ -1,13 +1,13 @@
 import os
 
-from modules.utils import(
+from ..modules.utils import(
     single_select_input,
     request_file_path
 )
-from modules.record_manager import RecordManager
-from packages.workbook_manager import WorkbookManager
+from ..modules.record_manager import RecordManager
+from ..packages.workbook_manager import WorkbookManager
 # from packages.content_manager import ContentManager
-from modules.content_manager import ContentManager
+from ..modules.content_manager import ContentManager
 
 def compile_attachments():
     with RecordManager(os.getenv("ATTACHMENT_RECORD_PATH")) as attachment_manager:

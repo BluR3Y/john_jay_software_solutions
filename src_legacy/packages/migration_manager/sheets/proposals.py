@@ -5,7 +5,7 @@ from datetime import datetime
 import traceback
 from dateutil.relativedelta import relativedelta
 
-from modules.utils import find_closest_match
+from ....modules.utils import find_closest_match
 
 if TYPE_CHECKING:
     from .. import MigrationManager

@@ -2,9 +2,9 @@ import os
 from tqdm import tqdm
 import traceback
 
-from packages.migration_manager import MigrationManager
-from packages.workbook_manager import WorkbookManager
-from modules.utils import (
+from ..packages.migration_manager import MigrationManager
+from ..packages.workbook_manager import WorkbookManager
+from ..modules.utils import (
     single_select_input,
     request_file_path,
     multi_select_input,

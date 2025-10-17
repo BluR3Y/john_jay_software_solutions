@@ -2,9 +2,9 @@ import shutil
 import platform
 import logging
 from pathlib import Path
-from modules.utils import find_closest_match
+from ..modules.utils import find_closest_match
 
-from modules.logger import logger
+from ..modules.logger import logger
 
 class ContentManager:
     """

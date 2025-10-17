@@ -4,14 +4,14 @@ import logging
 import pandas as pd
 from typing import Any, Literal, Union
 
-from packages.workbook_manager import WorkbookManager, SheetManager
-from modules.utils import (
+from ..packages.workbook_manager import WorkbookManager, SheetManager
+from ..modules.utils import (
     single_select_input,
     request_file_path,
     multi_select_input
 )
-from modules.column_manager import ColumnManager
-from modules.mutation import apply_mutation
+from ..modules.column_manager import ColumnManager
+from ..modules.mutation import apply_mutation
 
 PROCESS_NAME = "Manage Workbook"
 

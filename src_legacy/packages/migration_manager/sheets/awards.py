@@ -1,6 +1,7 @@
 from typing import TYPE_CHECKING, Union
 import traceback
 from datetime import datetime, date
+import pandas as pd
 
 if TYPE_CHECKING:
     from .. import MigrationManager
@@ -74,7 +75,7 @@ def awards_sheet_append(
     # Previous Version Sheet Manager
     ref_awards_sheet_manager = self.reference_wb_manager[SHEET_NAME]
     # Current Grant Previous Award Data
-    existing_award_sheet_data_ref = ref_awards_sheet_manager.find({ "projectLegacyNumber": grant_pln }, return_one=True)
+    existing_award_sheet_data_ref = ref_awards_sheet_manager.find({ "projectLegacyNumber": grant_pln }, return_one=True) if ref_awards_sheet_manager else pd.DataFrame()
     existing_award_sheet_data = existing_award_sheet_data_ref.to_dict() if existing_award_sheet_data_ref is not None else {}
 
     # Projects Sheet Manager
@@ -97,8 +98,8 @@ def awards_sheet_append(
     grant_prime_sponsor = proposal_sheet_data.get('Prime Sponsor')
     grant_title = proposal_sheet_data.get('Title')
     
-    grant_start_date = proposal_sheet_data.get('Project Start Date')
-    grant_end_date = proposal_sheet_data.get('Project End Date')
+    grant_start_date = grant_data.get("Start_Date", proposal_sheet_data.get('Project Start Date'))
+    grant_end_date = grant_data.get("End_Date", proposal_sheet_data.get('Project End Date'))
     
     grant_proposal_type = proposal_sheet_data.get('Proposal Type')
     grant_activity_type = proposal_sheet_data.get('Activity Type')

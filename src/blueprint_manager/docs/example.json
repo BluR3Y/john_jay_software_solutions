@@ -365,6 +365,128 @@
             "value": 0.5
           }
         }
+      },
+      {
+        "name": "access_investigators_compiled",
+        "mode": "union",
+        "inputs": [
+          "grants_table"
+        ],
+        "dedupe_on": [
+          "investigator_name"
+        ],
+        "columns": [
+          "investigator_name",
+          "end_date_req"
+        ],
+        "keep": "first",
+        "enrich_at": "post_dedupe",
+        "enrich": [
+          {
+            "from": "investigators_inline",
+            "left_on": "investigator_name",
+            "right_on": "investigator_full_name",
+            "how": "left",
+            "add": {
+              "investigator_email": "investigator_email",
+              "investigator_id": "investigator_id"
+            },
+            "match": {
+              "strategy": [
+                "exact",
+                "normalized",
+                "fuzzy"
+              ],
+              "fuzzy": {
+                "threshold": 85,
+                "scorer": "token_sort_ratio",
+                "top_k": 1
+              },
+              "on_miss": "leave_null",
+              "normalize": [
+                "strip",
+                "lower",
+                "collapse_ws",
+                "strip_punct"
+              ],
+              "left_kind": "string",
+              "right_kind": "string",
+              "right_keep": "first",
+              "audit": false
+            }
+          },
+          {
+            "from": "investigators_inline",
+            "left_on": "investigator_name",
+            "right_on": "investigator_alt_name",
+            "how": "left",
+            "on_conflict": "overwrite",
+            "add": {
+              "investigator_email": "investigator_email",
+              "investigator_id": "investigator_id"
+            },
+            "match": {
+              "write_policy": "fillna",
+              "strategy": [
+                "exact",
+                "normalized",
+                "fuzzy"
+              ],
+              "fuzzy": {
+                "threshold": 85,
+                "scorer": "token_sort_ratio",
+                "top_k": 1
+              },
+              "on_miss": "leave_null",
+              "normalize": [
+                "strip",
+                "lower",
+                "collapse_ws",
+                "strip_punct"
+              ],
+              "left_kind": "string",
+              "right_kind": "string",
+              "right_keep": "first",
+              "audit": false
+            }
+          },
+          {
+            "from": "thomas_investigators_compiled",
+            "left_on": "investigator_name",
+            "right_on": "investigator_name",
+            "how": "left",
+            "on_conflict": "overwrite",
+            "add": {
+              "investigator_email": "investigator_email",
+              "investigator_id": "investigator_id",
+              "investigator_association": "investigator_association"
+            },
+            "match": {
+              "write_policy": "fillna",
+              "strategy": [
+                "exact",
+                "normalized",
+                "fuzzy"
+              ],
+              "fuzzy": {
+                "threshold": 85,
+                "scorer": "token_sort_ratio",
+                "top_k": 1
+              },
+              "on_miss": "leave_null",
+              "normalize": [
+                "strip",
+                "lower",
+                "collapse_ws",
+                "strip_punct"
+              ],
+              "left_kind": "string",
+              "right_kind": "string",
+              "right_keep": "first",
+              "audit": false
+            }
+          }
+        ]
       }
     ]
   },

@@ -4,7 +4,7 @@ from pathlib import Path
 from openpyxl.cell.cell import ILLEGAL_CHARACTERS_RE # regex: [\000-\010\013\014\016-\037]
 import pandas as pd
 
-
+from .expr import eval_expr
 from .transforms import apply_pipeline
 from .filters import build_mask
 from .expr import eval_expr, ExprError
@@ -52,7 +52,6 @@ class Exporter:
                             # broadcast scalar to a Series
                             series = pd.Series([spec["value"]] * len(df), index=df.index)
                         elif "compute" in spec:
-                            from .expr import eval_expr
                             series = eval_expr(df, spec["compute"])
                         elif "alias" in spec:
                             series = df.get(spec["alias"])

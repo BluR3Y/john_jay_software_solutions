@@ -1,5 +1,6 @@
 from typing import TYPE_CHECKING
 from modules.utils import find_closest_match
+import pandas as pd
 
 if TYPE_CHECKING:
     from .. import MigrationManager
@@ -17,8 +18,7 @@ def determine_pi_id(self, grant_pi, pi_data) -> int:
 
 def members_sheet_append(
     self: "MigrationManager",
-    grant_data: dict,
-    pi_data: dict
+    grant_data: dict
 ):
     grant_pln = grant_data.get('Project_Legacy_Number')
     grant_id = grant_data.get('Grant_ID')
@@ -32,7 +32,7 @@ def members_sheet_append(
     proposal_data_ref = gen_proposals_sheet_manager.find({"projectLegacyNumber": grant_pln}, return_one=True)
     proposal_data = proposal_data_ref.to_dict() if not proposal_data_ref.empty else {}
 
-    existing_data_ref = ref_members_sheet_manager.find({"projectLegacyNumber": grant_pln}, return_one=True)
+    existing_data_ref = ref_members_sheet_manager.find({"projectLegacyNumber": grant_pln}, return_one=True) if ref_members_sheet_manager else pd.DataFrame()
     existing_data = existing_data_ref.to_dict() if not existing_data_ref.empty else {}
 
     investigator_association = proposal_data.get('Admin Unit')
@@ -56,21 +56,22 @@ def members_sheet_append(
         grant_db_pi_name = grant_data.get('Primary_PI')
         grant_ref_pi_name = existing_data.get('personName')
         grant_gen_pi_name = grant_pi_name = None
-        try:
-            determined_pi_name = find_closest_match(grant_db_pi_name, [pi.get('PI_name') for pi in pi_data], case_sensitive=False)
-            if not determined_pi_name:
-                raise ValueError(f"Investigator information could not be determined for the name: {grant_db_pi_name}")
-            if determined_pi_name[1] < 90:
-                gen_members_sheet_manager.add_issue(next_row, "personName", "warning", f"Failed to determine exact PI but was similar to: {determined_pi_name[0]}")
-            grant_gen_pi_name = determined_pi_name[0]
-        except Exception as err:
-            gen_members_sheet_manager.add_issue(next_row, "personName", "error", err)
+        # try:
+        #     determined_pi_name = find_closest_match(grant_db_pi_name, [pi.get('PI_name') for pi in pi_data], case_sensitive=False)
+        #     if not determined_pi_name:
+        #         raise ValueError(f"Investigator information could not be determined for the name: {grant_db_pi_name}")
+        #     if determined_pi_name[1] < 90:
+        #         gen_members_sheet_manager.add_issue(next_row, "personName", "warning", f"Failed to determine exact PI but was similar to: {determined_pi_name[0]}")
+        #     grant_gen_pi_name = determined_pi_name[0]
+        # except Exception as err:
+        #     gen_members_sheet_manager.add_issue(next_row, "personName", "error", err)
 
-        name_best_match = self.determine_best_match(grant_ref_pi_name, grant_gen_pi_name)
-        if name_best_match:
-            grant_pi_name, name_error = name_best_match
-            if name_error:
-                gen_members_sheet_manager.add_issue(next_row, "personName", "warning", name_error)
+        # name_best_match = self.determine_best_match(grant_ref_pi_name, grant_gen_pi_name)
+        # if name_best_match:
+        #     grant_pi_name, name_error = name_best_match
+        #     if name_error:
+        #         gen_members_sheet_manager.add_issue(next_row, "personName", "warning", name_error)
+        grant_pi_name = grant_db_pi_name
         
         try:
             determined_pi_email = find_closest_match(grant_pi_name, list(self.FORMAT_INVESTIGATORS.keys()), case_sensitive=False)
